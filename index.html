@@ -3,1133 +3,274 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>DeltaV</title>
+  <title>Sudoku Touch</title>
   <style>
     :root {
-      --hud-bg: rgba(3, 7, 18, 0.38);
-      --hud-border: rgba(255,255,255,0.13);
-      --cyan: rgba(95, 230, 255, 0.92);
-      --orange: rgba(255, 156, 64, 0.92);
+      --bg: #10131f;
+      --panel: rgba(255,255,255,0.08);
+      --panel2: rgba(255,255,255,0.13);
+      --line: rgba(255,255,255,0.22);
+      --thick: rgba(255,255,255,0.72);
+      --text: #f3f6ff;
+      --muted: rgba(243,246,255,0.65);
+      --accent2: #ffd166;
+      --bad: #ff6b6b;
+      --good: #7cffb2;
+      --given: #ffffff;
+      --user: #9ee6ff;
     }
-
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
     html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #020511;
-      color: white;
-      touch-action: none;
-      user-select: none;
-      -webkit-user-select: none;
-      -webkit-tap-highlight-color: transparent;
+      margin: 0; width: 100%; height: 100%; overflow: hidden;
+      background: radial-gradient(circle at 25% 10%, rgba(119,216,255,0.18), transparent 32%),
+                  radial-gradient(circle at 75% 85%, rgba(255,209,102,0.12), transparent 30%),
+                  var(--bg);
+      color: var(--text);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      touch-action: none;
     }
-
-    canvas {
-      display: block;
-      width: 100vw;
-      height: 100vh;
-      background:
-        radial-gradient(circle at 50% 36%, rgba(25, 40, 78, 0.85), rgba(4, 7, 20, 0.92) 48%, #01030a 100%);
+    .app {
+      width: 100vw; height: 100dvh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+      padding: calc(env(safe-area-inset-top, 0px) + 16px) 14px calc(env(safe-area-inset-bottom, 0px) + 16px);
     }
-
-    .hud {
-      position: fixed;
-      top: calc(env(safe-area-inset-top, 0px) + 10px);
-      left: 12px;
-      right: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 10px;
-      pointer-events: none;
-      font-size: 12px;
-      line-height: 1.35;
-      text-shadow: 0 1px 5px #000;
+    .top { width: min(94vw, 520px); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    h1 { margin: 0; font-size: 26px; letter-spacing: -0.04em; }
+    .subtitle { margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .pill {
+      background: var(--panel); border: 1px solid rgba(255,255,255,0.12); border-radius: 999px;
+      padding: 8px 12px; color: var(--muted); font-size: 12px; backdrop-filter: blur(10px); white-space: nowrap;
     }
-
-    .panel {
-      background: var(--hud-bg);
-      border: 1px solid var(--hud-border);
-      border-radius: 15px;
-      padding: 8px 10px;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 12px 32px rgba(0,0,0,0.25);
-      max-width: 50vw;
+    .board-wrap {
+      width: min(94vw, 520px); aspect-ratio: 1 / 1; padding: 7px; border-radius: 24px;
+      background: linear-gradient(145deg, rgba(255,255,255,0.20), rgba(255,255,255,0.04));
+      box-shadow: 0 24px 80px rgba(0,0,0,0.42); border: 1px solid rgba(255,255,255,0.18);
     }
-
-    .burn-button {
-      position: fixed;
-      left: 50%;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
-      transform: translateX(-50%);
-      width: 116px;
-      height: 116px;
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.22);
-      background:
-        radial-gradient(circle at 50% 34%, rgba(255,255,255,0.21), rgba(255,255,255,0.06) 70%),
-        radial-gradient(circle at 50% 50%, rgba(255,160,60,0.14), rgba(255,160,60,0.02));
-      color: rgba(255,255,255,0.9);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 14px;
-      letter-spacing: 0.12em;
-      pointer-events: none;
-      box-shadow:
-        0 16px 40px rgba(0,0,0,0.42),
-        inset 0 0 24px rgba(255,255,255,0.06);
-      backdrop-filter: blur(9px);
+    .board {
+      width: 100%; height: 100%; display: grid; grid-template-columns: repeat(9, 1fr); grid-template-rows: repeat(9, 1fr);
+      border: 2px solid var(--thick); border-radius: 18px; overflow: hidden; background: rgba(0,0,0,0.22);
     }
-
-    .burn-button.active {
-      background:
-        radial-gradient(circle at 50% 35%, rgba(255,230,155,0.62), rgba(255,107,31,0.14) 68%),
-        radial-gradient(circle at 50% 50%, rgba(255,140,40,0.28), rgba(255,80,20,0.04));
-      transform: translateX(-50%) scale(0.985);
+    .cell {
+      position: relative; display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: clamp(20px, 6.6vw, 34px); color: var(--user);
+      background: rgba(255,255,255,0.035); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
     }
-
-    .touch-hints {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 140ms ease;
+    .cell:nth-child(3n) { border-right-color: var(--thick); border-right-width: 2px; }
+    .cell:nth-child(n+19):nth-child(-n+27), .cell:nth-child(n+46):nth-child(-n+54) { border-bottom-color: var(--thick); border-bottom-width: 2px; }
+    .cell:nth-child(9n) { border-right: none; }
+    .cell:nth-child(n+73) { border-bottom: none; }
+    .cell.given { color: var(--given); text-shadow: 0 0 16px rgba(255,255,255,0.18); background: rgba(255,255,255,0.065); }
+    .cell.selected { background: rgba(119,216,255,0.30); box-shadow: inset 0 0 0 2px rgba(119,216,255,0.9); }
+    .cell.peer { background: rgba(119,216,255,0.10); }
+    .cell.same { background: rgba(255,209,102,0.15); }
+    .cell.error { color: var(--bad); background: rgba(255,107,107,0.16); }
+    .notes {
+      position: absolute; inset: 3px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+      color: rgba(243,246,255,0.52); font-size: clamp(7px, 2.2vw, 12px); font-weight: 600; line-height: 1; pointer-events: none;
     }
-
-    .touch-hints.show { opacity: 1; }
-
-    .left-hint, .right-hint {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 35%;
-      background: rgba(255,255,255,0.027);
+    .note { display: flex; align-items: center; justify-content: center; }
+    .controls { width: min(94vw, 520px); display: grid; grid-template-columns: repeat(9, 1fr); gap: 6px; }
+    .num, .action {
+      height: clamp(42px, 10.5vw, 58px); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px;
+      background: var(--panel); color: var(--text); font-size: clamp(18px, 5vw, 26px); font-weight: 800;
+      backdrop-filter: blur(10px); box-shadow: 0 12px 26px rgba(0,0,0,0.22);
     }
-
-    .left-hint {
-      left: 0;
-      border-right: 1px solid rgba(255,255,255,0.045);
-    }
-
-    .right-hint {
-      right: 0;
-      border-left: 1px solid rgba(255,255,255,0.045);
-    }
-
-    .note {
-      position: fixed;
-      left: 50%;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 143px);
-      transform: translateX(-50%);
-      width: min(92vw, 560px);
-      text-align: center;
-      font-size: 12px;
-      line-height: 1.35;
-      opacity: 0.69;
-      text-shadow: 0 1px 5px #000;
-      pointer-events: none;
+    .num:active, .action:active { transform: scale(0.97); background: var(--panel2); }
+    .num.used { opacity: 0.34; }
+    .bottom { width: min(94vw, 520px); display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .action { font-size: 13px; font-weight: 750; height: 44px; border-radius: 13px; }
+    .action.active { color: #111827; background: var(--accent2); border-color: rgba(255,255,255,0.38); }
+    .message { min-height: 18px; font-size: 12px; color: var(--muted); text-align: center; width: min(94vw, 520px); }
+    .message.win { color: var(--good); font-weight: 700; }
+    @media (max-height: 720px) {
+      .app { gap: 8px; } h1 { font-size: 22px; }
+      .subtitle, .pill, .message { font-size: 11px; }
+      .bottom .action { height: 38px; }
+      .board-wrap { width: min(86vh, 94vw, 520px); }
     }
   </style>
 </head>
 <body>
-  <canvas id="game"></canvas>
-
-  <div class="hud">
-    <div class="panel">
-      DeltaV prototype<br>
-      Camera elastica: velocità + muso + target<br>
-      Lati invisibili: rotazione progressiva
+  <main class="app">
+    <div class="top">
+      <div><h1>Sudoku</h1><div class="subtitle">Touch prototype</div></div>
+      <div class="pill" id="status">Errori: 0 · Facile</div>
     </div>
-    <div class="panel" id="readout">
-      v 0<br>
-      throttle 0%
+    <div class="board-wrap"><div class="board" id="board"></div></div>
+    <div class="controls" id="numbers"></div>
+    <div class="bottom">
+      <button class="action" id="notesBtn">Note</button>
+      <button class="action" id="eraseBtn">Cancella</button>
+      <button class="action" id="checkBtn">Check</button>
+      <button class="action" id="newBtn">Nuovo</button>
     </div>
-  </div>
-
-  <div class="touch-hints" id="touchHints">
-    <div class="left-hint"></div>
-    <div class="right-hint"></div>
-  </div>
-
-  <div class="note">
-    Azzurro: traiettoria futura davanti al movimento. Arancione: traiettoria dietro la nave. La camera segue anche il muso, ma senza ribaltarsi quando vai retrograde.
-  </div>
-
-  <div class="burn-button" id="burnVisual">BURN</div>
-
+    <div class="message" id="message">Tocca una cella, poi scegli un numero.</div>
+  </main>
   <script>
-    const canvas = document.getElementById("game");
-    const ctx = canvas.getContext("2d");
-    const readout = document.getElementById("readout");
-    const burnVisual = document.getElementById("burnVisual");
-    const touchHints = document.getElementById("touchHints");
-
-    let W = 0, H = 0, DPR = 1;
-    let last = performance.now();
-
-    const input = {
-      leftIds: new Set(),
-      rightIds: new Set(),
-      burnIds: new Set()
-    };
-
-    const ship = {
-      x: 0,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      angle: -Math.PI / 2,
-      turnRate: 2.1,
-      thrust: 0,
-      thrustTarget: 0,
-      thrustPower: 155,
-      radius: 14,
-      turnInput: 0,
-      angularVelocity: 0
-    };
-
-    const camera = {
-      x: 0,
-      y: 0,
-      angle: ship.angle,
-      targetAngle: ship.angle,
-      back: 250,
-      height: 58,
-      lookAhead: 520,
-      fov: 720,
-      targetPlanet: null,
-      targetAssist: 0
-    };
-
-    const planets = [
-      {
-        name: "Aster",
-        x: -620,
-        y: 1120,
-        r: 92,
-        mass: 250000,
-        color1: [104, 223, 255],
-        color2: [27, 92, 210],
-        ring: false,
-        seed: 0.2
-      },
-      {
-        name: "Vesta",
-        x: 720,
-        y: 1840,
-        r: 136,
-        mass: 520000,
-        color1: [255, 214, 134],
-        color2: [157, 78, 52],
-        ring: true,
-        seed: 1.6
-      },
-      {
-        name: "Nox",
-        x: -460,
-        y: 2760,
-        r: 62,
-        mass: 130000,
-        color1: [210, 177, 255],
-        color2: [79, 61, 148],
-        ring: false,
-        seed: 2.5
-      }
+    const puzzles = [
+      { puzzle: "530070000600195000098000060800060003400803001700020006060000280000419005000080079", solution: "534678912672195348198342567859761423426853791713924856961537284287419635345286179" },
+      { puzzle: "000260701680070090190004500820100040004602900050003028009300074040050036703018000", solution: "435269781682571493197834562826195347374682915951743628519326874248957136763418259" },
+      { puzzle: "300000000005009000200504000020000700160000058704310600000890100000067080000005437", solution: "347682591615739842289514376528946713163278954794351628456893127931467285872125437" },
+      { puzzle: "000000907000420180000705026100904000050000040000507009920108000034059000507000000", solution: "462831957795426183381795426173984265659312748248567319926178534834259671517643892" }
     ];
+    const boardEl = document.getElementById("board");
+    const numbersEl = document.getElementById("numbers");
+    const statusEl = document.getElementById("status");
+    const messageEl = document.getElementById("message");
+    const notesBtn = document.getElementById("notesBtn");
+    const eraseBtn = document.getElementById("eraseBtn");
+    const checkBtn = document.getElementById("checkBtn");
+    const newBtn = document.getElementById("newBtn");
+    let current = null, puzzle = [], solution = [], values = [], given = [], notes = [], selected = 0, noteMode = false, mistakes = 0;
 
-    let stars = [];
-    let nebula = [];
-
-    function resize() {
-      DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-      W = window.innerWidth;
-      H = window.innerHeight;
-      canvas.width = Math.floor(W * DPR);
-      canvas.height = Math.floor(H * DPR);
-      canvas.style.width = W + "px";
-      canvas.style.height = H + "px";
-      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-      makeBackground();
+    function startGame(index = Math.floor(Math.random() * puzzles.length)) {
+      current = puzzles[index];
+      puzzle = current.puzzle.split("").map(Number);
+      solution = current.solution.split("").map(Number);
+      values = puzzle.slice();
+      given = puzzle.map(v => v !== 0);
+      notes = Array.from({ length: 81 }, () => new Set());
+      selected = puzzle.findIndex(v => v === 0);
+      if (selected < 0) selected = 0;
+      mistakes = 0;
+      noteMode = false;
+      notesBtn.classList.remove("active");
+      messageEl.className = "message";
+      messageEl.textContent = "Tocca una cella, poi scegli un numero.";
+      render();
     }
-
-    function makeBackground() {
-      stars = [];
-      nebula = [];
-      for (let i = 0; i < 340; i++) {
-        stars.push({
-          x: Math.random() * W,
-          y: Math.random() * H,
-          s: Math.random() * 1.7 + 0.2,
-          a: Math.random() * 0.72 + 0.18,
-          layer: Math.random() * 0.55 + 0.45
-        });
-      }
-      for (let i = 0; i < 18; i++) {
-        nebula.push({
-          x: Math.random() * W,
-          y: Math.random() * H,
-          r: Math.random() * 240 + 120,
-          a: Math.random() * 0.055 + 0.018
-        });
-      }
-    }
-
-    window.addEventListener("resize", resize);
-    resize();
-
-    function shortestAngleDelta(a, b) {
-      return Math.atan2(Math.sin(b - a), Math.cos(b - a));
-    }
-
-    function lerpAngle(a, b, t) {
-      return a + shortestAngleDelta(a, b) * t;
-    }
-
-    function regionForPointer(clientX, clientY) {
-      const burnR = 88;
-      const burnCx = W / 2;
-      const burnCy = H - 78;
-      const dx = clientX - burnCx;
-      const dy = clientY - burnCy;
-
-      if (dx * dx + dy * dy < burnR * burnR) return "burn";
-      if (clientX < W * 0.47) return "left";
-      if (clientX > W * 0.53) return "right";
-      return "burn";
-    }
-
-    function addPointer(id, region) {
-      if (region === "left") input.leftIds.add(id);
-      if (region === "right") input.rightIds.add(id);
-      if (region === "burn") input.burnIds.add(id);
-      updateTouchVisuals();
-    }
-
-    function clearPointer(id) {
-      input.leftIds.delete(id);
-      input.rightIds.delete(id);
-      input.burnIds.delete(id);
-      updateTouchVisuals();
-    }
-
-    function updateTouchVisuals() {
-      const touching = input.leftIds.size || input.rightIds.size || input.burnIds.size;
-      touchHints.classList.toggle("show", !!touching);
-      burnVisual.classList.toggle("active", input.burnIds.size > 0);
-    }
-
-    canvas.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      canvas.setPointerCapture(e.pointerId);
-      addPointer(e.pointerId, regionForPointer(e.clientX, e.clientY));
-    });
-
-    canvas.addEventListener("pointerup", (e) => {
-      e.preventDefault();
-      clearPointer(e.pointerId);
-    });
-
-    canvas.addEventListener("pointercancel", (e) => {
-      e.preventDefault();
-      clearPointer(e.pointerId);
-    });
-
-    canvas.addEventListener("pointermove", (e) => {
-      e.preventDefault();
-      clearPointer(e.pointerId);
-      addPointer(e.pointerId, regionForPointer(e.clientX, e.clientY));
-    });
-
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowLeft") input.leftIds.add("keyboard");
-      if (e.key === "ArrowRight") input.rightIds.add("keyboard");
-      if (e.key === "ArrowUp" || e.key === " ") input.burnIds.add("keyboard");
-      updateTouchVisuals();
-    });
-
-    window.addEventListener("keyup", (e) => {
-      if (e.key === "ArrowLeft") input.leftIds.delete("keyboard");
-      if (e.key === "ArrowRight") input.rightIds.delete("keyboard");
-      if (e.key === "ArrowUp" || e.key === " ") input.burnIds.delete("keyboard");
-      updateTouchVisuals();
-    });
-
-    function gravityAt(x, y) {
-      let ax = 0, ay = 0;
-      for (const p of planets) {
-        const dx = p.x - x;
-        const dy = p.y - y;
-        const d2 = dx * dx + dy * dy;
-        const d = Math.sqrt(d2) + 0.0001;
-        const safe = Math.max(d2, p.r * p.r * 0.84);
-        const g = p.mass / safe;
-        ax += (dx / d) * g;
-        ay += (dy / d) * g;
-      }
-      return { ax, ay };
-    }
-
-    function chooseSoftTarget() {
-      const speed = Math.hypot(ship.vx, ship.vy);
-      const dirX = speed > 5 ? ship.vx / speed : Math.cos(ship.angle);
-      const dirY = speed > 5 ? ship.vy / speed : Math.sin(ship.angle);
-
-      let best = null;
-      let bestScore = -Infinity;
-
-      for (const p of planets) {
-        const dx = p.x - ship.x;
-        const dy = p.y - ship.y;
-        const d = Math.sqrt(dx * dx + dy * dy) + 0.0001;
-        const nx = dx / d;
-        const ny = dy / d;
-        const alignment = nx * dirX + ny * dirY;
-
-        const distanceScore = 1 / (1 + d / 1400);
-        const gravityScore = p.mass / (d * d + 1);
-        const angleScore = Math.max(-0.35, alignment);
-
-        const score = angleScore * 1.35 + distanceScore * 0.65 + gravityScore * 1800;
-
-        if (score > bestScore) {
-          bestScore = score;
-          best = p;
-        }
-      }
-
-      return best;
-    }
-
-    function clampAngleAround(baseAngle, angle, maxOffset) {
-      const delta = shortestAngleDelta(baseAngle, angle);
-      const clamped = Math.max(-maxOffset, Math.min(maxOffset, delta));
-      return baseAngle + clamped;
-    }
-
-    function mixedAngle(baseAngle, influences) {
-      let x = 0;
-      let y = 0;
-
-      for (const item of influences) {
-        x += Math.cos(item.angle) * item.weight;
-        y += Math.sin(item.angle) * item.weight;
-      }
-
-      if (Math.abs(x) + Math.abs(y) < 0.0001) return baseAngle;
-      return Math.atan2(y, x);
-    }
-
-    function blendedCameraAngle(baseAngle, targetPlanet, speed) {
-      const noseMaxOffset = speed > 4.5 ? Math.PI / 3 : Math.PI * 0.9;
-      const limitedNoseAngle = speed > 4.5
-        ? clampAngleAround(baseAngle, ship.angle, noseMaxOffset)
-        : ship.angle;
-
-      let targetAngle = null;
-      let targetWeight = 0;
-
-      if (targetPlanet) {
-        const tx = targetPlanet.x - ship.x;
-        const ty = targetPlanet.y - ship.y;
-        targetAngle = Math.atan2(ty, tx);
-
-        const distance = Math.hypot(tx, ty);
-        const targetDelta = Math.abs(shortestAngleDelta(baseAngle, targetAngle));
-        const closeBoost = Math.max(0, 1 - distance / 2600);
-        const offscreenNeed = Math.min(1, targetDelta / 1.55);
-
-        targetWeight = 0.08 + closeBoost * 0.05 + offscreenNeed * 0.06;
-        if (speed < 5) targetWeight *= 0.7;
-        targetWeight = Math.max(0, Math.min(0.19, targetWeight));
-      }
-
-      const noseDelta = Math.abs(shortestAngleDelta(baseAngle, ship.angle));
-      const lookAroundBoost = Math.min(1, noseDelta / (Math.PI / 2));
-
-      let noseWeight = 0.30 + lookAroundBoost * 0.16;
-      let velocityWeight = speed > 4.5 ? 0.58 - lookAroundBoost * 0.10 : 0.30;
-
-      if (speed <= 4.5) {
-        noseWeight = 0.62;
-        velocityWeight = 0.25;
-      }
-
-      const influences = [
-        { angle: baseAngle, weight: velocityWeight },
-        { angle: limitedNoseAngle, weight: noseWeight }
-      ];
-
-      if (targetAngle !== null) {
-        influences.push({ angle: targetAngle, weight: targetWeight });
-      }
-
-      const raw = mixedAngle(baseAngle, influences);
-
-      const maxCameraOffset = speed > 4.5 ? Math.PI * 0.48 : Math.PI * 0.9;
-      const limited = clampAngleAround(baseAngle, raw, maxCameraOffset);
-
-      const desiredAssist = Math.abs(shortestAngleDelta(baseAngle, limited)) / Math.PI;
-      camera.targetAssist += (desiredAssist - camera.targetAssist) * 0.05;
-
-      return limited;
-    }
-
-    function update(dt) {
-      const left = input.leftIds.size > 0;
-      const right = input.rightIds.size > 0;
-      const burn = input.burnIds.size > 0;
-
-      const turnTarget = left && !right ? -1 : right && !left ? 1 : 0;
-
-      const turnRampUp = 2.2;
-      const turnRampDown = 4.2;
-      const turnRamp = Math.abs(turnTarget) > Math.abs(ship.turnInput) ? turnRampUp : turnRampDown;
-      ship.turnInput += (turnTarget - ship.turnInput) * Math.min(1, dt * turnRamp);
-
-      const turnSign = Math.sign(ship.turnInput);
-      const turnEffective = turnSign * ship.turnInput * ship.turnInput;
-      const targetAngularVelocity = turnEffective * ship.turnRate;
-
-      ship.angularVelocity += (targetAngularVelocity - ship.angularVelocity) * Math.min(1, dt * 5.2);
-      ship.angle += ship.angularVelocity * dt;
-
-      ship.thrustTarget = burn ? 1 : 0;
-      const rampUp = 0.86;
-      const rampDown = 3.35;
-      const ramp = ship.thrustTarget > ship.thrust ? rampUp : rampDown;
-      ship.thrust += (ship.thrustTarget - ship.thrust) * Math.min(1, dt * ramp);
-
-      const thrustEffective = ship.thrust * ship.thrust;
-
-      const g = gravityAt(ship.x, ship.y);
-      ship.vx += g.ax * dt;
-      ship.vy += g.ay * dt;
-
-      if (ship.thrust > 0.002) {
-        const power = ship.thrustPower * thrustEffective;
-        ship.vx += Math.cos(ship.angle) * power * dt;
-        ship.vy += Math.sin(ship.angle) * power * dt;
-      }
-
-      ship.x += ship.vx * dt;
-      ship.y += ship.vy * dt;
-
-      for (const p of planets) {
-        const dx = ship.x - p.x;
-        const dy = ship.y - p.y;
-        const d = Math.sqrt(dx * dx + dy * dy);
-        if (d < p.r + ship.radius) {
-          const nx = dx / d;
-          const ny = dy / d;
-          ship.x = p.x + nx * (p.r + ship.radius);
-          ship.y = p.y + ny * (p.r + ship.radius);
-          const radial = ship.vx * nx + ship.vy * ny;
-          if (radial < 0) {
-            ship.vx -= radial * nx * 1.38;
-            ship.vy -= radial * ny * 1.38;
-          }
-          ship.vx *= 0.66;
-          ship.vy *= 0.66;
-        }
-      }
-
-      const speed = Math.hypot(ship.vx, ship.vy);
-
-      const baseAngle = speed > 4.5 ? Math.atan2(ship.vy, ship.vx) : ship.angle;
-      camera.targetPlanet = chooseSoftTarget();
-      camera.targetAngle = blendedCameraAngle(baseAngle, camera.targetPlanet, speed);
-
-      const follow = Math.min(1, dt * (speed > 4.5 ? 2.15 : 1.05));
-      camera.angle = lerpAngle(camera.angle, camera.targetAngle, follow);
-
-      const back = 220 + Math.min(165, speed * 1.25);
-      camera.back += (back - camera.back) * Math.min(1, dt * 1.2);
-
-      camera.x = ship.x - Math.cos(camera.angle) * camera.back;
-      camera.y = ship.y - Math.sin(camera.angle) * camera.back;
-    }
-
-    function cameraBasis() {
-      const forward2 = { x: Math.cos(camera.angle), y: Math.sin(camera.angle) };
-
-      const cam = { x: camera.x, y: camera.height, z: camera.y };
-      const target = {
-        x: ship.x + forward2.x * camera.lookAhead,
-        y: 0,
-        z: ship.y + forward2.y * camera.lookAhead
-      };
-
-      let fx = target.x - cam.x;
-      let fy = target.y - cam.y;
-      let fz = target.z - cam.z;
-      const fl = Math.hypot(fx, fy, fz);
-      fx /= fl; fy /= fl; fz /= fl;
-
-      const upx = 0, upy = 1, upz = 0;
-      let rx = fy * upz - fz * upy;
-      let ry = fz * upx - fx * upz;
-      let rz = fx * upy - fy * upx;
-      const rl = Math.hypot(rx, ry, rz);
-      rx /= rl; ry /= rl; rz /= rl;
-
-      let ux = ry * fz - rz * fy;
-      let uy = rz * fx - rx * fz;
-      let uz = rx * fy - ry * fx;
-
-      return {
-        cam,
-        f: {x: fx, y: fy, z: fz},
-        r: {x: rx, y: ry, z: rz},
-        u: {x: ux, y: uy, z: uz}
-      };
-    }
-
-    function projectWorld(x, y, height = 0) {
-      const b = cameraBasis();
-      const px = x, py = height, pz = y;
-      const vx = px - b.cam.x;
-      const vy = py - b.cam.y;
-      const vz = pz - b.cam.z;
-
-      const cx = vx * b.r.x + vy * b.r.y + vz * b.r.z;
-      const cy = vx * b.u.x + vy * b.u.y + vz * b.u.z;
-      const cz = vx * b.f.x + vy * b.f.y + vz * b.f.z;
-
-      if (cz <= 8) return null;
-
-      const scale = camera.fov / cz;
-      return {
-        x: W / 2 + cx * scale,
-        y: H * 0.51 - cy * scale,
-        z: cz,
-        scale
-      };
-    }
-
-    function drawBackground() {
-      ctx.save();
-
-      for (const n of nebula) {
-        const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
-        grad.addColorStop(0, `rgba(85, 130, 255, ${n.a})`);
-        grad.addColorStop(1, "rgba(85, 130, 255, 0)");
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      const driftX = ((camera.x * 0.012) % W + W) % W;
-      const driftY = ((camera.y * 0.012) % H + H) % H;
-
-      for (const s of stars) {
-        ctx.globalAlpha = s.a;
-        ctx.fillStyle = "white";
-        const px = (s.x - driftX * s.layer + W * 2) % W;
-        const py = (s.y - driftY * s.layer + H * 2) % H;
-        ctx.beginPath();
-        ctx.arc(px, py, s.s, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      ctx.restore();
-    }
-
-    function drawGrid() {
-      ctx.save();
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = "rgba(255,255,255,0.045)";
-
-      const spacing = 220;
-      const extent = 3400;
-      const startX = Math.floor((ship.x - extent) / spacing) * spacing;
-      const endX = Math.ceil((ship.x + extent) / spacing) * spacing;
-      const startY = Math.floor((ship.y - extent) / spacing) * spacing;
-      const endY = Math.ceil((ship.y + extent) / spacing) * spacing;
-
-      for (let gx = startX; gx <= endX; gx += spacing) {
-        let started = false;
-        ctx.beginPath();
-        for (let gy = startY; gy <= endY; gy += 90) {
-          const p = projectWorld(gx, gy, -2);
-          if (!p) { started = false; continue; }
-          if (!started) { ctx.moveTo(p.x, p.y); started = true; }
-          else ctx.lineTo(p.x, p.y);
-        }
-        ctx.stroke();
-      }
-
-      for (let gy = startY; gy <= endY; gy += spacing) {
-        let started = false;
-        ctx.beginPath();
-        for (let gx = startX; gx <= endX; gx += 90) {
-          const p = projectWorld(gx, gy, -2);
-          if (!p) { started = false; continue; }
-          if (!started) { ctx.moveTo(p.x, p.y); started = true; }
-          else ctx.lineTo(p.x, p.y);
-        }
-        ctx.stroke();
-      }
-
-      ctx.restore();
-    }
-
-    function predictTrajectory() {
-      const speed = Math.hypot(ship.vx, ship.vy);
-      if (speed < 2.3 && ship.thrust < 0.035) return [];
-
-      const points = [];
-      let x = ship.x;
-      let y = ship.y;
-      let vx = ship.vx;
-      let vy = ship.vy;
-
-      const step = 0.075;
-      const steps = 790;
-
-      for (let i = 0; i < steps; i++) {
-        const g = gravityAt(x, y);
-        vx += g.ax * step;
-        vy += g.ay * step;
-        x += vx * step;
-        y += vy * step;
-        points.push({ x, y });
-
-        for (const p of planets) {
-          const dx = x - p.x;
-          const dy = y - p.y;
-          if (Math.sqrt(dx * dx + dy * dy) < p.r) return points;
-        }
-      }
-
-      return points;
-    }
-
-    function splitNulls(arr) {
-      const chunks = [];
-      let chunk = [];
-      for (const p of arr) {
-        if (p) chunk.push(p);
-        else if (chunk.length) {
-          chunks.push(chunk);
-          chunk = [];
-        }
-      }
-      if (chunk.length) chunks.push(chunk);
-      return chunks;
-    }
-
-    function drawTrajectorySegment(points, color, dashA, dashB, height, glow, width = 2.7) {
-      if (points.length < 2) return;
-
-      ctx.save();
-      ctx.lineWidth = width;
-      ctx.strokeStyle = color;
-      ctx.shadowColor = glow;
-      ctx.shadowBlur = 9;
-      ctx.setLineDash([dashA, dashB]);
-      ctx.lineDashOffset = -performance.now() * 0.035;
-
-      let drawing = false;
-      ctx.beginPath();
-
-      for (let i = 0; i < points.length; i++) {
-        const p = projectWorld(points[i].x, points[i].y, height);
-        if (!p) {
-          if (drawing) {
-            ctx.stroke();
-            ctx.beginPath();
-          }
-          drawing = false;
-          continue;
-        }
-
-        if (!drawing) {
-          ctx.moveTo(p.x, p.y);
-          drawing = true;
-        } else {
-          ctx.lineTo(p.x, p.y);
-        }
-      }
-
-      if (drawing) ctx.stroke();
-      ctx.restore();
-    }
-
-    function drawTrajectory() {
-      const all = predictTrajectory();
-      if (all.length < 2) return;
-
-      const front = [];
-      const back = [];
-
-      const speed = Math.hypot(ship.vx, ship.vy);
-      const dirX = speed > 4 ? ship.vx / speed : Math.cos(ship.angle);
-      const dirY = speed > 4 ? ship.vy / speed : Math.sin(ship.angle);
-
-      for (const p of all) {
-        const dx = p.x - ship.x;
-        const dy = p.y - ship.y;
-        const dot = dx * dirX + dy * dirY;
-
-        if (dot >= 0) {
-          front.push(p);
-          back.push(null);
-        } else {
-          back.push(p);
-          front.push(null);
-        }
-      }
-
-      for (const c of splitNulls(front)) {
-        drawTrajectorySegment(c, "rgba(96,232,255,0.94)", 11, 9, 2, "rgba(72,210,255,0.82)", 2.8);
-      }
-
-      for (const c of splitNulls(back)) {
-        drawTrajectorySegment(c, "rgba(255,154,64,0.94)", 5, 12, 2, "rgba(255,120,32,0.82)", 2.6);
-      }
-    }
-
-    function rgb(arr, a = 1) {
-      return `rgba(${arr[0]},${arr[1]},${arr[2]},${a})`;
-    }
-
-    function shadeColor(arr, factor) {
-      return arr.map(v => Math.max(0, Math.min(255, Math.round(v * factor))));
-    }
-
-    function drawPlanetTexture(cx, cy, r, p) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.clip();
-
-      for (let i = 0; i < 9; i++) {
-        const yy = cy - r + (i + 0.5) * (2 * r / 9);
-        const wave = Math.sin(i * 1.7 + p.seed) * r * 0.16;
-        ctx.globalAlpha = 0.10 + (i % 3) * 0.035;
-        ctx.strokeStyle = i % 2 ? "rgba(255,255,255,0.28)" : "rgba(0,0,0,0.35)";
-        ctx.lineWidth = Math.max(1, r * 0.035);
-        ctx.beginPath();
-        ctx.ellipse(cx + wave, yy, r * (0.92 - i * 0.018), r * 0.11, Math.sin(i + p.seed) * 0.13, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      for (let i = 0; i < 7; i++) {
-        const a = i * 2.399 + p.seed;
-        const rr = r * (0.15 + ((i * 37) % 70) / 100);
-        const bx = cx + Math.cos(a) * rr * 0.72;
-        const by = cy + Math.sin(a * 1.3) * rr * 0.58;
-        ctx.globalAlpha = 0.08;
-        ctx.fillStyle = i % 2 ? "white" : "black";
-        ctx.beginPath();
-        ctx.ellipse(bx, by, r * (0.06 + i * 0.006), r * (0.025 + i * 0.004), a, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      ctx.restore();
-      ctx.globalAlpha = 1;
-    }
-
-    function drawPlanet(p) {
-      const base = projectWorld(p.x, p.y, 0);
-      const top = projectWorld(p.x, p.y, p.r * 1.72);
-      if (!base || !top) return;
-
-      const radius = Math.max(3, Math.abs(base.y - top.y) * 0.62);
-      if (radius < 2) return;
-
-      const cx = base.x;
-      const cy = base.y - radius * 0.42;
-
-      ctx.save();
-
-      const atmosphere = ctx.createRadialGradient(cx, cy, radius * 0.8, cx, cy, radius * 1.85);
-      atmosphere.addColorStop(0, rgb(p.color1, 0.0));
-      atmosphere.addColorStop(0.38, rgb(p.color1, 0.07));
-      atmosphere.addColorStop(1, rgb(p.color1, 0));
-      ctx.fillStyle = atmosphere;
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius * 1.85, 0, Math.PI * 2);
-      ctx.fill();
-
-      if (p.ring) {
-        ctx.save();
-        ctx.globalAlpha = 0.34;
-        ctx.strokeStyle = "rgba(255,226,170,0.55)";
-        ctx.lineWidth = Math.max(1, radius * 0.075);
-        ctx.beginPath();
-        ctx.ellipse(cx, cy + radius * 0.07, radius * 1.9, radius * 0.36, -0.08, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 0.18;
-        ctx.lineWidth = Math.max(1, radius * 0.045);
-        ctx.beginPath();
-        ctx.ellipse(cx, cy + radius * 0.07, radius * 2.25, radius * 0.43, -0.08, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      const grad = ctx.createRadialGradient(cx - radius * 0.42, cy - radius * 0.45, radius * 0.08, cx, cy, radius);
-      grad.addColorStop(0, rgb(p.color1, 1));
-      grad.addColorStop(0.52, rgb(p.color2, 1));
-      grad.addColorStop(1, rgb(shadeColor(p.color2, 0.45), 1));
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      drawPlanetTexture(cx, cy, radius, p);
-
-      const shade = ctx.createRadialGradient(cx - radius * 0.35, cy - radius * 0.35, radius * 0.1, cx + radius * 0.28, cy + radius * 0.38, radius * 1.05);
-      shade.addColorStop(0, "rgba(255,255,255,0.20)");
-      shade.addColorStop(0.42, "rgba(255,255,255,0.02)");
-      shade.addColorStop(1, "rgba(0,0,0,0.56)");
-      ctx.fillStyle = shade;
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.globalAlpha = 0.38;
-      ctx.strokeStyle = "rgba(255,255,255,0.7)";
-      ctx.lineWidth = Math.max(1, radius * 0.018);
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.globalAlpha = 0.78;
-      ctx.fillStyle = "white";
-      ctx.font = `${Math.max(10, Math.min(14, radius * 0.18))}px system-ui`;
-      ctx.textAlign = "center";
-      ctx.fillText(p.name, cx, cy - radius * 1.45);
-
-      ctx.restore();
-    }
-
-    function drawPlanets() {
-      const ordered = [...planets].sort((a, b) => {
-        const pa = projectWorld(a.x, a.y, 0);
-        const pb = projectWorld(b.x, b.y, 0);
-        return (pb?.z || 0) - (pa?.z || 0);
-      });
-
-      for (const p of ordered) drawPlanet(p);
-    }
-
-    function drawShip() {
-      const noseHeight = 14;
-      const shipBase = projectWorld(ship.x, ship.y, 10);
-      if (!shipBase) return;
-
-      const px = shipBase.x;
-      const py = shipBase.y;
-      const scale = Math.max(0.45, Math.min(1.55, shipBase.scale * 1.65));
-
-      const rel = shortestAngleDelta(camera.angle, ship.angle);
-      const headingX = Math.sin(rel);
-      const headingY = -Math.cos(rel) * 0.72;
-      const sideX = Math.cos(rel);
-      const sideY = Math.sin(rel) * 0.18;
-
-      const len = 34 * scale;
-      const wid = 16 * scale;
-
-      const nose = { x: px + headingX * len, y: py + headingY * len };
-      const tail = { x: px - headingX * len * 0.72, y: py - headingY * len * 0.72 };
-      const left = { x: px - headingX * len * 0.18 - sideX * wid, y: py - headingY * len * 0.18 - sideY * wid };
-      const right = { x: px - headingX * len * 0.18 + sideX * wid, y: py - headingY * len * 0.18 + sideY * wid };
-
-      if (ship.thrust > 0.006) {
-        const thrustVisual = Math.max(0.10, ship.thrust * ship.thrust);
-        const flameLen = (14 + thrustVisual * 92 + Math.sin(performance.now() * 0.04) * 5) * scale;
-        const backX = -headingX;
-        const backY = -headingY;
-        const flameTip = { x: tail.x + backX * flameLen, y: tail.y + backY * flameLen };
-
-        const grad = ctx.createLinearGradient(tail.x, tail.y, flameTip.x, flameTip.y);
-        grad.addColorStop(0, `rgba(255,255,255,${0.28 + thrustVisual * 0.62})`);
-        grad.addColorStop(0.28, `rgba(255,198,87,${0.18 + thrustVisual * 0.66})`);
-        grad.addColorStop(1, "rgba(255,80,20,0.02)");
-
-        ctx.save();
-        ctx.globalCompositeOperation = "lighter";
-        ctx.fillStyle = grad;
-        ctx.shadowColor = "rgba(255,132,38,0.75)";
-        ctx.shadowBlur = 18;
-        ctx.beginPath();
-        ctx.moveTo(tail.x - sideX * wid * 0.45, tail.y - sideY * wid * 0.45);
-        ctx.lineTo(flameTip.x, flameTip.y);
-        ctx.lineTo(tail.x + sideX * wid * 0.45, tail.y + sideY * wid * 0.45);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-      }
-
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.65)";
-      ctx.shadowBlur = 10;
-      ctx.fillStyle = "#dfefff";
-      ctx.strokeStyle = "rgba(0,0,0,0.6)";
-      ctx.lineWidth = 1.2;
-
-      ctx.beginPath();
-      ctx.moveTo(nose.x, nose.y);
-      ctx.lineTo(left.x, left.y);
-      ctx.lineTo(tail.x, tail.y);
-      ctx.lineTo(right.x, right.y);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      const bodyGrad = ctx.createLinearGradient(nose.x, nose.y, tail.x, tail.y);
-      bodyGrad.addColorStop(0, "rgba(255,255,255,0.65)");
-      bodyGrad.addColorStop(0.48, "rgba(117,178,230,0.18)");
-      bodyGrad.addColorStop(1, "rgba(0,0,0,0.20)");
-      ctx.fillStyle = bodyGrad;
-      ctx.beginPath();
-      ctx.moveTo(nose.x, nose.y);
-      ctx.lineTo(left.x, left.y);
-      ctx.lineTo(tail.x, tail.y);
-      ctx.lineTo(right.x, right.y);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = "rgba(95,230,255,0.95)";
-      ctx.shadowColor = "rgba(95,230,255,0.8)";
-      ctx.shadowBlur = 8;
-      ctx.beginPath();
-      ctx.ellipse(
-        px + headingX * len * 0.22,
-        py + headingY * len * 0.22,
-        Math.max(2.3, 4.2 * scale),
-        Math.max(1.6, 2.6 * scale),
-        rel,
-        0,
-        Math.PI * 2
-      );
-      ctx.fill();
-
-      ctx.restore();
-    }
-
-    function drawAttitudeGhost() {
-      const speed = Math.hypot(ship.vx, ship.vy);
-      if (speed < 4) return;
-
-      const vx = ship.vx / speed;
-      const vy = ship.vy / speed;
-      const pro = projectWorld(ship.x + vx * 330, ship.y + vy * 330, 4);
-      const retro = projectWorld(ship.x - vx * 330, ship.y - vy * 330, 4);
-
-      ctx.save();
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([7, 9]);
-
-      if (pro) {
-        ctx.strokeStyle = "rgba(95,230,255,0.34)";
-        ctx.beginPath();
-        ctx.arc(pro.x, pro.y, 9, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      if (retro) {
-        ctx.strokeStyle = "rgba(255,154,64,0.34)";
-        ctx.beginPath();
-        ctx.arc(retro.x, retro.y, 9, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      ctx.restore();
-    }
-
-
-    function drawTargetAssist() {
-      const target = camera.targetPlanet;
-      if (!target) return;
-
-      const p = projectWorld(target.x, target.y, target.r * 0.15);
-      const label = target.name;
-
-      ctx.save();
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([5, 8]);
-      ctx.strokeStyle = "rgba(255,255,255,0.32)";
-      ctx.fillStyle = "rgba(255,255,255,0.68)";
-      ctx.font = "12px system-ui";
-      ctx.textAlign = "center";
-
-      if (p && p.x > 24 && p.x < W - 24 && p.y > 34 && p.y < H - 150) {
-        ctx.globalAlpha = 0.85;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 18, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.fillText("target " + label, p.x, p.y + 34);
-      } else {
-        const dx = target.x - ship.x;
-        const dy = target.y - ship.y;
-        const angleWorld = Math.atan2(dy, dx);
-        const rel = shortestAngleDelta(camera.angle, angleWorld);
-
-        const cx = W / 2;
-        const cy = H / 2;
-        const margin = 34;
-        const arrowX = cx + Math.sin(rel) * (W / 2 - margin);
-        const arrowY = cy - Math.cos(rel) * (H / 2 - 92);
-
-        const clampedX = Math.max(margin, Math.min(W - margin, arrowX));
-        const clampedY = Math.max(margin + 10, Math.min(H - 172, arrowY));
-
-        ctx.globalAlpha = 0.9;
-        ctx.translate(clampedX, clampedY);
-        ctx.rotate(rel);
-        ctx.setLineDash([]);
-        ctx.fillStyle = "rgba(255,255,255,0.82)";
-        ctx.beginPath();
-        ctx.moveTo(0, -15);
-        ctx.lineTo(-9, 9);
-        ctx.lineTo(0, 4);
-        ctx.lineTo(9, 9);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.rotate(-rel);
-        ctx.fillStyle = "rgba(255,255,255,0.74)";
-        ctx.fillText(label, 0, 30);
-      }
-
-      ctx.restore();
-    }
+    function rowOf(i) { return Math.floor(i / 9); }
+    function colOf(i) { return i % 9; }
+    function boxOf(i) { return Math.floor(rowOf(i) / 3) * 3 + Math.floor(colOf(i) / 3); }
+    function isPeer(a, b) { return rowOf(a) === rowOf(b) || colOf(a) === colOf(b) || boxOf(a) === boxOf(b); }
 
     function render() {
-      ctx.clearRect(0, 0, W, H);
-
-      drawBackground();
-      drawGrid();
-      drawTrajectory();
-      drawPlanets();
-      drawTargetAssist();
-      drawAttitudeGhost();
-      drawShip();
-
-      const speed = Math.hypot(ship.vx, ship.vy);
-      const thrustEffective = ship.thrust * ship.thrust;
-      readout.innerHTML = `v ${speed.toFixed(1)}<br>throttle ${(thrustEffective * 100).toFixed(0)}%<br>turn ${(Math.abs(ship.turnInput) * 100).toFixed(0)}%<br>${input.burnIds.size ? "burning" : "coasting"}`;
-      burnVisual.style.opacity = `${0.58 + Math.max(0.1, thrustEffective) * 0.42}`;
+      boardEl.innerHTML = "";
+      const selectedValue = values[selected];
+      for (let i = 0; i < 81; i++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        if (given[i]) cell.classList.add("given");
+        if (i === selected) cell.classList.add("selected");
+        else if (isPeer(i, selected)) cell.classList.add("peer");
+        if (selectedValue && values[i] === selectedValue && i !== selected) cell.classList.add("same");
+        if (values[i] && values[i] !== solution[i]) cell.classList.add("error");
+        if (values[i]) {
+          cell.textContent = values[i];
+        } else {
+          const notesBox = document.createElement("div");
+          notesBox.className = "notes";
+          for (let n = 1; n <= 9; n++) {
+            const note = document.createElement("div");
+            note.className = "note";
+            note.textContent = notes[i].has(n) ? n : "";
+            notesBox.appendChild(note);
+          }
+          cell.appendChild(notesBox);
+        }
+        cell.addEventListener("pointerdown", e => { e.preventDefault(); selected = i; render(); });
+        boardEl.appendChild(cell);
+      }
+      renderNumbers();
+      statusEl.textContent = "Errori: " + mistakes + " · Facile";
     }
 
-    function loop(now) {
-      const dt = Math.min(0.033, (now - last) / 1000);
-      last = now;
-      update(dt);
+    function renderNumbers() {
+      numbersEl.innerHTML = "";
+      for (let n = 1; n <= 9; n++) {
+        const btn = document.createElement("button");
+        btn.className = "num";
+        btn.textContent = n;
+        if (values.filter(v => v === n).length >= 9) btn.classList.add("used");
+        btn.addEventListener("pointerdown", e => { e.preventDefault(); placeNumber(n); });
+        numbersEl.appendChild(btn);
+      }
+    }
+
+    function placeNumber(n) {
+      if (given[selected]) { showMessage("Questa cella è fissa."); return; }
+      if (noteMode) {
+        if (values[selected]) return;
+        notes[selected].has(n) ? notes[selected].delete(n) : notes[selected].add(n);
+        render();
+        return;
+      }
+      values[selected] = n;
+      notes[selected].clear();
+      if (n !== solution[selected]) {
+        mistakes++;
+        showMessage("Numero non corretto.");
+      } else {
+        for (let i = 0; i < 81; i++) if (isPeer(i, selected)) notes[i].delete(n);
+        showMessage("Bene.");
+      }
+      if (isSolved()) {
+        messageEl.className = "message win";
+        messageEl.textContent = "Completato.";
+      }
       render();
-      requestAnimationFrame(loop);
     }
 
-    requestAnimationFrame(loop);
+    function eraseSelected() {
+      if (given[selected]) { showMessage("Non puoi cancellare un numero iniziale."); return; }
+      values[selected] = 0;
+      notes[selected].clear();
+      showMessage("Cella cancellata.");
+      render();
+    }
+
+    function checkBoard() {
+      let wrong = 0, empty = 0;
+      for (let i = 0; i < 81; i++) {
+        if (!values[i]) empty++;
+        else if (values[i] !== solution[i]) wrong++;
+      }
+      if (wrong === 0 && empty === 0) {
+        messageEl.className = "message win";
+        messageEl.textContent = "Perfetto, sudoku completato.";
+      } else if (wrong === 0) {
+        showMessage("Nessun errore. Mancano " + empty + " celle.");
+      } else {
+        showMessage(wrong + " celle non corrette.");
+      }
+      render();
+    }
+
+    function isSolved() {
+      for (let i = 0; i < 81; i++) if (values[i] !== solution[i]) return false;
+      return true;
+    }
+    function showMessage(text) { messageEl.className = "message"; messageEl.textContent = text; }
+
+    notesBtn.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      noteMode = !noteMode;
+      notesBtn.classList.toggle("active", noteMode);
+      showMessage(noteMode ? "Modalità note attiva." : "Modalità normale.");
+    });
+    eraseBtn.addEventListener("pointerdown", e => { e.preventDefault(); eraseSelected(); });
+    checkBtn.addEventListener("pointerdown", e => { e.preventDefault(); checkBoard(); });
+    newBtn.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      const currentIndex = puzzles.indexOf(current);
+      startGame((currentIndex + 1) % puzzles.length);
+    });
+
+    window.addEventListener("keydown", e => {
+      if (e.key >= "1" && e.key <= "9") placeNumber(Number(e.key));
+      if (e.key === "Backspace" || e.key === "Delete" || e.key === "0") eraseSelected();
+      if (e.key === "n" || e.key === "N") {
+        noteMode = !noteMode;
+        notesBtn.classList.toggle("active", noteMode);
+      }
+      if (e.key === "ArrowLeft") selected = Math.max(0, selected - 1);
+      if (e.key === "ArrowRight") selected = Math.min(80, selected + 1);
+      if (e.key === "ArrowUp") selected = Math.max(0, selected - 9);
+      if (e.key === "ArrowDown") selected = Math.min(80, selected + 9);
+      render();
+    });
+
+    startGame(0);
   </script>
 </body>
 </html>
