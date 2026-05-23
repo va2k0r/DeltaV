@@ -142,7 +142,7 @@
   <div class="hud">
     <div class="panel">
       DeltaV prototype<br>
-      Camera su traiettoria + target assist<br>
+      Camera elastica: velocità + muso + target<br>
       Lati invisibili: rotazione progressiva
     </div>
     <div class="panel" id="readout">
@@ -157,7 +157,7 @@
   </div>
 
   <div class="note">
-    Azzurro: traiettoria futura davanti al movimento. Arancione: traiettoria dietro la nave. La camera tiene leggermente in campo il pianeta target.
+    Azzurro: traiettoria futura davanti al movimento. Arancione: traiettoria dietro la nave. La camera segue anche il muso, ma senza ribaltarsi quando vai retrograde.
   </div>
 
   <div class="burn-button" id="burnVisual">BURN</div>
@@ -405,24 +405,78 @@
       return best;
     }
 
+    function clampAngleAround(baseAngle, angle, maxOffset) {
+      const delta = shortestAngleDelta(baseAngle, angle);
+      const clamped = Math.max(-maxOffset, Math.min(maxOffset, delta));
+      return baseAngle + clamped;
+    }
+
+    function mixedAngle(baseAngle, influences) {
+      let x = 0;
+      let y = 0;
+
+      for (const item of influences) {
+        x += Math.cos(item.angle) * item.weight;
+        y += Math.sin(item.angle) * item.weight;
+      }
+
+      if (Math.abs(x) + Math.abs(y) < 0.0001) return baseAngle;
+      return Math.atan2(y, x);
+    }
+
     function blendedCameraAngle(baseAngle, targetPlanet, speed) {
-      if (!targetPlanet) return baseAngle;
+      const noseMaxOffset = speed > 4.5 ? Math.PI / 3 : Math.PI * 0.9;
+      const limitedNoseAngle = speed > 4.5
+        ? clampAngleAround(baseAngle, ship.angle, noseMaxOffset)
+        : ship.angle;
 
-      const tx = targetPlanet.x - ship.x;
-      const ty = targetPlanet.y - ship.y;
-      const targetAngle = Math.atan2(ty, tx);
-      const angularDistance = Math.abs(shortestAngleDelta(baseAngle, targetAngle));
+      let targetAngle = null;
+      let targetWeight = 0;
 
-      const distance = Math.hypot(tx, ty);
-      const closeBoost = Math.max(0, 1 - distance / 2300);
-      const visibleNeed = Math.min(1, angularDistance / 1.35);
+      if (targetPlanet) {
+        const tx = targetPlanet.x - ship.x;
+        const ty = targetPlanet.y - ship.y;
+        targetAngle = Math.atan2(ty, tx);
 
-      let assist = 0.12 + closeBoost * 0.14 + visibleNeed * 0.14;
-      if (speed < 7) assist *= 0.45;
-      assist = Math.max(0, Math.min(0.36, assist));
+        const distance = Math.hypot(tx, ty);
+        const targetDelta = Math.abs(shortestAngleDelta(baseAngle, targetAngle));
+        const closeBoost = Math.max(0, 1 - distance / 2600);
+        const offscreenNeed = Math.min(1, targetDelta / 1.55);
 
-      camera.targetAssist += (assist - camera.targetAssist) * 0.045;
-      return lerpAngle(baseAngle, targetAngle, camera.targetAssist);
+        targetWeight = 0.08 + closeBoost * 0.05 + offscreenNeed * 0.06;
+        if (speed < 5) targetWeight *= 0.7;
+        targetWeight = Math.max(0, Math.min(0.19, targetWeight));
+      }
+
+      const noseDelta = Math.abs(shortestAngleDelta(baseAngle, ship.angle));
+      const lookAroundBoost = Math.min(1, noseDelta / (Math.PI / 2));
+
+      let noseWeight = 0.30 + lookAroundBoost * 0.16;
+      let velocityWeight = speed > 4.5 ? 0.58 - lookAroundBoost * 0.10 : 0.30;
+
+      if (speed <= 4.5) {
+        noseWeight = 0.62;
+        velocityWeight = 0.25;
+      }
+
+      const influences = [
+        { angle: baseAngle, weight: velocityWeight },
+        { angle: limitedNoseAngle, weight: noseWeight }
+      ];
+
+      if (targetAngle !== null) {
+        influences.push({ angle: targetAngle, weight: targetWeight });
+      }
+
+      const raw = mixedAngle(baseAngle, influences);
+
+      const maxCameraOffset = speed > 4.5 ? Math.PI * 0.48 : Math.PI * 0.9;
+      const limited = clampAngleAround(baseAngle, raw, maxCameraOffset);
+
+      const desiredAssist = Math.abs(shortestAngleDelta(baseAngle, limited)) / Math.PI;
+      camera.targetAssist += (desiredAssist - camera.targetAssist) * 0.05;
+
+      return limited;
     }
 
     function update(dt) {
@@ -1003,8 +1057,8 @@
       ctx.save();
       ctx.lineWidth = 1.5;
       ctx.setLineDash([5, 8]);
-      ctx.strokeStyle = "rgba(255,255,255,0.42)";
-      ctx.fillStyle = "rgba(255,255,255,0.78)";
+      ctx.strokeStyle = "rgba(255,255,255,0.32)";
+      ctx.fillStyle = "rgba(255,255,255,0.68)";
       ctx.font = "12px system-ui";
       ctx.textAlign = "center";
 
