@@ -3,28 +3,36 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>DeltaV 3D Chase Camera Prototype</title>
+  <title>DeltaV</title>
   <style>
+    :root {
+      --hud-bg: rgba(3, 7, 18, 0.38);
+      --hud-border: rgba(255,255,255,0.13);
+      --cyan: rgba(95, 230, 255, 0.92);
+      --orange: rgba(255, 156, 64, 0.92);
+    }
+
     html, body {
       margin: 0;
       padding: 0;
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #030611;
+      background: #020511;
+      color: white;
       touch-action: none;
       user-select: none;
       -webkit-user-select: none;
       -webkit-tap-highlight-color: transparent;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: white;
     }
 
     canvas {
       display: block;
       width: 100vw;
       height: 100vh;
-      background: radial-gradient(circle at 50% 35%, #14203b 0%, #060916 48%, #01030a 100%);
+      background:
+        radial-gradient(circle at 50% 36%, rgba(25, 40, 78, 0.85), rgba(4, 7, 20, 0.92) 48%, #01030a 100%);
     }
 
     .hud {
@@ -35,6 +43,7 @@
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
+      gap: 10px;
       pointer-events: none;
       font-size: 12px;
       line-height: 1.35;
@@ -42,12 +51,13 @@
     }
 
     .panel {
-      background: rgba(0,0,0,0.28);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 14px;
+      background: var(--hud-bg);
+      border: 1px solid var(--hud-border);
+      border-radius: 15px;
       padding: 8px 10px;
-      backdrop-filter: blur(8px);
-      max-width: 48vw;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+      max-width: 50vw;
     }
 
     .burn-button {
@@ -55,26 +65,32 @@
       left: 50%;
       bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
       transform: translateX(-50%);
-      width: 112px;
-      height: 112px;
+      width: 116px;
+      height: 116px;
       border-radius: 50%;
       border: 1px solid rgba(255,255,255,0.22);
-      background: radial-gradient(circle at 50% 35%, rgba(255,255,255,0.20), rgba(255,255,255,0.07));
+      background:
+        radial-gradient(circle at 50% 34%, rgba(255,255,255,0.21), rgba(255,255,255,0.06) 70%),
+        radial-gradient(circle at 50% 50%, rgba(255,160,60,0.14), rgba(255,160,60,0.02));
       color: rgba(255,255,255,0.9);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 700;
+      font-weight: 800;
       font-size: 14px;
       letter-spacing: 0.12em;
       pointer-events: none;
-      box-shadow: 0 16px 38px rgba(0,0,0,0.38);
-      backdrop-filter: blur(8px);
+      box-shadow:
+        0 16px 40px rgba(0,0,0,0.42),
+        inset 0 0 24px rgba(255,255,255,0.06);
+      backdrop-filter: blur(9px);
     }
 
     .burn-button.active {
-      background: radial-gradient(circle at 50% 35%, rgba(255,210,120,0.55), rgba(255,100,30,0.13));
-      transform: translateX(-50%) scale(0.98);
+      background:
+        radial-gradient(circle at 50% 35%, rgba(255,230,155,0.62), rgba(255,107,31,0.14) 68%),
+        radial-gradient(circle at 50% 50%, rgba(255,140,40,0.28), rgba(255,80,20,0.04));
+      transform: translateX(-50%) scale(0.985);
     }
 
     .touch-hints {
@@ -82,41 +98,39 @@
       inset: 0;
       pointer-events: none;
       opacity: 0;
-      transition: opacity 160ms ease;
+      transition: opacity 140ms ease;
     }
 
-    .touch-hints.show {
-      opacity: 1;
-    }
+    .touch-hints.show { opacity: 1; }
 
     .left-hint, .right-hint {
       position: absolute;
       top: 0;
       bottom: 0;
       width: 35%;
-      background: rgba(255,255,255,0.035);
+      background: rgba(255,255,255,0.027);
     }
 
     .left-hint {
       left: 0;
-      border-right: 1px solid rgba(255,255,255,0.05);
+      border-right: 1px solid rgba(255,255,255,0.045);
     }
 
     .right-hint {
       right: 0;
-      border-left: 1px solid rgba(255,255,255,0.05);
+      border-left: 1px solid rgba(255,255,255,0.045);
     }
 
-    .bottom-note {
+    .note {
       position: fixed;
       left: 50%;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 140px);
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 143px);
       transform: translateX(-50%);
-      width: min(92vw, 520px);
+      width: min(92vw, 560px);
       text-align: center;
       font-size: 12px;
       line-height: 1.35;
-      opacity: 0.72;
+      opacity: 0.69;
       text-shadow: 0 1px 5px #000;
       pointer-events: none;
     }
@@ -127,9 +141,9 @@
 
   <div class="hud">
     <div class="panel">
-      DeltaV 3D chase prototype<br>
-      Lati invisibili: turn left / turn right<br>
-      Centro basso: burn progressivo
+      DeltaV prototype<br>
+      Camera sulla traiettoria, non sul muso<br>
+      Lati invisibili: ruota nave
     </div>
     <div class="panel" id="readout">
       v 0<br>
@@ -142,18 +156,18 @@
     <div class="right-hint"></div>
   </div>
 
-  <div class="bottom-note">
-    La linea azzurra è la traiettoria davanti alla nave. La linea arancione è la traiettoria dietro la nave, utile per capire quando sei retrograde.
+  <div class="note">
+    Azzurro: traiettoria futura davanti al movimento. Arancione: traiettoria dietro la nave, utile per capire il retrograde. Nessun marker.
   </div>
 
   <div class="burn-button" id="burnVisual">BURN</div>
 
   <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const readout = document.getElementById('readout');
-    const burnVisual = document.getElementById('burnVisual');
-    const touchHints = document.getElementById('touchHints');
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const readout = document.getElementById("readout");
+    const burnVisual = document.getElementById("burnVisual");
+    const touchHints = document.getElementById("touchHints");
 
     let W = 0, H = 0, DPR = 1;
     let last = performance.now();
@@ -164,59 +178,68 @@
       burnIds: new Set()
     };
 
-    const planets = [
-      {
-        name: "Aster",
-        x: -720,
-        y: 1050,
-        r: 86,
-        mass: 230000,
-        color1: "#6ae5ff",
-        color2: "#1c6fd1"
-      },
-      {
-        name: "Vesta",
-        x: 690,
-        y: 1720,
-        r: 128,
-        mass: 470000,
-        color1: "#ffd486",
-        color2: "#ae5537"
-      },
-      {
-        name: "Nox",
-        x: -380,
-        y: 2520,
-        r: 58,
-        mass: 120000,
-        color1: "#caa8ff",
-        color2: "#533c95"
-      }
-    ];
-
     const ship = {
       x: 0,
       y: 0,
       vx: 0,
       vy: 0,
       angle: -Math.PI / 2,
-      turnRate: 2.15,
+      turnRate: 2.1,
       thrust: 0,
       thrustTarget: 0,
-      thrustPower: 165,
-      radius: 13
+      thrustPower: 155,
+      radius: 14
     };
 
     const camera = {
-      x: 0, y: 0,
+      x: 0,
+      y: 0,
       angle: ship.angle,
-      back: 185,
-      height: 95,
-      lookAhead: 430,
-      fov: 620
+      targetAngle: ship.angle,
+      back: 250,
+      height: 58,
+      lookAhead: 520,
+      fov: 720
     };
 
+    const planets = [
+      {
+        name: "Aster",
+        x: -620,
+        y: 1120,
+        r: 92,
+        mass: 250000,
+        color1: [104, 223, 255],
+        color2: [27, 92, 210],
+        ring: false,
+        seed: 0.2
+      },
+      {
+        name: "Vesta",
+        x: 720,
+        y: 1840,
+        r: 136,
+        mass: 520000,
+        color1: [255, 214, 134],
+        color2: [157, 78, 52],
+        ring: true,
+        seed: 1.6
+      },
+      {
+        name: "Nox",
+        x: -460,
+        y: 2760,
+        r: 62,
+        mass: 130000,
+        color1: [210, 177, 255],
+        color2: [79, 61, 148],
+        ring: false,
+        seed: 2.5
+      }
+    ];
+
     let stars = [];
+    let nebula = [];
 
     function resize() {
       DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
@@ -227,17 +250,27 @@
       canvas.style.width = W + "px";
       canvas.style.height = H + "px";
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-      makeStars();
+      makeBackground();
     }
 
-    function makeStars() {
+    function makeBackground() {
       stars = [];
-      for (let i = 0; i < 260; i++) {
+      nebula = [];
+      for (let i = 0; i < 340; i++) {
         stars.push({
           x: Math.random() * W,
           y: Math.random() * H,
-          s: Math.random() * 1.8 + 0.25,
-          a: Math.random() * 0.65 + 0.25
+          s: Math.random() * 1.7 + 0.2,
+          a: Math.random() * 0.72 + 0.18,
+          layer: Math.random() * 0.55 + 0.45
+        });
+      }
+      for (let i = 0; i < 18; i++) {
+        nebula.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          r: Math.random() * 240 + 120,
+          a: Math.random() * 0.055 + 0.018
         });
       }
     }
@@ -245,10 +278,18 @@
     window.addEventListener("resize", resize);
     resize();
 
+    function shortestAngleDelta(a, b) {
+      return Math.atan2(Math.sin(b - a), Math.cos(b - a));
+    }
+
+    function lerpAngle(a, b, t) {
+      return a + shortestAngleDelta(a, b) * t;
+    }
+
     function regionForPointer(clientX, clientY) {
-      const burnR = 86;
+      const burnR = 88;
       const burnCx = W / 2;
-      const burnCy = H - 76;
+      const burnCy = H - 78;
       const dx = clientX - burnCx;
       const dy = clientY - burnCy;
 
@@ -321,7 +362,7 @@
         const dy = p.y - y;
         const d2 = dx * dx + dy * dy;
         const d = Math.sqrt(d2) + 0.0001;
-        const safe = Math.max(d2, p.r * p.r * 0.82);
+        const safe = Math.max(d2, p.r * p.r * 0.84);
         const g = p.mass / safe;
         ax += (dx / d) * g;
         ay += (dy / d) * g;
@@ -338,9 +379,8 @@
       if (right) ship.angle += ship.turnRate * dt;
 
       ship.thrustTarget = burn ? 1 : 0;
-
-      const rampUp = 1.35;
-      const rampDown = 2.9;
+      const rampUp = 1.12;
+      const rampDown = 3.15;
       const ramp = ship.thrustTarget > ship.thrust ? rampUp : rampDown;
       ship.thrust += (ship.thrustTarget - ship.thrust) * Math.min(1, dt * ramp);
 
@@ -368,17 +408,30 @@
           ship.y = p.y + ny * (p.r + ship.radius);
           const radial = ship.vx * nx + ship.vy * ny;
           if (radial < 0) {
-            ship.vx -= radial * nx * 1.35;
-            ship.vy -= radial * ny * 1.35;
+            ship.vx -= radial * nx * 1.38;
+            ship.vy -= radial * ny * 1.38;
           }
-          ship.vx *= 0.68;
-          ship.vy *= 0.68;
+          ship.vx *= 0.66;
+          ship.vy *= 0.66;
         }
       }
 
-      camera.angle = ship.angle;
-      camera.x = ship.x - Math.cos(ship.angle) * camera.back;
-      camera.y = ship.y - Math.sin(ship.angle) * camera.back;
+      const speed = Math.hypot(ship.vx, ship.vy);
+
+      if (speed > 4.5) {
+        camera.targetAngle = Math.atan2(ship.vy, ship.vx);
+      } else {
+        camera.targetAngle = ship.angle;
+      }
+
+      const follow = Math.min(1, dt * (speed > 4.5 ? 2.4 : 1.15));
+      camera.angle = lerpAngle(camera.angle, camera.targetAngle, follow);
+
+      const back = 220 + Math.min(150, speed * 1.2);
+      camera.back += (back - camera.back) * Math.min(1, dt * 1.2);
+
+      camera.x = ship.x - Math.cos(camera.angle) * camera.back;
+      camera.y = ship.y - Math.sin(camera.angle) * camera.back;
     }
 
     function cameraBasis() {
@@ -398,7 +451,6 @@
       fx /= fl; fy /= fl; fz /= fl;
 
       const upx = 0, upy = 1, upz = 0;
-
       let rx = fy * upz - fz * upy;
       let ry = fz * upx - fx * upz;
       let rz = fx * upy - fy * upx;
@@ -409,7 +461,12 @@
       let uy = rz * fx - rx * fz;
       let uz = rx * fy - ry * fx;
 
-      return { cam, f: {x: fx, y: fy, z: fz}, r: {x: rx, y: ry, z: rz}, u: {x: ux, y: uy, z: uz} };
+      return {
+        cam,
+        f: {x: fx, y: fy, z: fz},
+        r: {x: rx, y: ry, z: rz},
+        u: {x: ux, y: uy, z: uz}
+      };
     }
 
     function projectWorld(x, y, height = 0) {
@@ -428,31 +485,48 @@
       const scale = camera.fov / cz;
       return {
         x: W / 2 + cx * scale,
-        y: H * 0.49 - cy * scale,
+        y: H * 0.51 - cy * scale,
         z: cz,
         scale
       };
     }
 
-    function drawStars() {
+    function drawBackground() {
       ctx.save();
+
+      for (const n of nebula) {
+        const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
+        grad.addColorStop(0, `rgba(85, 130, 255, ${n.a})`);
+        grad.addColorStop(1, "rgba(85, 130, 255, 0)");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const driftX = ((camera.x * 0.012) % W + W) % W;
+      const driftY = ((camera.y * 0.012) % H + H) % H;
+
       for (const s of stars) {
         ctx.globalAlpha = s.a;
         ctx.fillStyle = "white";
+        const px = (s.x - driftX * s.layer + W * 2) % W;
+        const py = (s.y - driftY * s.layer + H * 2) % H;
         ctx.beginPath();
-        ctx.arc(s.x, s.y, s.s, 0, Math.PI * 2);
+        ctx.arc(px, py, s.s, 0, Math.PI * 2);
         ctx.fill();
       }
+
       ctx.restore();
     }
 
     function drawGrid() {
       ctx.save();
       ctx.lineWidth = 1;
-      ctx.strokeStyle = "rgba(255,255,255,0.06)";
+      ctx.strokeStyle = "rgba(255,255,255,0.045)";
 
       const spacing = 220;
-      const extent = 3200;
+      const extent = 3400;
       const startX = Math.floor((ship.x - extent) / spacing) * spacing;
       const endX = Math.ceil((ship.x + extent) / spacing) * spacing;
       const startY = Math.floor((ship.y - extent) / spacing) * spacing;
@@ -461,8 +535,8 @@
       for (let gx = startX; gx <= endX; gx += spacing) {
         let started = false;
         ctx.beginPath();
-        for (let gy = startY; gy <= endY; gy += 80) {
-          const p = projectWorld(gx, gy, 0);
+        for (let gy = startY; gy <= endY; gy += 90) {
+          const p = projectWorld(gx, gy, -2);
           if (!p) { started = false; continue; }
           if (!started) { ctx.moveTo(p.x, p.y); started = true; }
           else ctx.lineTo(p.x, p.y);
@@ -473,8 +547,8 @@
       for (let gy = startY; gy <= endY; gy += spacing) {
         let started = false;
         ctx.beginPath();
-        for (let gx = startX; gx <= endX; gx += 80) {
-          const p = projectWorld(gx, gy, 0);
+        for (let gx = startX; gx <= endX; gx += 90) {
+          const p = projectWorld(gx, gy, -2);
           if (!p) { started = false; continue; }
           if (!started) { ctx.moveTo(p.x, p.y); started = true; }
           else ctx.lineTo(p.x, p.y);
@@ -487,7 +561,7 @@
 
     function predictTrajectory() {
       const speed = Math.hypot(ship.vx, ship.vy);
-      if (speed < 2.5 && ship.thrust < 0.04) return [];
+      if (speed < 2.3 && ship.thrust < 0.035) return [];
 
       const points = [];
       let x = ship.x;
@@ -496,7 +570,7 @@
       let vy = ship.vy;
 
       const step = 0.075;
-      const steps = 760;
+      const steps = 790;
 
       for (let i = 0; i < steps; i++) {
         const g = gravityAt(x, y);
@@ -512,17 +586,32 @@
           if (Math.sqrt(dx * dx + dy * dy) < p.r) return points;
         }
       }
+
       return points;
     }
 
-    function drawDashedProjectedSegment(points, color, dashA, dashB, height, glow) {
+    function splitNulls(arr) {
+      const chunks = [];
+      let chunk = [];
+      for (const p of arr) {
+        if (p) chunk.push(p);
+        else if (chunk.length) {
+          chunks.push(chunk);
+          chunk = [];
+        }
+      }
+      if (chunk.length) chunks.push(chunk);
+      return chunks;
+    }
+
+    function drawTrajectorySegment(points, color, dashA, dashB, height, glow, width = 2.7) {
       if (points.length < 2) return;
 
       ctx.save();
-      ctx.lineWidth = 2.6;
+      ctx.lineWidth = width;
       ctx.strokeStyle = color;
       ctx.shadowColor = glow;
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 9;
       ctx.setLineDash([dashA, dashB]);
       ctx.lineDashOffset = -performance.now() * 0.035;
 
@@ -558,13 +647,15 @@
 
       const front = [];
       const back = [];
-      const fx = Math.cos(ship.angle);
-      const fy = Math.sin(ship.angle);
+
+      const speed = Math.hypot(ship.vx, ship.vy);
+      const dirX = speed > 4 ? ship.vx / speed : Math.cos(ship.angle);
+      const dirY = speed > 4 ? ship.vy / speed : Math.sin(ship.angle);
 
       for (const p of all) {
         const dx = p.x - ship.x;
         const dy = p.y - ship.y;
-        const dot = dx * fx + dy * fy;
+        const dot = dx * dirX + dy * dirY;
 
         if (dot >= 0) {
           front.push(p);
@@ -575,68 +666,126 @@
         }
       }
 
-      function splitNulls(arr) {
-        const chunks = [];
-        let chunk = [];
-        for (const p of arr) {
-          if (p) chunk.push(p);
-          else if (chunk.length) {
-            chunks.push(chunk);
-            chunk = [];
-          }
-        }
-        if (chunk.length) chunks.push(chunk);
-        return chunks;
-      }
-
       for (const c of splitNulls(front)) {
-        drawDashedProjectedSegment(c, "rgba(105,230,255,0.9)", 10, 10, 7, "rgba(70,210,255,0.75)");
+        drawTrajectorySegment(c, "rgba(96,232,255,0.94)", 11, 9, 2, "rgba(72,210,255,0.82)", 2.8);
       }
 
       for (const c of splitNulls(back)) {
-        drawDashedProjectedSegment(c, "rgba(255,160,70,0.9)", 4, 13, 10, "rgba(255,120,30,0.75)");
+        drawTrajectorySegment(c, "rgba(255,154,64,0.94)", 5, 12, 2, "rgba(255,120,32,0.82)", 2.6);
       }
+    }
+
+    function rgb(arr, a = 1) {
+      return `rgba(${arr[0]},${arr[1]},${arr[2]},${a})`;
+    }
+
+    function shadeColor(arr, factor) {
+      return arr.map(v => Math.max(0, Math.min(255, Math.round(v * factor))));
+    }
+
+    function drawPlanetTexture(cx, cy, r, p) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.clip();
+
+      for (let i = 0; i < 9; i++) {
+        const yy = cy - r + (i + 0.5) * (2 * r / 9);
+        const wave = Math.sin(i * 1.7 + p.seed) * r * 0.16;
+        ctx.globalAlpha = 0.10 + (i % 3) * 0.035;
+        ctx.strokeStyle = i % 2 ? "rgba(255,255,255,0.28)" : "rgba(0,0,0,0.35)";
+        ctx.lineWidth = Math.max(1, r * 0.035);
+        ctx.beginPath();
+        ctx.ellipse(cx + wave, yy, r * (0.92 - i * 0.018), r * 0.11, Math.sin(i + p.seed) * 0.13, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 7; i++) {
+        const a = i * 2.399 + p.seed;
+        const rr = r * (0.15 + ((i * 37) % 70) / 100);
+        const bx = cx + Math.cos(a) * rr * 0.72;
+        const by = cy + Math.sin(a * 1.3) * rr * 0.58;
+        ctx.globalAlpha = 0.08;
+        ctx.fillStyle = i % 2 ? "white" : "black";
+        ctx.beginPath();
+        ctx.ellipse(bx, by, r * (0.06 + i * 0.006), r * (0.025 + i * 0.004), a, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+      ctx.globalAlpha = 1;
     }
 
     function drawPlanet(p) {
       const base = projectWorld(p.x, p.y, 0);
-      const top = projectWorld(p.x, p.y, p.r * 1.65);
+      const top = projectWorld(p.x, p.y, p.r * 1.72);
       if (!base || !top) return;
 
-      const radius = Math.max(4, Math.abs(base.y - top.y) * 0.62);
+      const radius = Math.max(3, Math.abs(base.y - top.y) * 0.62);
       if (radius < 2) return;
 
-      const grad = ctx.createRadialGradient(base.x - radius * 0.35, base.y - radius * 0.45, radius * 0.1, base.x, base.y, radius);
-      grad.addColorStop(0, p.color1);
-      grad.addColorStop(1, p.color2);
+      const cx = base.x;
+      const cy = base.y - radius * 0.42;
 
       ctx.save();
 
-      ctx.globalAlpha = 0.11;
-      ctx.strokeStyle = p.color1;
-      ctx.lineWidth = 1;
+      const atmosphere = ctx.createRadialGradient(cx, cy, radius * 0.8, cx, cy, radius * 1.85);
+      atmosphere.addColorStop(0, rgb(p.color1, 0.0));
+      atmosphere.addColorStop(0.38, rgb(p.color1, 0.07));
+      atmosphere.addColorStop(1, rgb(p.color1, 0));
+      ctx.fillStyle = atmosphere;
       ctx.beginPath();
-      ctx.ellipse(base.x, base.y, radius * 1.7, radius * 0.42, 0, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(base.x, base.y - radius * 0.45, radius, 0, Math.PI * 2);
+      ctx.arc(cx, cy, radius * 1.85, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.globalAlpha = 0.32;
-      ctx.strokeStyle = "white";
-      ctx.lineWidth = 1.5;
+      if (p.ring) {
+        ctx.save();
+        ctx.globalAlpha = 0.34;
+        ctx.strokeStyle = "rgba(255,226,170,0.55)";
+        ctx.lineWidth = Math.max(1, radius * 0.075);
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + radius * 0.07, radius * 1.9, radius * 0.36, -0.08, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 0.18;
+        ctx.lineWidth = Math.max(1, radius * 0.045);
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + radius * 0.07, radius * 2.25, radius * 0.43, -0.08, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      const grad = ctx.createRadialGradient(cx - radius * 0.42, cy - radius * 0.45, radius * 0.08, cx, cy, radius);
+      grad.addColorStop(0, rgb(p.color1, 1));
+      grad.addColorStop(0.52, rgb(p.color2, 1));
+      grad.addColorStop(1, rgb(shadeColor(p.color2, 0.45), 1));
+      ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.arc(base.x, base.y - radius * 0.45, radius, 0, Math.PI * 2);
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      drawPlanetTexture(cx, cy, radius, p);
+
+      const shade = ctx.createRadialGradient(cx - radius * 0.35, cy - radius * 0.35, radius * 0.1, cx + radius * 0.28, cy + radius * 0.38, radius * 1.05);
+      shade.addColorStop(0, "rgba(255,255,255,0.20)");
+      shade.addColorStop(0.42, "rgba(255,255,255,0.02)");
+      shade.addColorStop(1, "rgba(0,0,0,0.56)");
+      ctx.fillStyle = shade;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.globalAlpha = 0.38;
+      ctx.strokeStyle = "rgba(255,255,255,0.7)";
+      ctx.lineWidth = Math.max(1, radius * 0.018);
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
       ctx.stroke();
 
       ctx.globalAlpha = 0.78;
       ctx.fillStyle = "white";
-      ctx.font = `${Math.max(10, Math.min(13, radius * 0.17))}px system-ui`;
+      ctx.font = `${Math.max(10, Math.min(14, radius * 0.18))}px system-ui`;
       ctx.textAlign = "center";
-      ctx.fillText(p.name, base.x, base.y - radius * 1.65);
+      ctx.fillText(p.name, cx, cy - radius * 1.45);
 
       ctx.restore();
     }
@@ -651,109 +800,144 @@
       for (const p of ordered) drawPlanet(p);
     }
 
-    function drawShipHUD() {
-      const cx = W / 2;
-      const cy = H * 0.66;
-      const s = 24;
+    function drawShip() {
+      const noseHeight = 14;
+      const shipBase = projectWorld(ship.x, ship.y, 10);
+      if (!shipBase) return;
 
-      ctx.save();
+      const px = shipBase.x;
+      const py = shipBase.y;
+      const scale = Math.max(0.45, Math.min(1.55, shipBase.scale * 1.65));
 
-      if (ship.thrust > 0.02) {
-        const flame = 26 + ship.thrust * 44 + Math.sin(performance.now() * 0.04) * 5;
-        const grad = ctx.createLinearGradient(cx, cy + s, cx, cy + s + flame);
-        grad.addColorStop(0, `rgba(255,255,255,${0.35 + ship.thrust * 0.55})`);
-        grad.addColorStop(0.35, `rgba(255,180,70,${0.25 + ship.thrust * 0.55})`);
-        grad.addColorStop(1, "rgba(255,70,20,0.02)");
+      const rel = shortestAngleDelta(camera.angle, ship.angle);
+      const headingX = Math.sin(rel);
+      const headingY = -Math.cos(rel) * 0.72;
+      const sideX = Math.cos(rel);
+      const sideY = Math.sin(rel) * 0.18;
 
+      const len = 34 * scale;
+      const wid = 16 * scale;
+
+      const nose = { x: px + headingX * len, y: py + headingY * len };
+      const tail = { x: px - headingX * len * 0.72, y: py - headingY * len * 0.72 };
+      const left = { x: px - headingX * len * 0.18 - sideX * wid, y: py - headingY * len * 0.18 - sideY * wid };
+      const right = { x: px - headingX * len * 0.18 + sideX * wid, y: py - headingY * len * 0.18 + sideY * wid };
+
+      if (ship.thrust > 0.015) {
+        const flameLen = (30 + ship.thrust * 62 + Math.sin(performance.now() * 0.04) * 6) * scale;
+        const backX = -headingX;
+        const backY = -headingY;
+        const flameTip = { x: tail.x + backX * flameLen, y: tail.y + backY * flameLen };
+
+        const grad = ctx.createLinearGradient(tail.x, tail.y, flameTip.x, flameTip.y);
+        grad.addColorStop(0, `rgba(255,255,255,${0.38 + ship.thrust * 0.5})`);
+        grad.addColorStop(0.28, `rgba(255,198,87,${0.24 + ship.thrust * 0.55})`);
+        grad.addColorStop(1, "rgba(255,80,20,0.02)");
+
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
         ctx.fillStyle = grad;
+        ctx.shadowColor = "rgba(255,132,38,0.75)";
+        ctx.shadowBlur = 18;
         ctx.beginPath();
-        ctx.moveTo(cx - 11, cy + s * 0.8);
-        ctx.lineTo(cx, cy + s + flame);
-        ctx.lineTo(cx + 11, cy + s * 0.8);
+        ctx.moveTo(tail.x - sideX * wid * 0.45, tail.y - sideY * wid * 0.45);
+        ctx.lineTo(flameTip.x, flameTip.y);
+        ctx.lineTo(tail.x + sideX * wid * 0.45, tail.y + sideY * wid * 0.45);
         ctx.closePath();
         ctx.fill();
+        ctx.restore();
       }
 
-      ctx.fillStyle = "#eef7ff";
-      ctx.strokeStyle = "rgba(0,0,0,0.55)";
-      ctx.lineWidth = 1.3;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.65)";
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = "#dfefff";
+      ctx.strokeStyle = "rgba(0,0,0,0.6)";
+      ctx.lineWidth = 1.2;
+
       ctx.beginPath();
-      ctx.moveTo(cx, cy - s);
-      ctx.lineTo(cx - s * 0.72, cy + s * 0.85);
-      ctx.lineTo(cx, cy + s * 0.36);
-      ctx.lineTo(cx + s * 0.72, cy + s * 0.85);
+      ctx.moveTo(nose.x, nose.y);
+      ctx.lineTo(left.x, left.y);
+      ctx.lineTo(tail.x, tail.y);
+      ctx.lineTo(right.x, right.y);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = "#6ae5ff";
+      const bodyGrad = ctx.createLinearGradient(nose.x, nose.y, tail.x, tail.y);
+      bodyGrad.addColorStop(0, "rgba(255,255,255,0.65)");
+      bodyGrad.addColorStop(0.48, "rgba(117,178,230,0.18)");
+      bodyGrad.addColorStop(1, "rgba(0,0,0,0.20)");
+      ctx.fillStyle = bodyGrad;
       ctx.beginPath();
-      ctx.arc(cx, cy - 3, 4, 0, Math.PI * 2);
+      ctx.moveTo(nose.x, nose.y);
+      ctx.lineTo(left.x, left.y);
+      ctx.lineTo(tail.x, tail.y);
+      ctx.lineTo(right.x, right.y);
+      ctx.closePath();
       ctx.fill();
 
-      ctx.globalAlpha = 0.38;
-      ctx.strokeStyle = "white";
-      ctx.lineWidth = 1;
+      ctx.fillStyle = "rgba(95,230,255,0.95)";
+      ctx.shadowColor = "rgba(95,230,255,0.8)";
+      ctx.shadowBlur = 8;
       ctx.beginPath();
-      ctx.moveTo(cx - 16, cy - 44);
-      ctx.lineTo(cx + 16, cy - 44);
-      ctx.moveTo(cx, cy - 60);
-      ctx.lineTo(cx, cy - 28);
-      ctx.stroke();
+      ctx.ellipse(
+        px + headingX * len * 0.22,
+        py + headingY * len * 0.22,
+        Math.max(2.3, 4.2 * scale),
+        Math.max(1.6, 2.6 * scale),
+        rel,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
 
       ctx.restore();
     }
 
-    function drawRetrogradeHint() {
+    function drawAttitudeGhost() {
       const speed = Math.hypot(ship.vx, ship.vy);
       if (speed < 4) return;
 
       const vx = ship.vx / speed;
       const vy = ship.vy / speed;
-
-      const retroX = ship.x - vx * 420;
-      const retroY = ship.y - vy * 420;
-      const p = projectWorld(retroX, retroY, 20);
-      if (!p) return;
+      const pro = projectWorld(ship.x + vx * 330, ship.y + vy * 330, 4);
+      const retro = projectWorld(ship.x - vx * 330, ship.y - vy * 330, 4);
 
       ctx.save();
-      ctx.globalAlpha = 0.86;
-      ctx.strokeStyle = "rgba(255,160,70,0.95)";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 7]);
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 12, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(p.x - 18, p.y);
-      ctx.lineTo(p.x - 8, p.y);
-      ctx.moveTo(p.x + 8, p.y);
-      ctx.lineTo(p.x + 18, p.y);
-      ctx.moveTo(p.x, p.y - 18);
-      ctx.lineTo(p.x, p.y - 8);
-      ctx.moveTo(p.x, p.y + 8);
-      ctx.lineTo(p.x, p.y + 18);
-      ctx.stroke();
-      ctx.fillStyle = "rgba(255,190,110,0.95)";
-      ctx.font = "11px system-ui";
-      ctx.textAlign = "center";
-      ctx.fillText("retro", p.x, p.y + 34);
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([7, 9]);
+
+      if (pro) {
+        ctx.strokeStyle = "rgba(95,230,255,0.34)";
+        ctx.beginPath();
+        ctx.arc(pro.x, pro.y, 9, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      if (retro) {
+        ctx.strokeStyle = "rgba(255,154,64,0.34)";
+        ctx.beginPath();
+        ctx.arc(retro.x, retro.y, 9, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
       ctx.restore();
     }
 
     function render() {
       ctx.clearRect(0, 0, W, H);
 
-      drawStars();
+      drawBackground();
       drawGrid();
       drawTrajectory();
       drawPlanets();
-      drawRetrogradeHint();
-      drawShipHUD();
+      drawAttitudeGhost();
+      drawShip();
 
       const speed = Math.hypot(ship.vx, ship.vy);
       readout.innerHTML = `v ${speed.toFixed(1)}<br>throttle ${(ship.thrust * 100).toFixed(0)}%<br>${input.burnIds.size ? "burning" : "coasting"}`;
-      burnVisual.style.opacity = `${0.55 + ship.thrust * 0.45}`;
+      burnVisual.style.opacity = `${0.58 + ship.thrust * 0.42}`;
     }
 
     function loop(now) {
