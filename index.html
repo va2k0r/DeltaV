@@ -11,21 +11,14 @@
       --panel: rgba(7, 12, 24, 0.56);
       --panelBorder: rgba(255,255,255,0.12);
       --text: #eef5ff;
-      --muted: rgba(238,245,255,0.7);
-      --gold: #ffd88f;
-      --cyan: #7ce9ff;
-      --orange: #ffb069;
-      --green: #98ffbf;
-      --red: #ff7d7d;
+      --muted: rgba(238,245,255,0.72);
     }
-
     * {
       box-sizing: border-box;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
       -webkit-user-select: none;
     }
-
     html, body {
       margin: 0;
       width: 100%;
@@ -33,19 +26,13 @@
       overflow: hidden;
       touch-action: none;
       background:
-        radial-gradient(circle at 28% 20%, rgba(99, 132, 255, 0.15), transparent 26%),
-        radial-gradient(circle at 72% 82%, rgba(255, 194, 96, 0.08), transparent 24%),
+        radial-gradient(circle at 28% 20%, rgba(99,132,255,0.15), transparent 26%),
+        radial-gradient(circle at 72% 82%, rgba(255,194,96,0.08), transparent 24%),
         linear-gradient(180deg, var(--bg2), var(--bg1));
       color: var(--text);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-
-    canvas {
-      width: 100vw;
-      height: 100dvh;
-      display: block;
-    }
-
+    canvas { width: 100vw; height: 100dvh; display: block; }
     .hud {
       position: fixed;
       top: calc(env(safe-area-inset-top, 0px) + 10px);
@@ -58,7 +45,6 @@
       pointer-events: none;
       z-index: 10;
     }
-
     .panel {
       background: var(--panel);
       border: 1px solid var(--panelBorder);
@@ -69,24 +55,16 @@
       font-size: 12px;
       line-height: 1.35;
       text-shadow: 0 1px 4px rgba(0,0,0,0.45);
-      max-width: min(58vw, 400px);
+      max-width: min(58vw, 420px);
     }
-
-    .title {
-      font-weight: 700;
-      color: white;
-      font-size: 13px;
-      margin-bottom: 2px;
-    }
-
+    .title { font-weight: 700; color: white; font-size: 13px; margin-bottom: 2px; }
     .small { color: var(--muted); }
-
     .hint {
       position: fixed;
       left: 50%;
       bottom: calc(env(safe-area-inset-bottom, 0px) + 134px);
       transform: translateX(-50%);
-      width: min(94vw, 640px);
+      width: min(94vw, 660px);
       text-align: center;
       color: var(--muted);
       font-size: 12px;
@@ -95,39 +73,20 @@
       pointer-events: none;
       z-index: 10;
     }
-
-    .controls {
-      position: fixed;
-      inset: 0;
-      z-index: 8;
-      pointer-events: none;
-    }
-
+    .controls { position: fixed; inset: 0; z-index: 8; pointer-events: none; }
     .turnZone {
       position: absolute;
       top: 0;
       bottom: 0;
       width: 35vw;
-      background: rgba(255,255,255,0.024);
+      background: rgba(255,255,255,0.022);
       pointer-events: none;
       opacity: 0;
       transition: opacity 120ms ease;
     }
-
-    .turnZone.left {
-      left: 0;
-      border-right: 1px solid rgba(255,255,255,0.03);
-    }
-
-    .turnZone.right {
-      right: 0;
-      border-left: 1px solid rgba(255,255,255,0.03);
-    }
-
-    .turnZone.show {
-      opacity: 1;
-    }
-
+    .turnZone.left { left: 0; border-right: 1px solid rgba(255,255,255,0.03); }
+    .turnZone.right { right: 0; border-left: 1px solid rgba(255,255,255,0.03); }
+    .turnZone.show { opacity: 1; }
     .burnButton {
       position: fixed;
       left: 50%;
@@ -152,14 +111,12 @@
       z-index: 9;
       transition: transform 80ms ease, background 120ms ease;
     }
-
     .burnButton.active {
       transform: translateX(-50%) scale(0.985);
       background:
         radial-gradient(circle at 50% 36%, rgba(255,235,185,0.50), rgba(255,130,55,0.12) 66%),
         radial-gradient(circle at 50% 50%, rgba(255,118,42,0.20), rgba(255,118,42,0.03));
     }
-
     .actions {
       position: fixed;
       right: 12px;
@@ -169,11 +126,10 @@
       gap: 8px;
       z-index: 11;
     }
-
     .hudBtn {
       pointer-events: auto;
       border: 1px solid rgba(255,255,255,0.16);
-      background: rgba(8, 14, 28, 0.72);
+      background: rgba(8,14,28,0.72);
       color: white;
       border-radius: 12px;
       padding: 10px 12px;
@@ -182,13 +138,11 @@
       backdrop-filter: blur(10px);
       box-shadow: 0 10px 24px rgba(0,0,0,0.28);
     }
-
     .hudBtn.active {
-      background: rgba(255, 211, 127, 0.92);
+      background: rgba(255,211,127,0.92);
       color: #0f1524;
       border-color: rgba(255,255,255,0.28);
     }
-
     @media (max-height: 740px) {
       .panel, .hint, .hudBtn { font-size: 11px; }
       .burnButton { width: 96px; height: 96px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); }
@@ -198,31 +152,23 @@
 </head>
 <body>
   <canvas id="game"></canvas>
-
   <div class="hud">
     <div class="panel">
       <div class="title">DeltaV 2D prototype</div>
-      <div class="small">Zoom dinamico sul contesto, pianeti in orbita lenta, nave sempre leggibile, assistenza orbitale più generosa ma discreta.</div>
+      <div class="small">Zoom guidato da traiettoria e corpi rilevanti. Pianeti fuori schermo resi solo come indicatori. Rotazione più costosa, traiettorie più pulite.</div>
     </div>
     <div class="panel" id="readout">v 0<br>fuel 100%<br>target —<br>state coasting</div>
   </div>
-
-  <div class="hint">
-    Lati invisibili: ruota e usa piccoli RCS. Centro basso: burn. Azzurro = traiettoria futura. Arancione = retrograde. I corpi fuori schermo appaiono come punti colorati che diventano cerchi vuoti man mano che ti avvicini.
-  </div>
-
+  <div class="hint">Lati invisibili: ruota con RCS. Centro basso: burn. Azzurro = traiettoria futura. Arancione = retrograde. I corpi fuori schermo restano solo indicatori, non pianeti completi.</div>
   <div class="controls">
     <div class="turnZone left" id="turnLeftGlow"></div>
     <div class="turnZone right" id="turnRightGlow"></div>
   </div>
-
   <div class="burnButton" id="burnVisual">BURN</div>
-
   <div class="actions">
     <button class="hudBtn" id="audioBtn">Audio</button>
     <button class="hudBtn" id="resetBtn">Reset</button>
   </div>
-
 <script>
 (() => {
   const canvas = document.getElementById('game');
@@ -237,54 +183,29 @@
   let W = 0, H = 0, DPR = 1;
   let last = performance.now();
   let simTime = 0;
-  let stars = [];
-  let nebulas = [];
-  let particles = [];
+  let stars = [], nebulas = [], particles = [];
   let currentBodies = [];
   let targetBody = null;
-  let orbitHintState = '';
+  let orbitHintState = 'coasting';
   let crashTimer = 0;
   let flashTimer = 0;
+  let predictedData = { points: [], stableBody: null, interactingBodies: [] };
 
-  const world = {
-    zoom: 0.7,
-    targetZoom: 0.7,
-    camX: 0,
-    camY: 0
-  };
-
-  const input = {
-    leftIds: new Set(),
-    rightIds: new Set(),
-    burnIds: new Set()
-  };
-
+  const world = { zoom: 0.7, targetZoom: 0.7, camX: 0, camY: 0 };
+  const input = { leftIds: new Set(), rightIds: new Set(), burnIds: new Set() };
   const burnButtonScreen = { x: 0, y: 0, r: 82 };
 
-  const sun = {
-    id: 'sol',
-    name: 'Sol',
-    type: 'sun',
-    r: 180,
-    mass: 1650000,
-    colorA: [255, 230, 160],
-    colorB: [255, 132, 52]
-  };
-
+  const sun = { id: 'sol', name: 'Sol', type: 'sun', r: 180, mass: 1650000, colorA: [255,230,160], colorB: [255,132,52] };
   const planetDefs = [
-    { id: 'aster', name: 'Aster', orbitR: 760, omega: 0.012, angle0: 0.55, r: 84, mass: 260000, colorA: [115, 236, 255], colorB: [35, 110, 220], ring: false, seed: 0.12 },
-    { id: 'vesta', name: 'Vesta', orbitR: 1240, omega: 0.0085, angle0: 2.20, r: 118, mass: 470000, colorA: [255, 216, 130], colorB: [180, 82, 50], ring: true, seed: 1.35 },
-    { id: 'nox', name: 'Nox', orbitR: 1700, omega: 0.0062, angle0: 3.72, r: 72, mass: 155000, colorA: [218, 175, 255], colorB: [76, 56, 148], ring: false, seed: 2.1 },
-    { id: 'crios', name: 'Crios', orbitR: 2280, omega: 0.0048, angle0: 5.10, r: 102, mass: 300000, colorA: [162, 255, 201], colorB: [39, 140, 120], ring: false, seed: 2.9 },
-    { id: 'helios', name: 'Helios', orbitR: 2980, omega: 0.0035, angle0: 1.15, r: 146, mass: 690000, colorA: [255, 223, 142], colorB: [194, 93, 32], ring: false, seed: 0.68 }
+    { id: 'aster', name: 'Aster', orbitR: 760, omega: 0.012, angle0: 0.55, r: 84, mass: 260000, colorA: [115,236,255], colorB: [35,110,220], ring: false, seed: 0.12 },
+    { id: 'vesta', name: 'Vesta', orbitR: 1240, omega: 0.0085, angle0: 2.20, r: 118, mass: 470000, colorA: [255,216,130], colorB: [180,82,50], ring: true, seed: 1.35 },
+    { id: 'nox', name: 'Nox', orbitR: 1700, omega: 0.0062, angle0: 3.72, r: 72, mass: 155000, colorA: [218,175,255], colorB: [76,56,148], ring: false, seed: 2.1 },
+    { id: 'crios', name: 'Crios', orbitR: 2280, omega: 0.0048, angle0: 5.10, r: 102, mass: 300000, colorA: [162,255,201], colorB: [39,140,120], ring: false, seed: 2.9 },
+    { id: 'helios', name: 'Helios', orbitR: 2980, omega: 0.0035, angle0: 1.15, r: 146, mass: 690000, colorA: [255,223,142], colorB: [194,93,32], ring: false, seed: 0.68 }
   ];
 
   const ship = {
-    x: 0,
-    y: 0,
-    vx: 0,
-    vy: 0,
-    angle: -Math.PI / 2,
+    x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI / 2,
     radius: 11,
     turnInput: 0,
     angularVelocity: 0,
@@ -295,40 +216,32 @@
     fuel: 1,
     fuelMax: 1,
     burnFuelUse: 0.56,
-    turnFuelUse: 0.055,
+    turnFuelUse: 0.20,
     fuelRegen: 0.14,
-    turnPulseCooldown: 0,
+    rcsVisualCooldown: 0,
     burnSounding: false
   };
 
-  // Audio
-  let audioCtx = null;
-  let masterGain = null;
-  let musicGain = null;
-  let sfxGain = null;
-  let turnNoiseGain = null;
-  let turnNoiseSource = null;
-  let soundOn = false;
-  let musicTimer = null;
-  let musicStep = 0;
+  let audioCtx = null, masterGain = null, musicGain = null, sfxGain = null, turnNoiseGain = null, turnNoiseSource = null;
+  let soundOn = false, musicTimer = null, musicStep = 0;
+
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function shortestAngleDelta(a, b) { return Math.atan2(Math.sin(b - a), Math.cos(b - a)); }
+  function rgb(arr, a = 1) { return `rgba(${arr[0]},${arr[1]},${arr[2]},${a})`; }
 
   function initAudio() {
     if (audioCtx) return;
     const AC = window.AudioContext || window.webkitAudioContext;
     audioCtx = new AC();
-
     masterGain = audioCtx.createGain();
     masterGain.gain.value = 0.64;
     masterGain.connect(audioCtx.destination);
-
     musicGain = audioCtx.createGain();
     musicGain.gain.value = 0.12;
     musicGain.connect(masterGain);
-
     sfxGain = audioCtx.createGain();
     sfxGain.gain.value = 0.34;
     sfxGain.connect(masterGain);
-
     turnNoiseGain = audioCtx.createGain();
     turnNoiseGain.gain.value = 0.0001;
     turnNoiseGain.connect(sfxGain);
@@ -339,14 +252,12 @@
     turnNoiseSource = audioCtx.createBufferSource();
     turnNoiseSource.buffer = buffer;
     turnNoiseSource.loop = true;
-
     const hp = audioCtx.createBiquadFilter();
     hp.type = 'highpass';
-    hp.frequency.value = 900;
+    hp.frequency.value = 1200;
     const lp = audioCtx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 2600;
-
+    lp.frequency.value = 2200;
     turnNoiseSource.connect(hp);
     hp.connect(lp);
     lp.connect(turnNoiseGain);
@@ -374,14 +285,12 @@
     const t = audioCtx.currentTime + when;
     const buffer = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * duration), audioCtx.sampleRate);
     const data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 1.8);
-    }
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 1.8);
     const src = audioCtx.createBufferSource();
     src.buffer = buffer;
     const hp = audioCtx.createBiquadFilter();
     hp.type = 'highpass';
-    hp.frequency.value = 750;
+    hp.frequency.value = 700;
     const g = audioCtx.createGain();
     g.gain.setValueAtTime(gain, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
@@ -395,9 +304,9 @@
   function setTurnSound(level) {
     if (!audioCtx || !soundOn || !turnNoiseGain) return;
     const t = audioCtx.currentTime;
-    const target = Math.max(0.0001, Math.min(0.05, level));
+    const target = clamp(level, 0.0001, 0.03);
     turnNoiseGain.gain.cancelScheduledValues(t);
-    turnNoiseGain.gain.linearRampToValueAtTime(target, t + 0.03);
+    turnNoiseGain.gain.linearRampToValueAtTime(target, t + 0.06);
   }
 
   function sfx(name) {
@@ -415,25 +324,18 @@
       playTone(659.25, 0.16, 'triangle', 0.07, sfxGain, 0.10);
       playTone(783.99, 0.18, 'sine', 0.06, sfxGain, 0.22);
     }
-    if (name === 'tap') {
-      playTone(510, 0.04, 'sine', 0.03, sfxGain);
-    }
-    if (name === 'fuelLow') {
-      playTone(210, 0.09, 'square', 0.045, sfxGain);
-    }
+    if (name === 'tap') playTone(510, 0.04, 'sine', 0.03, sfxGain);
+    if (name === 'fuelLow') playTone(210, 0.09, 'square', 0.045, sfxGain);
     if (name === 'crash') {
       playNoiseBurst(0.22, 0.08);
       playTone(110, 0.26, 'sawtooth', 0.07, sfxGain);
       playTone(70, 0.34, 'square', 0.05, sfxGain, 0.06);
     }
-    if (name === 'turnPulse') {
-      playNoiseBurst(0.045, 0.025);
-    }
   }
 
   function startMusic() {
     if (musicTimer || !audioCtx || !soundOn) return;
-    const melody = [261.63, 329.63, 392.00, 329.63, 440.00, 392.00, 329.63, 493.88, 392.00, 329.63, 293.66, 349.23, 440.00, 349.23, 329.63, 261.63];
+    const melody = [261.63,329.63,392.00,329.63,440.00,392.00,329.63,493.88,392.00,329.63,293.66,349.23,440.00,349.23,329.63,261.63];
     musicTimer = setInterval(() => {
       if (!soundOn || !audioCtx) return;
       const n = melody[musicStep % melody.length];
@@ -445,10 +347,7 @@
     }, 360);
   }
 
-  function stopMusic() {
-    if (musicTimer) clearInterval(musicTimer);
-    musicTimer = null;
-  }
+  function stopMusic() { if (musicTimer) clearInterval(musicTimer); musicTimer = null; }
 
   async function toggleAudio() {
     initAudio();
@@ -463,17 +362,22 @@
       audioBtn.classList.remove('active');
       audioBtn.textContent = 'Audio';
       stopMusic();
-      setTurnSound(0);
+      setTurnSound(0.0001);
     }
   }
 
-  function clamp(v, a, b) {
-    return Math.max(a, Math.min(b, v));
+  function bodyState(def, t) {
+    if (def.type === 'sun') return { ...def, x: 0, y: 0, vx: 0, vy: 0 };
+    const ang = def.angle0 + def.omega * t;
+    const x = Math.cos(ang) * def.orbitR;
+    const y = Math.sin(ang) * def.orbitR;
+    const vx = -Math.sin(ang) * def.orbitR * def.omega;
+    const vy = Math.cos(ang) * def.orbitR * def.omega;
+    return { ...def, angle: ang, x, y, vx, vy };
   }
 
-  function shortestAngleDelta(a, b) {
-    return Math.atan2(Math.sin(b - a), Math.cos(b - a));
-  }
+  function getBodiesAtTime(t) { return [bodyState(sun, t), ...planetDefs.map(p => bodyState(p, t))]; }
+  function getBodyById(states, id) { return states.find(b => b.id === id) || null; }
 
   function resize() {
     DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
@@ -492,46 +396,8 @@
   function buildSpace() {
     stars = [];
     nebulas = [];
-    for (let i = 0; i < 460; i++) {
-      stars.push({
-        x: Math.random() * W,
-        y: Math.random() * H,
-        r: Math.random() * 1.6 + 0.2,
-        a: Math.random() * 0.75 + 0.2,
-        layer: Math.random() * 0.65 + 0.35
-      });
-    }
-    for (let i = 0; i < 20; i++) {
-      nebulas.push({
-        x: Math.random() * W,
-        y: Math.random() * H,
-        r: Math.random() * 280 + 120,
-        a: Math.random() * 0.06 + 0.02,
-        hue: Math.random() < 0.5 ? '90,130,255' : '255,170,100'
-      });
-    }
-  }
-
-  function rgb(arr, a = 1) {
-    return `rgba(${arr[0]},${arr[1]},${arr[2]},${a})`;
-  }
-
-  function bodyState(def, t) {
-    if (def.type === 'sun') return { ...def, x: 0, y: 0, vx: 0, vy: 0 };
-    const ang = def.angle0 + def.omega * t;
-    const x = Math.cos(ang) * def.orbitR;
-    const y = Math.sin(ang) * def.orbitR;
-    const vx = -Math.sin(ang) * def.orbitR * def.omega;
-    const vy = Math.cos(ang) * def.orbitR * def.omega;
-    return { ...def, angle: ang, x, y, vx, vy };
-  }
-
-  function getBodiesAtTime(t) {
-    return [bodyState(sun, t), ...planetDefs.map(p => bodyState(p, t))];
-  }
-
-  function getBodyById(states, id) {
-    return states.find(b => b.id === id) || null;
+    for (let i = 0; i < 460; i++) stars.push({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 1.6 + 0.2, a: Math.random() * 0.75 + 0.2, layer: Math.random() * 0.65 + 0.35 });
+    for (let i = 0; i < 20; i++) nebulas.push({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 280 + 120, a: Math.random() * 0.06 + 0.02, hue: Math.random() < 0.5 ? '90,130,255' : '255,170,100' });
   }
 
   function resetShip() {
@@ -543,37 +409,24 @@
     const sy = startPlanet.y + Math.sin(angle) * dist;
     const nx = (sx - startPlanet.x) / dist;
     const ny = (sy - startPlanet.y) / dist;
-    const tx = -ny;
-    const ty = nx;
+    const tx = -ny, ty = nx;
     const localCircular = Math.sqrt(startPlanet.mass / dist) * 0.88;
-
-    ship.x = sx;
-    ship.y = sy;
+    ship.x = sx; ship.y = sy;
     ship.vx = startPlanet.vx + tx * localCircular;
     ship.vy = startPlanet.vy + ty * localCircular;
     ship.angle = Math.atan2(ship.vy - startPlanet.vy, ship.vx - startPlanet.vx);
-    ship.turnInput = 0;
-    ship.angularVelocity = 0;
-    ship.thrust = 0;
-    ship.thrustTarget = 0;
-    ship.fuel = 1;
-    ship.turnPulseCooldown = 0;
-    ship.burnSounding = false;
-    crashTimer = 0;
-    flashTimer = 0;
-    particles = [];
-    orbitHintState = '';
-    input.leftIds.clear();
-    input.rightIds.clear();
-    input.burnIds.clear();
-    updateInputUI();
+    ship.turnInput = 0; ship.angularVelocity = 0; ship.thrust = 0; ship.thrustTarget = 0; ship.fuel = 1;
+    ship.rcsVisualCooldown = 0; ship.burnSounding = false;
+    crashTimer = 0; flashTimer = 0; particles = [];
+    orbitHintState = 'coasting';
+    input.leftIds.clear(); input.rightIds.clear(); input.burnIds.clear(); updateInputUI();
+    predictedData = { points: [], stableBody: null, interactingBodies: [] };
   }
 
   function gravityAt(x, y, bodies) {
     let ax = 0, ay = 0;
     for (const b of bodies) {
-      const dx = b.x - x;
-      const dy = b.y - y;
+      const dx = b.x - x, dy = b.y - y;
       const d2 = dx * dx + dy * dy;
       const d = Math.sqrt(d2) + 0.0001;
       const safe = Math.max(d2, b.r * b.r * 0.78);
@@ -585,8 +438,7 @@
   }
 
   function regionForPointer(x, y) {
-    const dx = x - burnButtonScreen.x;
-    const dy = y - burnButtonScreen.y;
+    const dx = x - burnButtonScreen.x, dy = y - burnButtonScreen.y;
     if (dx * dx + dy * dy < burnButtonScreen.r * burnButtonScreen.r) return 'burn';
     if (x < W * 0.47) return 'left';
     if (x > W * 0.53) return 'right';
@@ -599,170 +451,81 @@
     if (region === 'burn') input.burnIds.add(id);
     updateInputUI();
   }
-
   function clearPointer(id) {
-    input.leftIds.delete(id);
-    input.rightIds.delete(id);
-    input.burnIds.delete(id);
-    updateInputUI();
+    input.leftIds.delete(id); input.rightIds.delete(id); input.burnIds.delete(id); updateInputUI();
   }
-
   function updateInputUI() {
     leftGlow.classList.toggle('show', input.leftIds.size > 0);
     rightGlow.classList.toggle('show', input.rightIds.size > 0);
     burnVisual.classList.toggle('active', input.burnIds.size > 0);
   }
 
-  function screenPos(x, y) {
-    return {
-      x: W / 2 + (x - world.camX) * world.zoom,
-      y: H / 2 + (y - world.camY) * world.zoom
-    };
-  }
+  function screenPos(x, y) { return { x: W / 2 + (x - world.camX) * world.zoom, y: H / 2 + (y - world.camY) * world.zoom }; }
 
   function chooseTargetBody() {
     const speed = Math.hypot(ship.vx, ship.vy);
     const dirX = speed > 5 ? ship.vx / speed : Math.cos(ship.angle);
     const dirY = speed > 5 ? ship.vy / speed : Math.sin(ship.angle);
-    let best = null;
-    let bestScore = -Infinity;
+    let best = null, bestScore = -Infinity;
     for (const b of currentBodies) {
       if (b.type === 'sun') continue;
-      const dx = b.x - ship.x;
-      const dy = b.y - ship.y;
+      const dx = b.x - ship.x, dy = b.y - ship.y;
       const d = Math.hypot(dx, dy) + 0.0001;
-      const nx = dx / d;
-      const ny = dy / d;
+      const nx = dx / d, ny = dy / d;
       const align = nx * dirX + ny * dirY;
       const score = align * 1.2 + (1 / (1 + d / 1600)) + b.mass / (d * d) * 2000;
-      if (score > bestScore) {
-        bestScore = score;
-        best = b;
-      }
+      if (score > bestScore) { bestScore = score; best = b; }
     }
     targetBody = best;
   }
 
-  function nearestBodies(count = 2) {
-    return [...currentBodies]
-      .filter(b => b.type !== 'sun')
-      .map(b => ({ body: b, d: Math.hypot(b.x - ship.x, b.y - ship.y) }))
-      .sort((a, b) => a.d - b.d)
-      .slice(0, count)
-      .map(x => x.body);
-  }
-
-  function relevantBodiesForZoom() {
-    const near = nearestBodies(2);
-    const list = [];
-    if (near[0]) list.push(near[0]);
-    if (targetBody && !list.find(b => b.id === targetBody.id)) list.push(targetBody);
-    if (near[1] && !list.find(b => b.id === near[1].id)) list.push(near[1]);
-    const distSun = Math.hypot(ship.x, ship.y);
-    if (distSun < 1650) list.push(currentBodies[0]);
-    return list.slice(0, 3);
-  }
-
-  function updateZoom(dt) {
-    const rel = relevantBodiesForZoom();
-    const maxX = W * 0.36;
-    const maxY = H * 0.29;
-    let fitZoom = 1.35;
-
-    for (const b of rel) {
-      const dx = b.x - ship.x;
-      const dy = b.y - ship.y;
-      const pad = b.r + 90;
-      const zx = maxX / (Math.abs(dx) + pad);
-      const zy = maxY / (Math.abs(dy) + pad);
-      fitZoom = Math.min(fitZoom, zx, zy);
+  function nearestPlanet() {
+    let best = null, bestD = Infinity;
+    for (const b of currentBodies) {
+      if (b.type === 'sun') continue;
+      const d = Math.hypot(ship.x - b.x, ship.y - b.y);
+      if (d < bestD) { bestD = d; best = b; }
     }
-
-    const speed = Math.hypot(ship.vx, ship.vy);
-    if (speed > 130) fitZoom = Math.min(fitZoom, 0.48);
-    if (speed > 190) fitZoom = Math.min(fitZoom, 0.35);
-
-    world.targetZoom = clamp(fitZoom * 0.96, 0.12, 1.28);
-    world.zoom += (world.targetZoom - world.zoom) * Math.min(1, dt * 1.7);
-
-    world.camX = ship.x;
-    world.camY = ship.y;
+    return { body: best, distance: bestD };
   }
 
   function applyOrbitAssist(dt, x, y, vx, vy, bodies, mode = 'actual') {
     const planets = bodies.filter(b => b.type !== 'sun');
-    let closest = null;
-    let bestD = Infinity;
+    let closest = null, bestD = Infinity;
     for (const p of planets) {
       const d = Math.hypot(x - p.x, y - p.y);
-      if (d < bestD) {
-        bestD = d;
-        closest = p;
-      }
+      if (d < bestD) { bestD = d; closest = p; }
     }
     if (!closest) return { vx, vy, body: null, stable: false };
-
     const p = closest;
-    const dx = x - p.x;
-    const dy = y - p.y;
+    const dx = x - p.x, dy = y - p.y;
     const d = Math.hypot(dx, dy);
-    const captureOuter = p.r * 3.6;
+    const captureOuter = p.r * 3.8;
     const captureInner = p.r * 1.18;
     if (d > captureOuter || d < captureInner) return { vx, vy, body: p, stable: false };
 
-    const nx = dx / d;
-    const ny = dy / d;
-    const tx = -ny;
-    const ty = nx;
+    const nx = dx / d, ny = dy / d;
+    const tx = -ny, ty = nx;
     const radialV = vx * nx + vy * ny;
     const tangentialV = vx * tx + vy * ty;
-    const ideal = Math.sqrt(p.mass / Math.max(d, p.r * 1.05)) * 0.93;
-    const closeToTangential = Math.abs(tangentialV) > ideal * 0.42;
+    const ideal = Math.sqrt(p.mass / Math.max(d, p.r * 1.05)) * 0.94;
+    const closeToTangential = Math.abs(tangentialV) > ideal * 0.38;
     const speedError = Math.abs(Math.abs(tangentialV) - ideal) / ideal;
     const radialRatio = Math.abs(radialV) / ideal;
-    const captureAffinity = clamp(1 - speedError * 0.8 - radialRatio * 0.65, 0, 1);
-
+    const captureAffinity = clamp(1 - speedError * 0.85 - radialRatio * 0.65, 0, 1);
     let stable = false;
 
-    if (closeToTangential && captureAffinity > 0.12) {
-      const strength = (mode === 'predict' ? 0.78 : 0.86) * captureAffinity;
-      vx += (-radialV * nx) * dt * (1.0 + strength * 1.2);
-      vy += (-radialV * ny) * dt * (1.0 + strength * 1.2);
-
+    if (closeToTangential && captureAffinity > 0.10) {
+      const strength = (mode === 'predict' ? 0.82 : 0.90) * captureAffinity;
+      vx += (-radialV * nx) * dt * (1.05 + strength * 1.25);
+      vy += (-radialV * ny) * dt * (1.05 + strength * 1.25);
       const desiredTan = Math.sign(tangentialV || 1) * ideal;
       const tanDelta = desiredTan - tangentialV;
-      vx += (tx * tanDelta) * dt * (0.42 + strength * 0.48);
-      vy += (ty * tanDelta) * dt * (0.42 + strength * 0.48);
-
-      stable = Math.abs(radialV) < ideal * 0.11 && Math.abs(tanDelta) < ideal * 0.10;
+      vx += (tx * tanDelta) * dt * (0.48 + strength * 0.56);
+      vy += (ty * tanDelta) * dt * (0.48 + strength * 0.56);
+      stable = Math.abs(radialV) < ideal * 0.10 && Math.abs(tanDelta) < ideal * 0.11;
     }
-
     return { vx, vy, body: p, stable };
-  }
-
-  function triggerCrash() {
-    if (crashTimer > 0) return;
-    crashTimer = 1.2;
-    flashTimer = 0.24;
-    sfx('crash');
-    setTurnSound(0);
-    ship.thrust = 0;
-    ship.thrustTarget = 0;
-    ship.burnSounding = false;
-
-    for (let i = 0; i < 70; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const speed = 40 + Math.random() * 140;
-      particles.push({
-        x: ship.x,
-        y: ship.y,
-        vx: Math.cos(a) * speed + ship.vx * 0.15,
-        vy: Math.sin(a) * speed + ship.vy * 0.15,
-        life: 0.35 + Math.random() * 0.45,
-        r: 2 + Math.random() * 4,
-        color: Math.random() < 0.5 ? '255,160,70' : '135,230,255'
-      });
-    }
   }
 
   function spawnMainExhaust(strength) {
@@ -770,52 +533,121 @@
     for (let i = 0; i < count; i++) {
       const a = ship.angle + Math.PI + (Math.random() - 0.5) * 0.24;
       const speed = 70 + Math.random() * 42 + strength * 95;
-      particles.push({
-        x: ship.x - Math.cos(ship.angle) * 12,
-        y: ship.y - Math.sin(ship.angle) * 12,
-        vx: Math.cos(a) * speed + ship.vx * 0.12,
-        vy: Math.sin(a) * speed + ship.vy * 0.12,
-        life: 0.22 + Math.random() * 0.20,
-        r: 2.2 + Math.random() * 3.1,
-        color: Math.random() < 0.6 ? '255,175,78' : '120,230,255'
-      });
+      particles.push({ x: ship.x - Math.cos(ship.angle) * 12, y: ship.y - Math.sin(ship.angle) * 12, vx: Math.cos(a) * speed + ship.vx * 0.12, vy: Math.sin(a) * speed + ship.vy * 0.12, life: 0.22 + Math.random() * 0.20, r: 2.2 + Math.random() * 3.1, color: Math.random() < 0.6 ? '255,175,78' : '120,230,255' });
     }
   }
 
   function spawnRCS(side, intensity) {
     const lateral = side === 'left' ? 1 : -1;
-    const hx = Math.cos(ship.angle);
-    const hy = Math.sin(ship.angle);
-    const sx = -hy;
-    const sy = hx;
+    const hx = Math.cos(ship.angle), hy = Math.sin(ship.angle);
+    const sx = -hy, sy = hx;
     const portX = ship.x - hx * 4 + sx * lateral * 10;
     const portY = ship.y - hy * 4 + sy * lateral * 10;
-
     const a = ship.angle + (side === 'left' ? Math.PI / 2 : -Math.PI / 2) + (Math.random() - 0.5) * 0.26;
     const count = 1 + Math.floor(intensity * 3);
     for (let i = 0; i < count; i++) {
       const speed = 28 + Math.random() * 22 + intensity * 40;
-      particles.push({
-        x: portX,
-        y: portY,
-        vx: Math.cos(a) * speed + ship.vx * 0.12,
-        vy: Math.sin(a) * speed + ship.vy * 0.12,
-        life: 0.12 + Math.random() * 0.08,
-        r: 1.4 + Math.random() * 1.5,
-        color: '165,235,255'
-      });
+      particles.push({ x: portX, y: portY, vx: Math.cos(a) * speed + ship.vx * 0.12, vy: Math.sin(a) * speed + ship.vy * 0.12, life: 0.11 + Math.random() * 0.08, r: 1.4 + Math.random() * 1.5, color: '165,235,255' });
     }
   }
 
   function updateParticles(dt) {
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.life -= dt;
-      p.r *= 0.993;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; p.r *= 0.993;
       if (p.life <= 0 || p.r < 0.2) particles.splice(i, 1);
     }
+  }
+
+  function triggerCrash() {
+    if (crashTimer > 0) return;
+    crashTimer = 1.2;
+    flashTimer = 0.24;
+    sfx('crash');
+    setTurnSound(0.0001);
+    ship.thrust = 0; ship.thrustTarget = 0; ship.burnSounding = false;
+    for (let i = 0; i < 70; i++) {
+      const a = Math.random() * Math.PI * 2, speed = 40 + Math.random() * 140;
+      particles.push({ x: ship.x, y: ship.y, vx: Math.cos(a) * speed + ship.vx * 0.15, vy: Math.sin(a) * speed + ship.vy * 0.15, life: 0.35 + Math.random() * 0.45, r: 2 + Math.random() * 4, color: Math.random() < 0.5 ? '255,160,70' : '135,230,255' });
+    }
+  }
+
+  function computePredictedData() {
+    const speed = Math.hypot(ship.vx, ship.vy);
+    if (speed < 2 && ship.thrust < 0.03) return { points: [], stableBody: null, interactingBodies: [] };
+
+    let x = ship.x, y = ship.y, vx = ship.vx, vy = ship.vy;
+    const points = [];
+    const interactMap = new Map();
+    const step = 0.10;
+    const maxSteps = 320;
+    let stableBody = null;
+    let orbitTracker = null, lastAng = 0, accumAng = 0;
+
+    for (let i = 0; i < maxSteps; i++) {
+      const t = simTime + i * step;
+      const bodies = getBodiesAtTime(t);
+      const g = gravityAt(x, y, bodies);
+      vx += g.ax * step;
+      vy += g.ay * step;
+      const assist = applyOrbitAssist(step, x, y, vx, vy, bodies, 'predict');
+      vx = assist.vx; vy = assist.vy;
+      if (assist.stable && assist.body) stableBody = assist.body;
+      x += vx * step; y += vy * step;
+      points.push({ x, y });
+
+      for (const b of bodies) {
+        if (b.type === 'sun') continue;
+        const d = Math.hypot(x - b.x, y - b.y);
+        if (d < b.r * 4.2) interactMap.set(b.id, b);
+        if (d < b.r) return { points, stableBody, interactingBodies: [...interactMap.values()] };
+      }
+
+      if (stableBody) {
+        const sBody = bodies.find(b => b.id === stableBody.id) || stableBody;
+        const dx = x - sBody.x, dy = y - sBody.y;
+        const ang = Math.atan2(dy, dx);
+        if (!orbitTracker) {
+          orbitTracker = stableBody.id; lastAng = ang;
+        } else if (orbitTracker === stableBody.id) {
+          accumAng += shortestAngleDelta(lastAng, ang);
+          lastAng = ang;
+          if (Math.abs(accumAng) > Math.PI * 2 * 0.92) break;
+        }
+      }
+    }
+
+    let interactingBodies = [...interactMap.values()];
+    if (!interactingBodies.length) {
+      const near = nearestPlanet();
+      if (near.body && near.distance < 1300) interactingBodies = [near.body];
+    }
+    return { points, stableBody, interactingBodies };
+  }
+
+  function updateZoom(dt) {
+    const relevant = predictedData.interactingBodies.slice(0, 2);
+    const samplePoints = predictedData.points.filter((_, i) => i % 6 === 0).slice(0, 42);
+    let minX = ship.x, maxX = ship.x, minY = ship.y, maxY = ship.y;
+    for (const p of samplePoints) {
+      if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+    }
+    for (const b of relevant) {
+      minX = Math.min(minX, b.x - b.r - 40); maxX = Math.max(maxX, b.x + b.r + 40);
+      minY = Math.min(minY, b.y - b.r - 40); maxY = Math.max(maxY, b.y + b.r + 40);
+    }
+
+    const spanX = Math.max(280, maxX - minX);
+    const spanY = Math.max(220, maxY - minY);
+    const zx = (W * 0.78) / spanX;
+    const zy = (H * 0.70) / spanY;
+    let fitZoom = Math.min(zx, zy);
+    if (!predictedData.points.length) fitZoom = 1.0;
+    world.targetZoom = clamp(fitZoom, 0.18, 1.28);
+    world.zoom += (world.targetZoom - world.zoom) * Math.min(1, dt * 2.0);
+    world.camX = ship.x;
+    world.camY = ship.y;
   }
 
   function update(dt) {
@@ -824,21 +656,15 @@
     chooseTargetBody();
 
     if (crashTimer > 0) {
-      crashTimer -= dt;
-      flashTimer = Math.max(0, flashTimer - dt);
-      updateParticles(dt);
+      crashTimer -= dt; flashTimer = Math.max(0, flashTimer - dt); updateParticles(dt);
       if (crashTimer <= 0) resetShip();
       return;
     }
 
-    const left = input.leftIds.size > 0;
-    const right = input.rightIds.size > 0;
-    const burnHeld = input.burnIds.size > 0;
-
+    const left = input.leftIds.size > 0, right = input.rightIds.size > 0, burnHeld = input.burnIds.size > 0;
     const turnTarget = left && !right ? -1 : right && !left ? 1 : 0;
     const turnRamp = Math.abs(turnTarget) > Math.abs(ship.turnInput) ? 2.6 : 4.7;
     ship.turnInput += (turnTarget - ship.turnInput) * Math.min(1, dt * turnRamp);
-
     const turnSign = Math.sign(ship.turnInput);
     const turnEff = turnSign * ship.turnInput * ship.turnInput;
     const turnLevel = Math.abs(turnEff);
@@ -848,41 +674,33 @@
 
     if (turnLevel > 0.03) {
       ship.fuel -= ship.turnFuelUse * turnLevel * dt;
-      ship.turnPulseCooldown -= dt;
-      if (ship.turnPulseCooldown <= 0) {
-        ship.turnPulseCooldown = 0.07;
+      ship.rcsVisualCooldown -= dt;
+      if (ship.rcsVisualCooldown <= 0) {
+        ship.rcsVisualCooldown = 0.055;
         spawnRCS(turnEff < 0 ? 'left' : 'right', turnLevel);
-        sfx('turnPulse');
       }
     } else {
-      ship.turnPulseCooldown = Math.max(0, ship.turnPulseCooldown - dt);
+      ship.rcsVisualCooldown = Math.max(0, ship.rcsVisualCooldown - dt);
     }
 
     ship.thrustTarget = burnHeld && ship.fuel > 0.01 ? 1 : 0;
     const thrustRamp = ship.thrustTarget > ship.thrust ? 0.95 : 3.4;
     ship.thrust += (ship.thrustTarget - ship.thrust) * Math.min(1, dt * thrustRamp);
-
     const thrustEff = ship.thrust * ship.thrust;
-    if (!ship.burnSounding && ship.thrust > 0.06) {
-      ship.burnSounding = true;
-      sfx('burnStart');
-    }
+    if (!ship.burnSounding && ship.thrust > 0.06) { ship.burnSounding = true; sfx('burnStart'); }
     if (ship.thrust < 0.02) ship.burnSounding = false;
 
-    if (thrustEff > 0.001) {
-      ship.fuel -= ship.burnFuelUse * thrustEff * dt;
-    } else {
-      const near = nearestBodies(1)[0];
-      const nearBonus = near ? Math.max(0, 1 - Math.hypot(near.x - ship.x, near.y - ship.y) / 1500) * 0.06 : 0;
+    if (thrustEff > 0.001) ship.fuel -= ship.burnFuelUse * thrustEff * dt;
+    else {
+      const near = nearestPlanet();
+      const nearBonus = near.body ? Math.max(0, 1 - near.distance / 1500) * 0.06 : 0;
       ship.fuel += (ship.fuelRegen + nearBonus) * dt;
     }
     ship.fuel = clamp(ship.fuel, 0, ship.fuelMax);
-
     if (ship.fuel < 0.12 && Math.random() < 0.006) sfx('fuelLow');
 
     const g = gravityAt(ship.x, ship.y, currentBodies);
-    ship.vx += g.ax * dt;
-    ship.vy += g.ay * dt;
+    ship.vx += g.ax * dt; ship.vy += g.ay * dt;
 
     if (thrustEff > 0.001 && ship.fuel > 0) {
       const power = ship.thrustPower * thrustEff;
@@ -892,80 +710,21 @@
     }
 
     const assist = applyOrbitAssist(dt, ship.x, ship.y, ship.vx, ship.vy, currentBodies, 'actual');
-    ship.vx = assist.vx;
-    ship.vy = assist.vy;
+    ship.vx = assist.vx; ship.vy = assist.vy;
     orbitHintState = assist.stable && assist.body ? `stable orbit ${assist.body.name}` : (assist.body ? `approach ${assist.body.name}` : 'coasting');
+    if (assist.stable && assist.body && Math.random() < 0.01) sfx('orbit');
 
-    ship.x += ship.vx * dt;
-    ship.y += ship.vy * dt;
+    ship.x += ship.vx * dt; ship.y += ship.vy * dt;
 
     for (const b of currentBodies) {
       const d = Math.hypot(ship.x - b.x, ship.y - b.y);
-      if (d < b.r + ship.radius) {
-        triggerCrash();
-        break;
-      }
+      if (d < b.r + ship.radius) { triggerCrash(); break; }
     }
 
-    setTurnSound(turnLevel * 0.03 + (ship.thrust > 0.05 ? 0.006 : 0));
-
-    updateZoom(dt);
+    setTurnSound(turnLevel * 0.022);
     updateParticles(dt);
-  }
-
-  function predictTrajectory() {
-    const speed = Math.hypot(ship.vx, ship.vy);
-    if (speed < 2 && ship.thrust < 0.03) return { points: [], stableBody: null };
-
-    let x = ship.x;
-    let y = ship.y;
-    let vx = ship.vx;
-    let vy = ship.vy;
-
-    const points = [];
-    const step = 0.10;
-    const maxSteps = 520;
-    let stableBody = null;
-    let orbitTracker = null;
-    let lastAng = 0;
-    let accumAng = 0;
-
-    for (let i = 0; i < maxSteps; i++) {
-      const t = simTime + i * step;
-      const bodies = getBodiesAtTime(t);
-      const g = gravityAt(x, y, bodies);
-      vx += g.ax * step;
-      vy += g.ay * step;
-
-      const assist = applyOrbitAssist(step, x, y, vx, vy, bodies, 'predict');
-      vx = assist.vx;
-      vy = assist.vy;
-      if (assist.stable && assist.body) stableBody = assist.body;
-
-      x += vx * step;
-      y += vy * step;
-      points.push({ x, y });
-
-      for (const b of bodies) {
-        if (Math.hypot(x - b.x, y - b.y) < b.r) return { points, stableBody };
-      }
-
-      if (stableBody) {
-        const dx = x - stableBody.x;
-        const dy = y - stableBody.y;
-        const ang = Math.atan2(dy, dx);
-        if (!orbitTracker) {
-          orbitTracker = stableBody.id;
-          lastAng = ang;
-        } else if (orbitTracker === stableBody.id) {
-          accumAng += shortestAngleDelta(lastAng, ang);
-          lastAng = ang;
-          if (Math.abs(accumAng) > Math.PI * 2 * 1.08) break;
-        }
-      }
-    }
-
-    return { points, stableBody };
+    predictedData = computePredictedData();
+    updateZoom(dt);
   }
 
   function drawBackground() {
@@ -973,31 +732,21 @@
       const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
       grad.addColorStop(0, `rgba(${n.hue},${n.a})`);
       grad.addColorStop(1, `rgba(${n.hue},0)`);
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2); ctx.fill();
     }
-
     const driftX = ((world.camX * 0.010) % W + W) % W;
     const driftY = ((world.camY * 0.010) % H + H) % H;
-
     for (const s of stars) {
       const x = (s.x - driftX * s.layer + W * 3) % W;
       const y = (s.y - driftY * s.layer + H * 3) % H;
-      ctx.globalAlpha = s.a;
-      ctx.fillStyle = 'white';
-      ctx.beginPath();
-      ctx.arc(x, y, s.r, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.globalAlpha = s.a; ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(x, y, s.r, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
   }
 
   function drawGrid() {
     ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1;
     const spacing = 180;
     const halfWorldX = W / world.zoom / 2 + 220;
     const halfWorldY = H / world.zoom / 2 + 220;
@@ -1005,108 +754,61 @@
     const endX = Math.ceil((world.camX + halfWorldX) / spacing) * spacing;
     const startY = Math.floor((world.camY - halfWorldY) / spacing) * spacing;
     const endY = Math.ceil((world.camY + halfWorldY) / spacing) * spacing;
-
     for (let x = startX; x <= endX; x += spacing) {
-      const a = screenPos(x, startY);
-      const b = screenPos(x, endY);
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
+      const a = screenPos(x, startY), b = screenPos(x, endY);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
     for (let y = startY; y <= endY; y += spacing) {
-      const a = screenPos(startX, y);
-      const b = screenPos(endX, y);
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
+      const a = screenPos(startX, y), b = screenPos(endX, y);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
     ctx.restore();
-  }
-
-  function drawTrajectory() {
-    const { points, stableBody } = predictTrajectory();
-    if (points.length < 2) return;
-
-    const speed = Math.hypot(ship.vx, ship.vy);
-    const dirX = speed > 4 ? ship.vx / speed : Math.cos(ship.angle);
-    const dirY = speed > 4 ? ship.vy / speed : Math.sin(ship.angle);
-
-    const front = [];
-    const back = [];
-
-    for (const p of points) {
-      const dx = p.x - ship.x;
-      const dy = p.y - ship.y;
-      const dot = dx * dirX + dy * dirY;
-      if (dot >= 0) {
-        front.push(p);
-        back.push(null);
-      } else {
-        back.push(p);
-        front.push(null);
-      }
-    }
-
-    function split(arr) {
-      const out = [];
-      let cur = [];
-      for (const p of arr) {
-        if (p) cur.push(p);
-        else if (cur.length) {
-          out.push(cur);
-          cur = [];
-        }
-      }
-      if (cur.length) out.push(cur);
-      return out;
-    }
-
-    for (const seg of split(back)) drawTrajectorySegment(seg, 'rgba(255,172,92,0.92)', 'rgba(255,130,50,0.82)', [5, 12], 2.3);
-    for (const seg of split(front)) drawTrajectorySegment(seg, stableBody ? 'rgba(145,255,190,0.95)' : 'rgba(110,236,255,0.95)', stableBody ? 'rgba(130,255,185,0.85)' : 'rgba(72,210,255,0.86)', [12, 9], 2.8);
-
-    if (stableBody && points.length) {
-      const end = screenPos(points[points.length - 1].x, points[points.length - 1].y);
-      ctx.save();
-      ctx.fillStyle = 'rgba(145,255,190,0.9)';
-      ctx.font = '12px system-ui';
-      ctx.textAlign = 'left';
-      ctx.fillText('stable orbit', end.x + 8, end.y - 6);
-      ctx.restore();
-    }
   }
 
   function drawTrajectorySegment(seg, stroke, glow, dash, width) {
     if (seg.length < 2) return;
     ctx.save();
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = width;
-    ctx.shadowColor = glow;
-    ctx.shadowBlur = 11;
-    ctx.setLineDash(dash);
-    ctx.lineDashOffset = -performance.now() * 0.03;
+    ctx.strokeStyle = stroke; ctx.lineWidth = width;
+    ctx.shadowColor = glow; ctx.shadowBlur = 11;
+    ctx.setLineDash(dash); ctx.lineDashOffset = -performance.now() * 0.03;
     const start = screenPos(seg[0].x, seg[0].y);
-    ctx.beginPath();
-    ctx.moveTo(start.x, start.y);
-    for (let i = 1; i < seg.length; i++) {
-      const p = screenPos(seg[i].x, seg[i].y);
-      ctx.lineTo(p.x, p.y);
-    }
+    ctx.beginPath(); ctx.moveTo(start.x, start.y);
+    for (let i = 1; i < seg.length; i++) { const p = screenPos(seg[i].x, seg[i].y); ctx.lineTo(p.x, p.y); }
     ctx.stroke();
     ctx.restore();
   }
 
-  function scalePlanetRadius(realR) {
-    return Math.max(14, realR * world.zoom);
+  function drawTrajectory() {
+    const points = predictedData.points;
+    if (points.length < 2) return;
+    const speed = Math.hypot(ship.vx, ship.vy);
+    const dirX = speed > 4 ? ship.vx / speed : Math.cos(ship.angle);
+    const dirY = speed > 4 ? ship.vy / speed : Math.sin(ship.angle);
+    const front = [], back = [];
+    for (const p of points) {
+      const dx = p.x - ship.x, dy = p.y - ship.y;
+      const dot = dx * dirX + dy * dirY;
+      if (dot >= 0) { front.push(p); back.push(null); } else { back.push(p); front.push(null); }
+    }
+    function split(arr) {
+      const out = []; let cur = [];
+      for (const p of arr) { if (p) cur.push(p); else if (cur.length) { out.push(cur); cur = []; } }
+      if (cur.length) out.push(cur);
+      return out;
+    }
+    for (const seg of split(back)) drawTrajectorySegment(seg, 'rgba(255,172,92,0.92)', 'rgba(255,130,50,0.82)', [5,12], 2.3);
+    for (const seg of split(front)) drawTrajectorySegment(seg, predictedData.stableBody ? 'rgba(145,255,190,0.95)' : 'rgba(110,236,255,0.95)', predictedData.stableBody ? 'rgba(130,255,185,0.85)' : 'rgba(72,210,255,0.86)', [12,9], 2.8);
+    if (predictedData.stableBody && points.length) {
+      const end = screenPos(points[points.length - 1].x, points[points.length - 1].y);
+      ctx.save(); ctx.fillStyle = 'rgba(145,255,190,0.92)'; ctx.font = '12px system-ui'; ctx.textAlign = 'left'; ctx.fillText('stable orbit', end.x + 8, end.y - 6); ctx.restore();
+    }
   }
+
+  function scalePlanetRadius(realR) { return Math.max(14, realR * world.zoom); }
 
   function drawBodyTexture(b, x, y, r) {
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.clip();
-
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
     for (let i = 0; i < 9; i++) {
       const yy = y - r + (i + 0.5) * (2 * r / 9);
       const wave = Math.sin(i * 1.6 + (b.seed || 0)) * r * 0.12;
@@ -1117,194 +819,93 @@
       ctx.ellipse(x + wave, yy, r * (0.90 - i * 0.028), r * 0.11, Math.sin(i + (b.seed || 0)) * 0.12, 0, Math.PI * 2);
       ctx.stroke();
     }
-
     for (let i = 0; i < 8; i++) {
-      const a = i * 2.2 + (b.seed || 0);
-      const rr = r * (0.18 + ((i * 23) % 54) / 100);
-      ctx.globalAlpha = 0.09;
-      ctx.fillStyle = i % 2 ? 'white' : 'black';
-      ctx.beginPath();
+      const a = i * 2.2 + (b.seed || 0), rr = r * (0.18 + ((i * 23) % 54) / 100);
+      ctx.globalAlpha = 0.09; ctx.fillStyle = i % 2 ? 'white' : 'black'; ctx.beginPath();
       ctx.ellipse(x + Math.cos(a) * rr * 0.7, y + Math.sin(a * 1.35) * rr * 0.5, r * (0.08 + i * 0.005), r * (0.03 + i * 0.003), a, 0, Math.PI * 2);
       ctx.fill();
     }
-
-    ctx.restore();
-    ctx.globalAlpha = 1;
+    ctx.restore(); ctx.globalAlpha = 1;
   }
 
   function drawSun(b) {
-    const sp = screenPos(b.x, b.y);
-    const r = scalePlanetRadius(b.r);
-
+    const sp = screenPos(b.x, b.y), r = scalePlanetRadius(b.r);
+    if (sp.x + r < 0 || sp.x - r > W || sp.y + r < 0 || sp.y - r > H) return;
     const glow = ctx.createRadialGradient(sp.x, sp.y, r * 0.4, sp.x, sp.y, r * 2.4);
-    glow.addColorStop(0, 'rgba(255,225,165,0.32)');
-    glow.addColorStop(0.55, 'rgba(255,165,72,0.14)');
-    glow.addColorStop(1, 'rgba(255,140,50,0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, r * 2.4, 0, Math.PI * 2);
-    ctx.fill();
-
+    glow.addColorStop(0, 'rgba(255,225,165,0.32)'); glow.addColorStop(0.55, 'rgba(255,165,72,0.14)'); glow.addColorStop(1, 'rgba(255,140,50,0)');
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(sp.x, sp.y, r * 2.4, 0, Math.PI * 2); ctx.fill();
     const body = ctx.createRadialGradient(sp.x - r * 0.35, sp.y - r * 0.45, r * 0.10, sp.x, sp.y, r);
-    body.addColorStop(0, 'rgba(255,248,210,1)');
-    body.addColorStop(0.45, 'rgba(255,201,108,1)');
-    body.addColorStop(1, 'rgba(255,118,42,1)');
-    ctx.fillStyle = body;
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
-    ctx.fill();
-
-    for (let i = 0; i < 5; i++) {
-      ctx.strokeStyle = `rgba(255,245,210,${0.08 - i * 0.012})`;
-      ctx.lineWidth = 1.2 + i * 0.4;
-      ctx.beginPath();
-      ctx.arc(sp.x, sp.y, r * (0.95 + i * 0.06), 0, Math.PI * 2);
-      ctx.stroke();
-    }
+    body.addColorStop(0, 'rgba(255,248,210,1)'); body.addColorStop(0.45, 'rgba(255,201,108,1)'); body.addColorStop(1, 'rgba(255,118,42,1)');
+    ctx.fillStyle = body; ctx.beginPath(); ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 5; i++) { ctx.strokeStyle = `rgba(255,245,210,${0.08 - i * 0.012})`; ctx.lineWidth = 1.2 + i * 0.4; ctx.beginPath(); ctx.arc(sp.x, sp.y, r * (0.95 + i * 0.06), 0, Math.PI * 2); ctx.stroke(); }
   }
 
-  function drawEdgeIndicator(b, sp, r) {
+  function drawIndicator(body, sp) {
     const cx = W / 2, cy = H / 2;
     const dx = sp.x - cx, dy = sp.y - cy;
     const ang = Math.atan2(dy, dx);
-    const ex = clamp(cx + Math.cos(ang) * (W * 0.44), 28, W - 28);
-    const ey = clamp(cy + Math.sin(ang) * (H * 0.38), 28, H - 165);
-    const dist = Math.hypot(b.x - ship.x, b.y - ship.y);
-    const t = clamp(1 - dist / 2400, 0, 1);
-    const baseR = 3.6 + t * 10;
-
+    const ex = clamp(cx + Math.cos(ang) * (W * 0.44), 26, W - 26);
+    const ey = clamp(cy + Math.sin(ang) * (H * 0.38), 26, H - 165);
+    const dist = Math.hypot(body.x - ship.x, body.y - ship.y);
+    const t = clamp(1 - dist / 2100, 0, 1);
+    const rr = 3.5 + t * 8.5;
     ctx.save();
-    ctx.shadowColor = rgb(b.colorA, 0.75);
+    ctx.shadowColor = rgb(body.colorA, 0.7);
     ctx.shadowBlur = 12;
-
-    if (t < 0.42) {
-      ctx.fillStyle = rgb(b.colorA, 0.95);
-      ctx.beginPath();
-      ctx.arc(ex, ey, baseR, 0, Math.PI * 2);
-      ctx.fill();
+    if (t < 0.45) {
+      ctx.fillStyle = rgb(body.colorA, 0.95);
+      ctx.beginPath(); ctx.arc(ex, ey, rr, 0, Math.PI * 2); ctx.fill();
     } else {
-      ctx.strokeStyle = rgb(b.colorA, 0.95);
+      ctx.strokeStyle = rgb(body.colorA, 0.95);
       ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(ex, ey, baseR, 0, Math.PI * 2);
-      ctx.stroke();
-      if (b === targetBody) {
-        ctx.beginPath();
-        ctx.arc(ex, ey, baseR + 4, 0, Math.PI * 2);
-        ctx.stroke();
-      }
+      ctx.beginPath(); ctx.arc(ex, ey, rr, 0, Math.PI * 2); ctx.stroke();
+      if (body === targetBody) { ctx.beginPath(); ctx.arc(ex, ey, rr + 4, 0, Math.PI * 2); ctx.stroke(); }
     }
-
     ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(255,255,255,0.82)';
-    ctx.font = '11px system-ui';
-    ctx.textAlign = 'center';
-    ctx.fillText(b.name, ex, ey + baseR + 16);
+    ctx.fillStyle = 'rgba(255,255,255,0.82)'; ctx.font = '11px system-ui'; ctx.textAlign = 'center'; ctx.fillText(body.name, ex, ey + rr + 16);
     ctx.restore();
   }
 
   function drawPlanet(b) {
-    const sp = screenPos(b.x, b.y);
-    const r = scalePlanetRadius(b.r);
-    if (sp.x < -r * 3 || sp.x > W + r * 3 || sp.y < -r * 3 || sp.y > H + r * 3) {
-      drawEdgeIndicator(b, sp, r);
-      return;
-    }
-
+    const sp = screenPos(b.x, b.y), r = scalePlanetRadius(b.r);
+    const fullyInside = sp.x - r > 6 && sp.x + r < W - 6 && sp.y - r > 6 && sp.y + r < H - 6;
+    if (!fullyInside) { drawIndicator(b, sp); return; }
     const atm = ctx.createRadialGradient(sp.x, sp.y, r * 0.45, sp.x, sp.y, r * 1.9);
-    atm.addColorStop(0, rgb(b.colorA, 0.02));
-    atm.addColorStop(0.55, rgb(b.colorA, 0.10));
-    atm.addColorStop(1, rgb(b.colorA, 0));
-    ctx.fillStyle = atm;
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, r * 1.9, 0, Math.PI * 2);
-    ctx.fill();
-
+    atm.addColorStop(0, rgb(b.colorA, 0.02)); atm.addColorStop(0.55, rgb(b.colorA, 0.10)); atm.addColorStop(1, rgb(b.colorA, 0));
+    ctx.fillStyle = atm; ctx.beginPath(); ctx.arc(sp.x, sp.y, r * 1.9, 0, Math.PI * 2); ctx.fill();
     if (b.ring) {
-      ctx.save();
-      ctx.globalAlpha = 0.34;
-      ctx.strokeStyle = 'rgba(255,232,180,0.64)';
-      ctx.lineWidth = Math.max(1, r * 0.055);
-      ctx.beginPath();
-      ctx.ellipse(sp.x, sp.y + r * 0.04, r * 1.85, r * 0.42, -0.18, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+      ctx.save(); ctx.globalAlpha = 0.34; ctx.strokeStyle = 'rgba(255,232,180,0.64)'; ctx.lineWidth = Math.max(1, r * 0.055); ctx.beginPath(); ctx.ellipse(sp.x, sp.y + r * 0.04, r * 1.85, r * 0.42, -0.18, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
     }
-
     const body = ctx.createRadialGradient(sp.x - r * 0.40, sp.y - r * 0.45, r * 0.08, sp.x, sp.y, r);
-    body.addColorStop(0, rgb(b.colorA, 1));
-    body.addColorStop(0.56, rgb(b.colorB, 1));
-    body.addColorStop(1, 'rgba(20,20,30,0.98)');
-    ctx.fillStyle = body;
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
-    ctx.fill();
-
+    body.addColorStop(0, rgb(b.colorA, 1)); body.addColorStop(0.56, rgb(b.colorB, 1)); body.addColorStop(1, 'rgba(20,20,30,0.98)');
+    ctx.fillStyle = body; ctx.beginPath(); ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2); ctx.fill();
     drawBodyTexture(b, sp.x, sp.y, r);
-
     const shade = ctx.createRadialGradient(sp.x - r * 0.35, sp.y - r * 0.40, r * 0.10, sp.x + r * 0.20, sp.y + r * 0.28, r * 1.05);
-    shade.addColorStop(0, 'rgba(255,255,255,0.18)');
-    shade.addColorStop(0.5, 'rgba(255,255,255,0.02)');
-    shade.addColorStop(1, 'rgba(0,0,0,0.55)');
-    ctx.fillStyle = shade;
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = 'rgba(255,255,255,0.24)';
-    ctx.lineWidth = Math.max(1, r * 0.02);
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.strokeStyle = b === targetBody ? 'rgba(255,214,122,0.25)' : 'rgba(255,255,255,0.08)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, r * 2.45, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.fillStyle = 'rgba(255,255,255,0.84)';
-    ctx.font = `${Math.max(10, Math.min(14, r * 0.16))}px system-ui`;
-    ctx.textAlign = 'center';
-    ctx.fillText(b.name, sp.x, sp.y - r - 12);
+    shade.addColorStop(0, 'rgba(255,255,255,0.18)'); shade.addColorStop(0.5, 'rgba(255,255,255,0.02)'); shade.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.fillStyle = shade; ctx.beginPath(); ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.24)'; ctx.lineWidth = Math.max(1, r * 0.02); ctx.beginPath(); ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = b === targetBody ? 'rgba(255,214,122,0.25)' : 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(sp.x, sp.y, r * 2.45, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.84)'; ctx.font = `${Math.max(10, Math.min(14, r * 0.16))}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(b.name, sp.x, sp.y - r - 12);
   }
 
   function drawBodies() {
-    const ordered = [...currentBodies].sort((a, b) => {
-      const da = Math.hypot(ship.x - a.x, ship.y - a.y);
-      const db = Math.hypot(ship.x - b.x, ship.y - b.y);
-      return db - da;
-    });
-    for (const b of ordered) {
-      if (b.type === 'sun') drawSun(b);
-      else drawPlanet(b);
-    }
+    const ordered = [...currentBodies].sort((a, b) => Math.hypot(ship.x - b.x, ship.y - b.y) - Math.hypot(ship.x - a.x, ship.y - a.y));
+    for (const b of ordered) { if (b.type === 'sun') drawSun(b); else drawPlanet(b); }
   }
 
   function drawParticles() {
     for (const p of particles) {
-      const sp = screenPos(p.x, p.y);
-      const r = Math.max(0.5, p.r * world.zoom);
+      const sp = screenPos(p.x, p.y), r = Math.max(0.5, p.r * world.zoom);
       ctx.fillStyle = `rgba(${p.color},${Math.max(0, p.life * 2.2)})`;
-      ctx.shadowColor = `rgba(${p.color},0.78)`;
-      ctx.shadowBlur = 10;
-      ctx.beginPath();
-      ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.shadowColor = `rgba(${p.color},0.78)`; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2); ctx.fill();
     }
     ctx.shadowBlur = 0;
   }
 
   function drawShip() {
-    const x = W / 2;
-    const y = H / 2;
-    const size = 19;
-    const a = ship.angle;
-
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(a);
-
+    const x = W / 2, y = H / 2, size = 19, a = ship.angle;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a);
     if (ship.thrust > 0.008) {
       const thrustVisual = Math.max(0.12, ship.thrust * ship.thrust);
       const flameLen = 16 + thrustVisual * 40 + Math.sin(performance.now() * 0.035) * 4;
@@ -1312,119 +913,44 @@
       grad.addColorStop(0, `rgba(255,255,255,${0.38 + thrustVisual * 0.45})`);
       grad.addColorStop(0.30, `rgba(255,190,82,${0.22 + thrustVisual * 0.58})`);
       grad.addColorStop(1, 'rgba(255,78,24,0.02)');
-      ctx.fillStyle = grad;
-      ctx.shadowColor = 'rgba(255,120,52,0.88)';
-      ctx.shadowBlur = 18;
-      ctx.beginPath();
-      ctx.moveTo(-size * 0.76, -4.4);
-      ctx.lineTo(-size - flameLen, 0);
-      ctx.lineTo(-size * 0.76, 4.4);
-      ctx.closePath();
-      ctx.fill();
-      ctx.shadowBlur = 0;
+      ctx.fillStyle = grad; ctx.shadowColor = 'rgba(255,120,52,0.88)'; ctx.shadowBlur = 18;
+      ctx.beginPath(); ctx.moveTo(-size * 0.76, -4.4); ctx.lineTo(-size - flameLen, 0); ctx.lineTo(-size * 0.76, 4.4); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0;
     }
-
-    const turnDir = Math.sign(ship.turnInput);
-    const turnVis = Math.abs(ship.turnInput);
+    const turnDir = Math.sign(ship.turnInput), turnVis = Math.abs(ship.turnInput);
     if (turnVis > 0.05) {
       const side = turnDir < 0 ? 1 : -1;
       const rcsAlpha = 0.28 + turnVis * 0.40;
       const rcsLen = 7 + turnVis * 11 + Math.sin(performance.now() * 0.06) * 2;
       ctx.fillStyle = `rgba(170,235,255,${rcsAlpha})`;
-      ctx.shadowColor = 'rgba(170,235,255,0.85)';
-      ctx.shadowBlur = 12;
-      ctx.beginPath();
-      ctx.moveTo(-4, side * 10);
-      ctx.lineTo(-4 - rcsLen, side * 13);
-      ctx.lineTo(-2, side * 8);
-      ctx.closePath();
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(5, side * -9);
-      ctx.lineTo(5 + rcsLen * 0.7, side * -12);
-      ctx.lineTo(3, side * -7);
-      ctx.closePath();
-      ctx.fill();
-      ctx.shadowBlur = 0;
+      ctx.shadowColor = 'rgba(170,235,255,0.85)'; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.moveTo(-4, side * 10); ctx.lineTo(-4 - rcsLen, side * 13); ctx.lineTo(-2, side * 8); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(5, side * -9); ctx.lineTo(5 + rcsLen * 0.7, side * -12); ctx.lineTo(3, side * -7); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0;
     }
-
-    ctx.fillStyle = '#eef7ff';
-    ctx.strokeStyle = 'rgba(0,0,0,0.52)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(size, 0);
-    ctx.lineTo(-size * 0.84, -size * 0.56);
-    ctx.lineTo(-size * 0.42, 0);
-    ctx.lineTo(-size * 0.84, size * 0.56);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
+    ctx.fillStyle = '#eef7ff'; ctx.strokeStyle = 'rgba(0,0,0,0.52)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(size, 0); ctx.lineTo(-size * 0.84, -size * 0.56); ctx.lineTo(-size * 0.42, 0); ctx.lineTo(-size * 0.84, size * 0.56); ctx.closePath(); ctx.fill(); ctx.stroke();
     const hullGrad = ctx.createLinearGradient(size, 0, -size, 0);
-    hullGrad.addColorStop(0, 'rgba(255,255,255,0.78)');
-    hullGrad.addColorStop(0.56, 'rgba(115,185,235,0.16)');
-    hullGrad.addColorStop(1, 'rgba(0,0,0,0.18)');
-    ctx.fillStyle = hullGrad;
-    ctx.beginPath();
-    ctx.moveTo(size, 0);
-    ctx.lineTo(-size * 0.84, -size * 0.56);
-    ctx.lineTo(-size * 0.42, 0);
-    ctx.lineTo(-size * 0.84, size * 0.56);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = 'rgba(108,232,255,0.95)';
-    ctx.shadowColor = 'rgba(108,232,255,0.9)';
-    ctx.shadowBlur = 12;
-    ctx.beginPath();
-    ctx.ellipse(size * 0.16, 0, 4.0, 3.0, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(0, 0, 25, 0, Math.PI * 2);
-    ctx.stroke();
-
+    hullGrad.addColorStop(0, 'rgba(255,255,255,0.78)'); hullGrad.addColorStop(0.56, 'rgba(115,185,235,0.16)'); hullGrad.addColorStop(1, 'rgba(0,0,0,0.18)');
+    ctx.fillStyle = hullGrad; ctx.beginPath(); ctx.moveTo(size, 0); ctx.lineTo(-size * 0.84, -size * 0.56); ctx.lineTo(-size * 0.42, 0); ctx.lineTo(-size * 0.84, size * 0.56); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(108,232,255,0.95)'; ctx.shadowColor = 'rgba(108,232,255,0.9)'; ctx.shadowBlur = 12; ctx.beginPath(); ctx.ellipse(size * 0.16, 0, 4.0, 3.0, 0, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
 
   function roundRect(x, y, w, h, r, fill = true, stroke = false) {
     const rr = Math.min(r, w / 2, h / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + rr, y);
-    ctx.arcTo(x + w, y, x + w, y + h, rr);
-    ctx.arcTo(x + w, y + h, x, y + h, rr);
-    ctx.arcTo(x, y + h, x, y, rr);
-    ctx.arcTo(x, y, x + w, y, rr);
-    ctx.closePath();
-    if (fill) ctx.fill();
-    if (stroke) ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + rr, y); ctx.arcTo(x + w, y, x + w, y + h, rr); ctx.arcTo(x + w, y + h, x, y + h, rr); ctx.arcTo(x, y + h, x, y, rr); ctx.arcTo(x, y, x + w, y, rr); ctx.closePath();
+    if (fill) ctx.fill(); if (stroke) ctx.stroke();
   }
 
   function drawFuelBar() {
-    const x = 18;
-    const y = H - 86;
-    const w = 160;
-    const h = 12;
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.34)';
-    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
-    ctx.lineWidth = 1;
-    roundRect(x, y, w, h, 8, true, true);
-
+    const x = 18, y = H - 86, w = 160, h = 12;
+    ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.34)'; ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1; roundRect(x, y, w, h, 8, true, true);
     const fillW = Math.max(0, (w - 2) * (ship.fuel / ship.fuelMax));
     const grad = ctx.createLinearGradient(x, y, x + w, y);
     grad.addColorStop(0, ship.fuel < 0.2 ? 'rgba(255,120,120,0.95)' : 'rgba(126,235,255,0.95)');
     grad.addColorStop(1, ship.fuel < 0.2 ? 'rgba(255,178,115,0.95)' : 'rgba(135,255,184,0.95)');
-    ctx.fillStyle = grad;
-    roundRect(x + 1, y + 1, fillW, h - 2, 7, true, false);
-
-    ctx.fillStyle = 'rgba(255,255,255,0.84)';
-    ctx.font = '11px system-ui';
-    ctx.fillText('burn capacitor', x, y - 8);
-    ctx.restore();
+    ctx.fillStyle = grad; roundRect(x + 1, y + 1, fillW, h - 2, 7, true, false);
+    ctx.fillStyle = 'rgba(255,255,255,0.84)'; ctx.font = '11px system-ui'; ctx.fillText('burn capacitor', x, y - 8); ctx.restore();
   }
 
   function drawCrashFlash() {
@@ -1443,14 +969,9 @@
     drawShip();
     drawFuelBar();
     drawCrashFlash();
-
     const speed = Math.hypot(ship.vx, ship.vy);
     const stateText = crashTimer > 0 ? 'crashed' : orbitHintState;
-    readout.innerHTML =
-      `v ${speed.toFixed(1)}<br>` +
-      `fuel ${(ship.fuel * 100).toFixed(0)}%<br>` +
-      `target ${targetBody ? targetBody.name : '—'}<br>` +
-      `state ${stateText}`;
+    readout.innerHTML = `v ${speed.toFixed(1)}<br>fuel ${(ship.fuel * 100).toFixed(0)}%<br>target ${targetBody ? targetBody.name : '—'}<br>state ${stateText}`;
     burnVisual.style.opacity = `${0.58 + Math.max(0.12, ship.thrust * ship.thrust) * 0.42}`;
   }
 
@@ -1461,43 +982,13 @@
     addPointer(e.pointerId, regionForPointer(e.clientX, e.clientY));
     sfx('tap');
   });
-
-  canvas.addEventListener('pointerup', e => {
-    e.preventDefault();
-    clearPointer(e.pointerId);
-  });
-
-  canvas.addEventListener('pointercancel', e => {
-    e.preventDefault();
-    clearPointer(e.pointerId);
-  });
-
-  canvas.addEventListener('pointermove', e => {
-    e.preventDefault();
-    clearPointer(e.pointerId);
-    addPointer(e.pointerId, regionForPointer(e.clientX, e.clientY));
-  });
-
-  window.addEventListener('keydown', e => {
-    if (e.key === 'ArrowLeft') input.leftIds.add('k');
-    if (e.key === 'ArrowRight') input.rightIds.add('k');
-    if (e.key === 'ArrowUp' || e.key === ' ') input.burnIds.add('k');
-    updateInputUI();
-  });
-
-  window.addEventListener('keyup', e => {
-    if (e.key === 'ArrowLeft') input.leftIds.delete('k');
-    if (e.key === 'ArrowRight') input.rightIds.delete('k');
-    if (e.key === 'ArrowUp' || e.key === ' ') input.burnIds.delete('k');
-    updateInputUI();
-  });
-
+  canvas.addEventListener('pointerup', e => { e.preventDefault(); clearPointer(e.pointerId); });
+  canvas.addEventListener('pointercancel', e => { e.preventDefault(); clearPointer(e.pointerId); });
+  canvas.addEventListener('pointermove', e => { e.preventDefault(); clearPointer(e.pointerId); addPointer(e.pointerId, regionForPointer(e.clientX, e.clientY)); });
+  window.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') input.leftIds.add('k'); if (e.key === 'ArrowRight') input.rightIds.add('k'); if (e.key === 'ArrowUp' || e.key === ' ') input.burnIds.add('k'); updateInputUI(); });
+  window.addEventListener('keyup', e => { if (e.key === 'ArrowLeft') input.leftIds.delete('k'); if (e.key === 'ArrowRight') input.rightIds.delete('k'); if (e.key === 'ArrowUp' || e.key === ' ') input.burnIds.delete('k'); updateInputUI(); });
   audioBtn.addEventListener('click', toggleAudio);
-  resetBtn.addEventListener('click', () => {
-    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-    sfx('tap');
-    resetShip();
-  });
+  resetBtn.addEventListener('click', () => { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); sfx('tap'); resetShip(); });
 
   function loop(now) {
     const dt = Math.min(0.033, (now - last) / 1000);
@@ -1510,6 +1001,7 @@
   window.addEventListener('resize', resize);
   resize();
   resetShip();
+  predictedData = computePredictedData();
   requestAnimationFrame(loop);
 })();
 </script>
