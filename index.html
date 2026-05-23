@@ -2,275 +2,135 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Sudoku Touch</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>DeltaV 2D Prototype</title>
   <style>
     :root {
-      --bg: #10131f;
-      --panel: rgba(255,255,255,0.08);
-      --panel2: rgba(255,255,255,0.13);
-      --line: rgba(255,255,255,0.22);
-      --thick: rgba(255,255,255,0.72);
-      --text: #f3f6ff;
-      --muted: rgba(243,246,255,0.65);
-      --accent2: #ffd166;
-      --bad: #ff6b6b;
-      --good: #7cffb2;
-      --given: #ffffff;
-      --user: #9ee6ff;
+      --bg1: #040816;
+      --bg2: #09142b;
+      --panel: rgba(7, 12, 24, 0.58);
+      --panelBorder: rgba(255,255,255,0.12);
+      --text: #eef5ff;
+      --muted: rgba(238,245,255,0.7);
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
     html, body {
       margin: 0; width: 100%; height: 100%; overflow: hidden;
-      background: radial-gradient(circle at 25% 10%, rgba(119,216,255,0.18), transparent 32%),
-                  radial-gradient(circle at 75% 85%, rgba(255,209,102,0.12), transparent 30%),
-                  var(--bg);
+      background:
+        radial-gradient(circle at 30% 25%, rgba(84, 130, 255, 0.18), transparent 28%),
+        radial-gradient(circle at 70% 80%, rgba(255, 194, 95, 0.10), transparent 24%),
+        linear-gradient(180deg, var(--bg2), var(--bg1));
       color: var(--text);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       touch-action: none;
     }
-    .app {
-      width: 100vw; height: 100dvh; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 14px;
-      padding: calc(env(safe-area-inset-top, 0px) + 16px) 14px calc(env(safe-area-inset-bottom, 0px) + 16px);
-    }
-    .top { width: min(94vw, 520px); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-    h1 { margin: 0; font-size: 26px; letter-spacing: -0.04em; }
-    .subtitle { margin-top: 3px; color: var(--muted); font-size: 12px; }
-    .pill {
-      background: var(--panel); border: 1px solid rgba(255,255,255,0.12); border-radius: 999px;
-      padding: 8px 12px; color: var(--muted); font-size: 12px; backdrop-filter: blur(10px); white-space: nowrap;
-    }
-    .board-wrap {
-      width: min(94vw, 520px); aspect-ratio: 1 / 1; padding: 7px; border-radius: 24px;
-      background: linear-gradient(145deg, rgba(255,255,255,0.20), rgba(255,255,255,0.04));
-      box-shadow: 0 24px 80px rgba(0,0,0,0.42); border: 1px solid rgba(255,255,255,0.18);
-    }
-    .board {
-      width: 100%; height: 100%; display: grid; grid-template-columns: repeat(9, 1fr); grid-template-rows: repeat(9, 1fr);
-      border: 2px solid var(--thick); border-radius: 18px; overflow: hidden; background: rgba(0,0,0,0.22);
-    }
-    .cell {
-      position: relative; display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: clamp(20px, 6.6vw, 34px); color: var(--user);
-      background: rgba(255,255,255,0.035); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
-    }
-    .cell:nth-child(3n) { border-right-color: var(--thick); border-right-width: 2px; }
-    .cell:nth-child(n+19):nth-child(-n+27), .cell:nth-child(n+46):nth-child(-n+54) { border-bottom-color: var(--thick); border-bottom-width: 2px; }
-    .cell:nth-child(9n) { border-right: none; }
-    .cell:nth-child(n+73) { border-bottom: none; }
-    .cell.given { color: var(--given); text-shadow: 0 0 16px rgba(255,255,255,0.18); background: rgba(255,255,255,0.065); }
-    .cell.selected { background: rgba(119,216,255,0.30); box-shadow: inset 0 0 0 2px rgba(119,216,255,0.9); }
-    .cell.peer { background: rgba(119,216,255,0.10); }
-    .cell.same { background: rgba(255,209,102,0.15); }
-    .cell.error { color: var(--bad); background: rgba(255,107,107,0.16); }
-    .notes {
-      position: absolute; inset: 3px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
-      color: rgba(243,246,255,0.52); font-size: clamp(7px, 2.2vw, 12px); font-weight: 600; line-height: 1; pointer-events: none;
-    }
-    .note { display: flex; align-items: center; justify-content: center; }
-    .controls { width: min(94vw, 520px); display: grid; grid-template-columns: repeat(9, 1fr); gap: 6px; }
-    .num, .action {
-      height: clamp(42px, 10.5vw, 58px); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px;
-      background: var(--panel); color: var(--text); font-size: clamp(18px, 5vw, 26px); font-weight: 800;
-      backdrop-filter: blur(10px); box-shadow: 0 12px 26px rgba(0,0,0,0.22);
-    }
-    .num:active, .action:active { transform: scale(0.97); background: var(--panel2); }
-    .num.used { opacity: 0.34; }
-    .bottom { width: min(94vw, 520px); display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-    .action { font-size: 13px; font-weight: 750; height: 44px; border-radius: 13px; }
-    .action.active { color: #111827; background: var(--accent2); border-color: rgba(255,255,255,0.38); }
-    .message { min-height: 18px; font-size: 12px; color: var(--muted); text-align: center; width: min(94vw, 520px); }
-    .message.win { color: var(--good); font-weight: 700; }
-    @media (max-height: 720px) {
-      .app { gap: 8px; } h1 { font-size: 22px; }
-      .subtitle, .pill, .message { font-size: 11px; }
-      .bottom .action { height: 38px; }
-      .board-wrap { width: min(86vh, 94vw, 520px); }
-    }
+    canvas { width: 100vw; height: 100dvh; display: block; }
+    .hud { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 10px; right: 10px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; pointer-events: none; z-index: 10; }
+    .panel { background: var(--panel); border: 1px solid var(--panelBorder); backdrop-filter: blur(10px); border-radius: 16px; padding: 9px 11px; box-shadow: 0 12px 36px rgba(0,0,0,0.28); font-size: 12px; line-height: 1.35; text-shadow: 0 1px 5px rgba(0,0,0,0.45); }
+    .title { font-weight: 700; font-size: 13px; color: white; margin-bottom: 2px; }
+    .small { color: var(--muted); }
+    .controls { position: fixed; inset: 0; z-index: 8; pointer-events: none; }
+    .turnZone { position: absolute; top: 0; bottom: 0; width: 35vw; pointer-events: none; opacity: 0; transition: opacity 120ms ease; background: rgba(255,255,255,0.025); }
+    .turnZone.left { left: 0; border-right: 1px solid rgba(255,255,255,0.03); }
+    .turnZone.right { right: 0; border-left: 1px solid rgba(255,255,255,0.03); }
+    .turnZone.show { opacity: 1; }
+    .burnButton { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); transform: translateX(-50%); width: 106px; height: 106px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, rgba(255,255,255,0.18), rgba(255,255,255,0.04) 66%), radial-gradient(circle at 50% 50%, rgba(255,166,72,0.12), rgba(255,166,72,0.02)); border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 18px 50px rgba(0,0,0,0.38), inset 0 0 20px rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-weight: 800; letter-spacing: 0.12em; color: rgba(255,255,255,0.88); font-size: 14px; pointer-events: none; z-index: 9; transition: transform 80ms ease, background 120ms ease; }
+    .burnButton.active { transform: translateX(-50%) scale(0.985); background: radial-gradient(circle at 50% 35%, rgba(255,235,180,0.46), rgba(255,130,55,0.12) 66%), radial-gradient(circle at 50% 50%, rgba(255,120,45,0.18), rgba(255,120,45,0.02)); }
+    .topActions { position: fixed; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); display: flex; flex-direction: column; gap: 8px; z-index: 11; }
+    .hudBtn { pointer-events: auto; border: 1px solid rgba(255,255,255,0.16); background: rgba(8, 14, 28, 0.7); color: white; border-radius: 12px; padding: 10px 12px; backdrop-filter: blur(10px); box-shadow: 0 10px 26px rgba(0,0,0,0.28); font-size: 12px; min-width: 72px; }
+    .hudBtn.active { background: rgba(255, 207, 122, 0.88); color: #101524; border-color: rgba(255,255,255,0.25); }
+    .hint { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 132px); transform: translateX(-50%); width: min(92vw, 560px); text-align: center; color: var(--muted); font-size: 12px; line-height: 1.32; text-shadow: 0 1px 5px rgba(0,0,0,0.45); z-index: 10; pointer-events: none; }
   </style>
 </head>
 <body>
-  <main class="app">
-    <div class="top">
-      <div><h1>Sudoku</h1><div class="subtitle">Touch prototype</div></div>
-      <div class="pill" id="status">Errori: 0 · Facile</div>
+  <canvas id="game"></canvas>
+  <div class="hud">
+    <div class="panel">
+      <div class="title">DeltaV 2D prototype</div>
+      <div class="small">Camera locale, zoom intelligente, traiettoria leggermente assistita verso orbite stabili.</div>
     </div>
-    <div class="board-wrap"><div class="board" id="board"></div></div>
-    <div class="controls" id="numbers"></div>
-    <div class="bottom">
-      <button class="action" id="notesBtn">Note</button>
-      <button class="action" id="eraseBtn">Cancella</button>
-      <button class="action" id="checkBtn">Check</button>
-      <button class="action" id="newBtn">Nuovo</button>
-    </div>
-    <div class="message" id="message">Tocca una cella, poi scegli un numero.</div>
-  </main>
-  <script>
-    const puzzles = [
-      { puzzle: "530070000600195000098000060800060003400803001700020006060000280000419005000080079", solution: "534678912672195348198342567859761423426853791713924856961537284287419635345286179" },
-      { puzzle: "000260701680070090190004500820100040004602900050003028009300074040050036703018000", solution: "435269781682571493197834562826195347374682915951743628519326874248957136763418259" },
-      { puzzle: "300000000005009000200504000020000700160000058704310600000890100000067080000005437", solution: "347682591615739842289514376528946713163278954794351628456893127931467285872125437" },
-      { puzzle: "000000907000420180000705026100904000050000040000507009920108000034059000507000000", solution: "462831957795426183381795426173984265659312748248567319926178534834259671517643892" }
-    ];
-    const boardEl = document.getElementById("board");
-    const numbersEl = document.getElementById("numbers");
-    const statusEl = document.getElementById("status");
-    const messageEl = document.getElementById("message");
-    const notesBtn = document.getElementById("notesBtn");
-    const eraseBtn = document.getElementById("eraseBtn");
-    const checkBtn = document.getElementById("checkBtn");
-    const newBtn = document.getElementById("newBtn");
-    let current = null, puzzle = [], solution = [], values = [], given = [], notes = [], selected = 0, noteMode = false, mistakes = 0;
-
-    function startGame(index = Math.floor(Math.random() * puzzles.length)) {
-      current = puzzles[index];
-      puzzle = current.puzzle.split("").map(Number);
-      solution = current.solution.split("").map(Number);
-      values = puzzle.slice();
-      given = puzzle.map(v => v !== 0);
-      notes = Array.from({ length: 81 }, () => new Set());
-      selected = puzzle.findIndex(v => v === 0);
-      if (selected < 0) selected = 0;
-      mistakes = 0;
-      noteMode = false;
-      notesBtn.classList.remove("active");
-      messageEl.className = "message";
-      messageEl.textContent = "Tocca una cella, poi scegli un numero.";
-      render();
-    }
-    function rowOf(i) { return Math.floor(i / 9); }
-    function colOf(i) { return i % 9; }
-    function boxOf(i) { return Math.floor(rowOf(i) / 3) * 3 + Math.floor(colOf(i) / 3); }
-    function isPeer(a, b) { return rowOf(a) === rowOf(b) || colOf(a) === colOf(b) || boxOf(a) === boxOf(b); }
-
-    function render() {
-      boardEl.innerHTML = "";
-      const selectedValue = values[selected];
-      for (let i = 0; i < 81; i++) {
-        const cell = document.createElement("div");
-        cell.className = "cell";
-        if (given[i]) cell.classList.add("given");
-        if (i === selected) cell.classList.add("selected");
-        else if (isPeer(i, selected)) cell.classList.add("peer");
-        if (selectedValue && values[i] === selectedValue && i !== selected) cell.classList.add("same");
-        if (values[i] && values[i] !== solution[i]) cell.classList.add("error");
-        if (values[i]) {
-          cell.textContent = values[i];
-        } else {
-          const notesBox = document.createElement("div");
-          notesBox.className = "notes";
-          for (let n = 1; n <= 9; n++) {
-            const note = document.createElement("div");
-            note.className = "note";
-            note.textContent = notes[i].has(n) ? n : "";
-            notesBox.appendChild(note);
-          }
-          cell.appendChild(notesBox);
-        }
-        cell.addEventListener("pointerdown", e => { e.preventDefault(); selected = i; render(); });
-        boardEl.appendChild(cell);
-      }
-      renderNumbers();
-      statusEl.textContent = "Errori: " + mistakes + " · Facile";
-    }
-
-    function renderNumbers() {
-      numbersEl.innerHTML = "";
-      for (let n = 1; n <= 9; n++) {
-        const btn = document.createElement("button");
-        btn.className = "num";
-        btn.textContent = n;
-        if (values.filter(v => v === n).length >= 9) btn.classList.add("used");
-        btn.addEventListener("pointerdown", e => { e.preventDefault(); placeNumber(n); });
-        numbersEl.appendChild(btn);
-      }
-    }
-
-    function placeNumber(n) {
-      if (given[selected]) { showMessage("Questa cella è fissa."); return; }
-      if (noteMode) {
-        if (values[selected]) return;
-        notes[selected].has(n) ? notes[selected].delete(n) : notes[selected].add(n);
-        render();
-        return;
-      }
-      values[selected] = n;
-      notes[selected].clear();
-      if (n !== solution[selected]) {
-        mistakes++;
-        showMessage("Numero non corretto.");
-      } else {
-        for (let i = 0; i < 81; i++) if (isPeer(i, selected)) notes[i].delete(n);
-        showMessage("Bene.");
-      }
-      if (isSolved()) {
-        messageEl.className = "message win";
-        messageEl.textContent = "Completato.";
-      }
-      render();
-    }
-
-    function eraseSelected() {
-      if (given[selected]) { showMessage("Non puoi cancellare un numero iniziale."); return; }
-      values[selected] = 0;
-      notes[selected].clear();
-      showMessage("Cella cancellata.");
-      render();
-    }
-
-    function checkBoard() {
-      let wrong = 0, empty = 0;
-      for (let i = 0; i < 81; i++) {
-        if (!values[i]) empty++;
-        else if (values[i] !== solution[i]) wrong++;
-      }
-      if (wrong === 0 && empty === 0) {
-        messageEl.className = "message win";
-        messageEl.textContent = "Perfetto, sudoku completato.";
-      } else if (wrong === 0) {
-        showMessage("Nessun errore. Mancano " + empty + " celle.");
-      } else {
-        showMessage(wrong + " celle non corrette.");
-      }
-      render();
-    }
-
-    function isSolved() {
-      for (let i = 0; i < 81; i++) if (values[i] !== solution[i]) return false;
-      return true;
-    }
-    function showMessage(text) { messageEl.className = "message"; messageEl.textContent = text; }
-
-    notesBtn.addEventListener("pointerdown", e => {
-      e.preventDefault();
-      noteMode = !noteMode;
-      notesBtn.classList.toggle("active", noteMode);
-      showMessage(noteMode ? "Modalità note attiva." : "Modalità normale.");
-    });
-    eraseBtn.addEventListener("pointerdown", e => { e.preventDefault(); eraseSelected(); });
-    checkBtn.addEventListener("pointerdown", e => { e.preventDefault(); checkBoard(); });
-    newBtn.addEventListener("pointerdown", e => {
-      e.preventDefault();
-      const currentIndex = puzzles.indexOf(current);
-      startGame((currentIndex + 1) % puzzles.length);
-    });
-
-    window.addEventListener("keydown", e => {
-      if (e.key >= "1" && e.key <= "9") placeNumber(Number(e.key));
-      if (e.key === "Backspace" || e.key === "Delete" || e.key === "0") eraseSelected();
-      if (e.key === "n" || e.key === "N") {
-        noteMode = !noteMode;
-        notesBtn.classList.toggle("active", noteMode);
-      }
-      if (e.key === "ArrowLeft") selected = Math.max(0, selected - 1);
-      if (e.key === "ArrowRight") selected = Math.min(80, selected + 1);
-      if (e.key === "ArrowUp") selected = Math.max(0, selected - 9);
-      if (e.key === "ArrowDown") selected = Math.min(80, selected + 9);
-      render();
-    });
-
-    startGame(0);
-  </script>
+    <div class="panel" id="readout">v 0<br>fuel 100%<br>target —</div>
+  </div>
+  <div class="hint">Lati invisibili: ruota. Centro basso: burn. Azzurro = traiettoria futura. Arancione = retrograde. Pianeti fuori schermo restano indicati sul bordo.</div>
+  <div class="controls"><div class="turnZone left" id="turnLeftGlow"></div><div class="turnZone right" id="turnRightGlow"></div></div>
+  <div class="burnButton" id="burnVisual">BURN</div>
+  <div class="topActions"><button class="hudBtn" id="audioBtn">Audio</button><button class="hudBtn" id="resetBtn">Reset</button></div>
+<script>
+(() => {
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const readout = document.getElementById('readout');
+const burnVisual = document.getElementById('burnVisual');
+const audioBtn = document.getElementById('audioBtn');
+const resetBtn = document.getElementById('resetBtn');
+const leftGlow = document.getElementById('turnLeftGlow');
+const rightGlow = document.getElementById('turnRightGlow');
+let W=0,H=0,DPR=1,last=performance.now();
+const world={zoom:1,targetZoom:1,camX:0,camY:0};
+const input={leftIds:new Set(),rightIds:new Set(),burnIds:new Set()};
+let stars=[],nebulas=[],particles=[];
+const planets=[
+{name:'Aster',x:-480,y:260,r:92,mass:210000,colorA:[105,231,255],colorB:[30,95,214],ring:false,seed:0.15},
+{name:'Vesta',x:760,y:-140,r:128,mass:410000,colorA:[255,212,128],colorB:[170,80,48],ring:true,seed:1.1},
+{name:'Nox',x:-1020,y:-900,r:74,mass:132000,colorA:[218,170,255],colorB:[76,56,148],ring:false,seed:2.2},
+{name:'Helios',x:1380,y:1040,r:160,mass:700000,colorA:[255,223,142],colorB:[194,93,32],ring:false,seed:0.67},
+{name:'Crios',x:80,y:1440,r:104,mass:275000,colorA:[162,255,201],colorB:[39,140,120],ring:false,seed:2.9}
+];
+const shipStart={x:0,y:0,vx:0,vy:0,angle:-Math.PI/2};
+const ship={x:0,y:0,vx:0,vy:0,angle:-Math.PI/2,radius:10,turnInput:0,angularVelocity:0,turnRate:2.25,thrust:0,thrustTarget:0,thrustPower:155,fuel:1,fuelMax:1,fuelUse:0.54,fuelRegen:0.13};
+let targetPlanet=null, orbitConfirmCooldown=0;
+let audioCtx=null,masterGain=null,musicGain=null,sfxGain=null,soundOn=false,musicSeq=null,musicStep=0;
+function initAudio(){if(audioCtx)return; const AC=window.AudioContext||window.webkitAudioContext; audioCtx=new AC(); masterGain=audioCtx.createGain(); masterGain.gain.value=0.55; masterGain.connect(audioCtx.destination); musicGain=audioCtx.createGain(); musicGain.gain.value=0.12; musicGain.connect(masterGain); sfxGain=audioCtx.createGain(); sfxGain.gain.value=0.35; sfxGain.connect(masterGain);} 
+function playTone(freq,duration,type='sine',gain=0.05,dest=null,when=0){if(!audioCtx||!soundOn)return; const t=audioCtx.currentTime+when; const osc=audioCtx.createOscillator(); const g=audioCtx.createGain(); osc.type=type; osc.frequency.setValueAtTime(freq,t); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+duration); osc.connect(g); g.connect(dest||sfxGain); osc.start(t); osc.stop(t+duration+0.03);} 
+function sfx(name){if(!soundOn||!audioCtx)return; if(name==='toggle'){playTone(392,0.08,'sine',0.06,sfxGain); playTone(784,0.10,'sine',0.05,sfxGain,0.06);} if(name==='burnStart'){playTone(170,0.18,'sawtooth',0.04,sfxGain);} if(name==='orbit'){playTone(523,0.12,'triangle',0.07,sfxGain); playTone(659,0.14,'triangle',0.06,sfxGain,0.10);} if(name==='tick'){playTone(520,0.04,'sine',0.035,sfxGain);} if(name==='fuelLow'){playTone(210,0.10,'square',0.045,sfxGain);} }
+function startMusic(){if(musicSeq||!soundOn||!audioCtx)return; const melody=[261.63,329.63,392.00,329.63,440.00,392.00,329.63,493.88,392.00,329.63,293.66,349.23,440.00,349.23,329.63,261.63]; musicSeq=setInterval(()=>{if(!soundOn||!audioCtx)return; const n=melody[musicStep%melody.length], bass=n/2; playTone(n,0.23,'sine',0.03,musicGain); if(musicStep%4===0)playTone(bass,0.52,'triangle',0.02,musicGain); musicStep++;},360);} 
+function stopMusic(){if(musicSeq)clearInterval(musicSeq); musicSeq=null;} 
+function enableAudio(){initAudio(); if(audioCtx.state==='suspended')audioCtx.resume(); soundOn=true; audioBtn.classList.add('active'); startMusic(); sfx('toggle');}
+function disableAudio(){soundOn=false; audioBtn.classList.remove('active'); stopMusic();}
+function toggleAudio(){if(soundOn)disableAudio(); else enableAudio();}
+function resize(){DPR=Math.max(1,Math.min(2,window.devicePixelRatio||1)); W=window.innerWidth; H=window.innerHeight; canvas.width=Math.floor(W*DPR); canvas.height=Math.floor(H*DPR); canvas.style.width=W+'px'; canvas.style.height=H+'px'; ctx.setTransform(DPR,0,0,DPR,0,0); buildSpace();}
+function buildSpace(){stars=[]; nebulas=[]; for(let i=0;i<420;i++)stars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.6+0.2,a:Math.random()*0.75+0.2,layer:Math.random()*0.65+0.35}); for(let i=0;i<16;i++)nebulas.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*240+140,a:Math.random()*0.05+0.02});}
+window.addEventListener('resize',resize); resize();
+function regionForPointer(x,y){const burnR=82,burnX=W/2,burnY=H-71,dx=x-burnX,dy=y-burnY; if(dx*dx+dy*dy<burnR*burnR)return 'burn'; if(x<W*0.47)return 'left'; if(x>W*0.53)return 'right'; return 'burn';}
+function addPointer(id,region){if(region==='left')input.leftIds.add(id); if(region==='right')input.rightIds.add(id); if(region==='burn')input.burnIds.add(id); updateInputUI();}
+function clearPointer(id){input.leftIds.delete(id); input.rightIds.delete(id); input.burnIds.delete(id); updateInputUI();}
+function updateInputUI(){leftGlow.classList.toggle('show',input.leftIds.size>0); rightGlow.classList.toggle('show',input.rightIds.size>0); burnVisual.classList.toggle('active',input.burnIds.size>0);}
+canvas.addEventListener('pointerdown',e=>{e.preventDefault(); canvas.setPointerCapture(e.pointerId); addPointer(e.pointerId,regionForPointer(e.clientX,e.clientY)); sfx('tick');});
+canvas.addEventListener('pointerup',e=>{e.preventDefault(); clearPointer(e.pointerId);});
+canvas.addEventListener('pointercancel',e=>{e.preventDefault(); clearPointer(e.pointerId);});
+canvas.addEventListener('pointermove',e=>{e.preventDefault(); clearPointer(e.pointerId); addPointer(e.pointerId,regionForPointer(e.clientX,e.clientY));});
+window.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')input.leftIds.add('k'); if(e.key==='ArrowRight')input.rightIds.add('k'); if(e.key==='ArrowUp'||e.key===' ')input.burnIds.add('k'); updateInputUI();});
+window.addEventListener('keyup',e=>{if(e.key==='ArrowLeft')input.leftIds.delete('k'); if(e.key==='ArrowRight')input.rightIds.delete('k'); if(e.key==='ArrowUp'||e.key===' ')input.burnIds.delete('k'); updateInputUI();});
+audioBtn.addEventListener('click',toggleAudio);
+resetBtn.addEventListener('click',()=>{Object.assign(ship,{x:shipStart.x,y:shipStart.y,vx:shipStart.vx,vy:shipStart.vy,angle:shipStart.angle,turnInput:0,angularVelocity:0,thrust:0,thrustTarget:0,fuel:1}); particles=[]; sfx('tick');});
+function gravityAt(x,y){let ax=0, ay=0; for(const p of planets){const dx=p.x-x, dy=p.y-y, d2=dx*dx+dy*dy, d=Math.sqrt(d2)+0.0001, safe=Math.max(d2,p.r*p.r*0.82), g=p.mass/safe; ax+=dx/d*g; ay+=dy/d*g;} return {ax,ay};}
+function findClosestPlanet(){let best=null,bestD=Infinity; for(const p of planets){const d=Math.hypot(ship.x-p.x,ship.y-p.y); if(d<bestD){bestD=d; best=p;}} return {planet:best,distance:bestD};}
+function chooseTargetPlanet(){const speed=Math.hypot(ship.vx,ship.vy), dirX=speed>5?ship.vx/speed:Math.cos(ship.angle), dirY=speed>5?ship.vy/speed:Math.sin(ship.angle); let best=null,bestScore=-Infinity; for(const p of planets){const dx=p.x-ship.x,dy=p.y-ship.y,d=Math.hypot(dx,dy)+0.0001,nx=dx/d,ny=dy/d,align=nx*dirX+ny*dirY,score=align*1.1+(1/(1+d/1400))+p.mass/(d*d)*1800; if(score>bestScore){bestScore=score; best=p;}} targetPlanet=best;}
+function applyOrbitAssist(dt){const info=findClosestPlanet(), p=info.planet; if(!p)return; const dx=ship.x-p.x, dy=ship.y-p.y, d=Math.hypot(dx,dy), range=p.r*2.5; if(d>range||d<p.r*1.08)return; const nx=dx/d, ny=dy/d, tx=-ny, ty=nx, radialV=ship.vx*nx+ship.vy*ny, tangentialV=ship.vx*tx+ship.vy*ty, ideal=Math.sqrt(p.mass/Math.max(d,p.r*1.1))*0.92; if(Math.abs(radialV)<ideal*0.42 && Math.abs(tangentialV)>ideal*0.55){ship.vx+=(-radialV*nx)*dt*0.60; ship.vy+=(-radialV*ny)*dt*0.60; const desiredTan=Math.sign(tangentialV||1)*ideal, tanDelta=desiredTan-tangentialV; ship.vx+=(tx*tanDelta)*dt*0.14; ship.vy+=(ty*tanDelta)*dt*0.14; orbitConfirmCooldown-=dt; if(orbitConfirmCooldown<=0&&Math.abs(radialV)<ideal*0.16){orbitConfirmCooldown=1.6; sfx('orbit');}}}
+function spawnExhaust(strength){const count=2+Math.floor(strength*4); for(let i=0;i<count;i++){const a=ship.angle+Math.PI+(Math.random()-0.5)*0.35, speed=55+Math.random()*35+strength*90; particles.push({x:ship.x-Math.cos(ship.angle)*9,y:ship.y-Math.sin(ship.angle)*9,vx:Math.cos(a)*speed+ship.vx*0.18,vy:Math.sin(a)*speed+ship.vy*0.18,life:0.28+Math.random()*0.24,r:2.2+Math.random()*2.6,color:Math.random()<0.55?'255,170,70':'120,225,255'});}}
+function updateParticles(dt){for(let i=particles.length-1;i>=0;i--){const p=particles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; p.r*=0.992; if(p.life<=0||p.r<0.2)particles.splice(i,1);}}
+function updateCamera(dt){const speed=Math.hypot(ship.vx,ship.vy), info=findClosestPlanet(), planet=info.planet, distance=info.distance; world.targetZoom=1; if(speed>90)world.targetZoom=0.90; if(speed>140)world.targetZoom=0.76; if(speed>190)world.targetZoom=0.64; if(planet&&distance<planet.r*4.0)world.targetZoom*=1.12; if(planet&&distance<planet.r*2.2)world.targetZoom*=1.08; world.targetZoom=Math.max(0.50,Math.min(1.28,world.targetZoom)); world.zoom += (world.targetZoom-world.zoom)*Math.min(1,dt*1.4); world.camX += (ship.x-world.camX)*Math.min(1,dt*3.2); world.camY += (ship.y-world.camY)*Math.min(1,dt*3.2); }
+function update(dt){chooseTargetPlanet(); const left=input.leftIds.size>0,right=input.rightIds.size>0,burnHeld=input.burnIds.size>0; const turnTarget=left&&!right?-1:right&&!left?1:0, turnRamp=Math.abs(turnTarget)>Math.abs(ship.turnInput)?2.4:4.5; ship.turnInput += (turnTarget-ship.turnInput)*Math.min(1,dt*turnRamp); const turnSign=Math.sign(ship.turnInput), turnEff=turnSign*ship.turnInput*ship.turnInput, targetAngularVel=turnEff*ship.turnRate; ship.angularVelocity += (targetAngularVel-ship.angularVelocity)*Math.min(1,dt*5.4); ship.angle += ship.angularVelocity*dt; const hadBurn=ship.thrust>0.05; ship.thrustTarget=(burnHeld&&ship.fuel>0.01)?1:0; const thrustRamp=ship.thrustTarget>ship.thrust?0.95:3.0; ship.thrust += (ship.thrustTarget-ship.thrust)*Math.min(1,dt*thrustRamp); if(!hadBurn&&ship.thrust>0.06)sfx('burnStart'); const thrustEff=ship.thrust*ship.thrust; if(thrustEff>0.001)ship.fuel -= ship.fuelUse*thrustEff*dt; else {const close=findClosestPlanet(), bonus=close.planet?Math.max(0,1-close.distance/1100)*0.05:0; ship.fuel += (ship.fuelRegen+bonus)*dt;} ship.fuel=Math.max(0,Math.min(ship.fuelMax,ship.fuel)); if(ship.fuel<0.12&&Math.random()<0.008)sfx('fuelLow'); const g=gravityAt(ship.x,ship.y); ship.vx += g.ax*dt; ship.vy += g.ay*dt; if(thrustEff>0.001&&ship.fuel>0){const power=ship.thrustPower*thrustEff; ship.vx += Math.cos(ship.angle)*power*dt; ship.vy += Math.sin(ship.angle)*power*dt; spawnExhaust(thrustEff);} applyOrbitAssist(dt); ship.x += ship.vx*dt; ship.y += ship.vy*dt; for(const p of planets){const dx=ship.x-p.x,dy=ship.y-p.y,d=Math.hypot(dx,dy); if(d<p.r+ship.radius){const nx=dx/d,ny=dy/d; ship.x=p.x+nx*(p.r+ship.radius); ship.y=p.y+ny*(p.r+ship.radius); const radial=ship.vx*nx+ship.vy*ny; if(radial<0){ship.vx-=radial*nx*1.35; ship.vy-=radial*ny*1.35;} ship.vx*=0.70; ship.vy*=0.70;}} updateCamera(dt); updateParticles(dt);} 
+function screenPos(x,y){return {x:W/2+(x-world.camX)*world.zoom,y:H/2+(y-world.camY)*world.zoom};}
+function drawBackground(){for(const n of nebulas){const grad=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,n.r); grad.addColorStop(0,`rgba(90,130,255,${n.a})`); grad.addColorStop(1,'rgba(90,130,255,0)'); ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,Math.PI*2); ctx.fill();} const driftX=((world.camX*0.012)%W+W)%W, driftY=((world.camY*0.012)%H+H)%H; for(const s of stars){const x=(s.x-driftX*s.layer+W*3)%W, y=(s.y-driftY*s.layer+H*3)%H; ctx.globalAlpha=s.a; ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(x,y,s.r,0,Math.PI*2); ctx.fill();} ctx.globalAlpha=1;}
+function drawGrid(){ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1; const spacing=160, halfWorldX=W/world.zoom/2+220, halfWorldY=H/world.zoom/2+220, startX=Math.floor((world.camX-halfWorldX)/spacing)*spacing, endX=Math.ceil((world.camX+halfWorldX)/spacing)*spacing, startY=Math.floor((world.camY-halfWorldY)/spacing)*spacing, endY=Math.ceil((world.camY+halfWorldY)/spacing)*spacing; for(let x=startX;x<=endX;x+=spacing){const a=screenPos(x,startY),b=screenPos(x,endY); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();} for(let y=startY;y<=endY;y+=spacing){const a=screenPos(startX,y),b=screenPos(endX,y); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();} ctx.restore();}
+function predictTrajectory(){const speed=Math.hypot(ship.vx,ship.vy); if(speed<2.0&&ship.thrust<0.03)return []; let x=ship.x,y=ship.y,vx=ship.vx,vy=ship.vy; const points=[], step=0.085, steps=720; for(let i=0;i<steps;i++){const g=gravityAt(x,y); vx+=g.ax*step; vy+=g.ay*step; let closest=null,bestD=Infinity; for(const p of planets){const d=Math.hypot(x-p.x,y-p.y); if(d<bestD){bestD=d; closest=p;}} if(closest){const p=closest,dx=x-p.x,dy=y-p.y,d=Math.hypot(dx,dy), range=p.r*2.5; if(d<range&&d>p.r*1.08){const nx=dx/d,ny=dy/d,tx=-ny,ty=nx,radialV=vx*nx+vy*ny,tangentialV=vx*tx+vy*ty,ideal=Math.sqrt(p.mass/Math.max(d,p.r*1.1))*0.92; if(Math.abs(radialV)<ideal*0.42&&Math.abs(tangentialV)>ideal*0.55){vx+=(-radialV*nx)*step*0.60; vy+=(-radialV*ny)*step*0.60; const desiredTan=Math.sign(tangentialV||1)*ideal, tanDelta=desiredTan-tangentialV; vx+=(tx*tanDelta)*step*0.14; vy+=(ty*tanDelta)*step*0.14;}}} x+=vx*step; y+=vy*step; points.push({x,y}); let hit=false; for(const p of planets){if(Math.hypot(x-p.x,y-p.y)<p.r){hit=true; break;}} if(hit)break;} return points;}
+function drawTrajSegment(seg,stroke,glow,dash,width){if(seg.length<2)return; ctx.save(); ctx.strokeStyle=stroke; ctx.lineWidth=width; ctx.shadowColor=glow; ctx.shadowBlur=10; ctx.setLineDash(dash); ctx.lineDashOffset=-performance.now()*0.03; ctx.beginPath(); let p=screenPos(seg[0].x,seg[0].y); ctx.moveTo(p.x,p.y); for(let i=1;i<seg.length;i++){p=screenPos(seg[i].x,seg[i].y); ctx.lineTo(p.x,p.y);} ctx.stroke(); ctx.restore();}
+function drawTrajectory(){const pts=predictTrajectory(); if(pts.length<2)return; const speed=Math.hypot(ship.vx,ship.vy), dirX=speed>4?ship.vx/speed:Math.cos(ship.angle), dirY=speed>4?ship.vy/speed:Math.sin(ship.angle); const front=[],back=[]; for(const p of pts){const dx=p.x-ship.x,dy=p.y-ship.y,dot=dx*dirX+dy*dirY; if(dot>=0){front.push(p); back.push(null);} else {back.push(p); front.push(null);}} function split(arr){const out=[]; let c=[]; for(const p of arr){if(p)c.push(p); else if(c.length){out.push(c); c=[];}} if(c.length)out.push(c); return out;} for(const seg of split(back))drawTrajSegment(seg,'rgba(255,170,85,0.92)','rgba(255,125,48,0.8)',[5,12],2.2); for(const seg of split(front))drawTrajSegment(seg,'rgba(110,235,255,0.94)','rgba(74,210,255,0.84)',[12,9],2.6);} 
+function rgb(arr,a=1){return `rgba(${arr[0]},${arr[1]},${arr[2]},${a})`;}
+function scalePlanetRadius(realR){return Math.max(14,realR*world.zoom);} 
+function drawPlanetTexture(p,x,y,r){ctx.save(); ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.clip(); for(let i=0;i<8;i++){const yy=y-r+(i+0.5)*(2*r/8), wave=Math.sin(i*1.8+p.seed)*r*0.12; ctx.globalAlpha=0.08+(i%3)*0.03; ctx.strokeStyle=i%2?'rgba(255,255,255,0.26)':'rgba(0,0,0,0.26)'; ctx.lineWidth=Math.max(1,r*0.06); ctx.beginPath(); ctx.ellipse(x+wave,yy,r*(0.90-i*0.03),r*0.10,Math.sin(i+p.seed)*0.10,0,Math.PI*2); ctx.stroke();} for(let i=0;i<7;i++){const a=i*2.2+p.seed, rr=r*(0.15+((i*27)%60)/100); ctx.globalAlpha=0.08; ctx.fillStyle=i%2?'white':'black'; ctx.beginPath(); ctx.ellipse(x+Math.cos(a)*rr*0.7,y+Math.sin(a*1.3)*rr*0.5,r*(0.09+i*0.005),r*(0.03+i*0.003),a,0,Math.PI*2); ctx.fill();} ctx.restore(); ctx.globalAlpha=1;}
+function drawEdgePlanetIndicator(p,sp,r){const cx=W/2,cy=H/2,dx=sp.x-cx,dy=sp.y-cy,ang=Math.atan2(dy,dx),margin=34,ex=Math.max(margin,Math.min(W-margin,cx+Math.cos(ang)*(W*0.44))),ey=Math.max(margin,Math.min(H-170,cy+Math.sin(ang)*(H*0.40))),indicatorR=Math.max(12,Math.min(22,r*0.22)); const grad=ctx.createRadialGradient(ex-indicatorR*0.35,ey-indicatorR*0.35,1,ex,ey,indicatorR); grad.addColorStop(0,rgb(p.colorA,1)); grad.addColorStop(1,rgb(p.colorB,1)); ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(ex,ey,indicatorR,0,Math.PI*2); ctx.fill(); ctx.strokeStyle=p===targetPlanet?'rgba(255,216,132,0.85)':'rgba(255,255,255,0.46)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(ex,ey,indicatorR+5,0,Math.PI*2); ctx.stroke(); ctx.fillStyle='rgba(255,255,255,0.82)'; ctx.font='11px system-ui'; ctx.textAlign='center'; ctx.fillText(p.name,ex,ey+indicatorR+16);} 
+function drawPlanet(p){const sp=screenPos(p.x,p.y), r=scalePlanetRadius(p.r); if(sp.x<-r*3||sp.x>W+r*3||sp.y<-r*3||sp.y>H+r*3){drawEdgePlanetIndicator(p,sp,r); return;} const atm=ctx.createRadialGradient(sp.x,sp.y,r*0.45,sp.x,sp.y,r*1.9); atm.addColorStop(0,rgb(p.colorA,0.02)); atm.addColorStop(0.55,rgb(p.colorA,0.10)); atm.addColorStop(1,rgb(p.colorA,0)); ctx.fillStyle=atm; ctx.beginPath(); ctx.arc(sp.x,sp.y,r*1.9,0,Math.PI*2); ctx.fill(); if(p.ring){ctx.save(); ctx.globalAlpha=0.34; ctx.strokeStyle='rgba(255,232,180,0.62)'; ctx.lineWidth=Math.max(1,r*0.055); ctx.beginPath(); ctx.ellipse(sp.x,sp.y+r*0.04,r*1.85,r*0.42,-0.18,0,Math.PI*2); ctx.stroke(); ctx.restore();} const body=ctx.createRadialGradient(sp.x-r*0.40,sp.y-r*0.45,r*0.08,sp.x,sp.y,r); body.addColorStop(0,rgb(p.colorA,1)); body.addColorStop(0.56,rgb(p.colorB,1)); body.addColorStop(1,'rgba(20,20,30,0.98)'); ctx.fillStyle=body; ctx.beginPath(); ctx.arc(sp.x,sp.y,r,0,Math.PI*2); ctx.fill(); drawPlanetTexture(p,sp.x,sp.y,r); const shade=ctx.createRadialGradient(sp.x-r*0.35,sp.y-r*0.40,r*0.10,sp.x+r*0.20,sp.y+r*0.28,r*1.05); shade.addColorStop(0,'rgba(255,255,255,0.18)'); shade.addColorStop(0.5,'rgba(255,255,255,0.02)'); shade.addColorStop(1,'rgba(0,0,0,0.55)'); ctx.fillStyle=shade; ctx.beginPath(); ctx.arc(sp.x,sp.y,r,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.24)'; ctx.lineWidth=Math.max(1,r*0.02); ctx.beginPath(); ctx.arc(sp.x,sp.y,r,0,Math.PI*2); ctx.stroke(); ctx.fillStyle='rgba(255,255,255,0.84)'; ctx.font=`${Math.max(10,Math.min(14,r*0.16))}px system-ui`; ctx.textAlign='center'; ctx.fillText(p.name,sp.x,sp.y-r-12); ctx.strokeStyle=p===targetPlanet?'rgba(255,214,122,0.22)':'rgba(255,255,255,0.08)'; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(sp.x,sp.y,r*2.35,0,Math.PI*2); ctx.stroke();}
+function drawPlanets(){const ordered=[...planets].sort((a,b)=>Math.hypot(ship.x-b.x,ship.y-b.y)-Math.hypot(ship.x-a.x,ship.y-a.y)); for(const p of ordered)drawPlanet(p);} 
+function drawParticles(){for(const p of particles){const sp=screenPos(p.x,p.y), r=Math.max(0.5,p.r*world.zoom); ctx.fillStyle=`rgba(${p.color},${Math.max(0,p.life*2.2)})`; ctx.shadowColor=`rgba(${p.color},0.75)`; ctx.shadowBlur=10; ctx.beginPath(); ctx.arc(sp.x,sp.y,r,0,Math.PI*2); ctx.fill();} ctx.shadowBlur=0;}
+function drawShip(){const sp={x:W/2,y:H/2}, size=18, a=ship.angle; ctx.save(); ctx.translate(sp.x,sp.y); ctx.rotate(a); if(ship.thrust>0.008){const thrustVisual=Math.max(0.12,ship.thrust*ship.thrust), flameLen=14+thrustVisual*34+Math.sin(performance.now()*0.04)*3, grad=ctx.createLinearGradient(-size*0.8,0,-size-flameLen,0); grad.addColorStop(0,`rgba(255,255,255,${0.35+thrustVisual*0.45})`); grad.addColorStop(0.34,`rgba(255,185,75,${0.20+thrustVisual*0.55})`); grad.addColorStop(1,'rgba(255,70,20,0.02)'); ctx.fillStyle=grad; ctx.shadowColor='rgba(255,120,50,0.8)'; ctx.shadowBlur=16; ctx.beginPath(); ctx.moveTo(-size*0.72,-4); ctx.lineTo(-size-flameLen,0); ctx.lineTo(-size*0.72,4); ctx.closePath(); ctx.fill(); ctx.shadowBlur=0;} ctx.fillStyle='#eef7ff'; ctx.strokeStyle='rgba(0,0,0,0.52)'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(size,0); ctx.lineTo(-size*0.80,-size*0.54); ctx.lineTo(-size*0.38,0); ctx.lineTo(-size*0.80,size*0.54); ctx.closePath(); ctx.fill(); ctx.stroke(); const bodyGrad=ctx.createLinearGradient(size,0,-size,0); bodyGrad.addColorStop(0,'rgba(255,255,255,0.75)'); bodyGrad.addColorStop(0.56,'rgba(100,170,225,0.16)'); bodyGrad.addColorStop(1,'rgba(0,0,0,0.18)'); ctx.fillStyle=bodyGrad; ctx.beginPath(); ctx.moveTo(size,0); ctx.lineTo(-size*0.80,-size*0.54); ctx.lineTo(-size*0.38,0); ctx.lineTo(-size*0.80,size*0.54); ctx.closePath(); ctx.fill(); ctx.fillStyle='rgba(105,230,255,0.95)'; ctx.shadowColor='rgba(105,230,255,0.9)'; ctx.shadowBlur=10; ctx.beginPath(); ctx.ellipse(size*0.18,0,3.7,2.8,0,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0; ctx.strokeStyle='rgba(255,255,255,0.14)'; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(0,0,25,0,Math.PI*2); ctx.stroke(); ctx.restore();}
+function roundRect(x,y,w,h,r,fill,stroke){const rr=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+rr,y); ctx.arcTo(x+w,y,x+w,y+h,rr); ctx.arcTo(x+w,y+h,x,y+h,rr); ctx.arcTo(x,y+h,x,y,rr); ctx.arcTo(x,y,x+w,y,rr); ctx.closePath(); if(fill)ctx.fill(); if(stroke)ctx.stroke();}
+function drawFuelBar(){const x=18,y=H-84,w=142,h=12; ctx.save(); ctx.fillStyle='rgba(0,0,0,0.32)'; ctx.strokeStyle='rgba(255,255,255,0.16)'; ctx.lineWidth=1; roundRect(x,y,w,h,8,true,true); const fillW=Math.max(0,(w-2)*(ship.fuel/ship.fuelMax)); const grad=ctx.createLinearGradient(x,y,x+w,y); grad.addColorStop(0,ship.fuel<0.2?'rgba(255,116,116,0.95)':'rgba(126,235,255,0.95)'); grad.addColorStop(1,ship.fuel<0.2?'rgba(255,170,110,0.95)':'rgba(135,255,184,0.95)'); ctx.fillStyle=grad; roundRect(x+1,y+1,fillW,h-2,7,true,false); ctx.fillStyle='rgba(255,255,255,0.84)'; ctx.font='11px system-ui'; ctx.fillText('burn capacitor',x,y-8); ctx.restore();}
+function drawTargetMarker(){if(!targetPlanet)return; const sp=screenPos(targetPlanet.x,targetPlanet.y), r=scalePlanetRadius(targetPlanet.r); if(sp.x>-r&&sp.x<W+r&&sp.y>-r&&sp.y<H+r){ctx.save(); ctx.strokeStyle='rgba(255,216,122,0.60)'; ctx.lineWidth=1.5; ctx.setLineDash([6,8]); ctx.beginPath(); ctx.arc(sp.x,sp.y,r*2.65,0,Math.PI*2); ctx.stroke(); ctx.restore();}}
+function render(){ctx.clearRect(0,0,W,H); drawBackground(); drawGrid(); drawTrajectory(); drawPlanets(); drawTargetMarker(); drawParticles(); drawShip(); drawFuelBar(); const speed=Math.hypot(ship.vx,ship.vy); readout.innerHTML=`v ${speed.toFixed(1)}<br>fuel ${(ship.fuel*100).toFixed(0)}%<br>target ${targetPlanet?targetPlanet.name:'—'}`; burnVisual.style.opacity=`${0.58+Math.max(0.12,ship.thrust*ship.thrust)*0.42}`;}
+function loop(now){const dt=Math.min(0.033,(now-last)/1000); last=now; update(dt); render(); requestAnimationFrame(loop);} requestAnimationFrame(loop);
+})();
+</script>
 </body>
 </html>
