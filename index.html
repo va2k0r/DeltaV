@@ -142,8 +142,8 @@
   <div class="hud">
     <div class="panel">
       DeltaV prototype<br>
-      Camera sulla traiettoria, non sul muso<br>
-      Lati invisibili: ruota nave
+      Camera su traiettoria + target assist<br>
+      Lati invisibili: rotazione progressiva
     </div>
     <div class="panel" id="readout">
       v 0<br>
@@ -157,7 +157,7 @@
   </div>
 
   <div class="note">
-    Azzurro: traiettoria futura davanti al movimento. Arancione: traiettoria dietro la nave, utile per capire il retrograde. Nessun marker.
+    Azzurro: traiettoria futura davanti al movimento. Arancione: traiettoria dietro la nave. La camera tiene leggermente in campo il pianeta target.
   </div>
 
   <div class="burn-button" id="burnVisual">BURN</div>
@@ -188,7 +188,9 @@
       thrust: 0,
       thrustTarget: 0,
       thrustPower: 155,
-      radius: 14
+      radius: 14,
+      turnInput: 0,
+      angularVelocity: 0
     };
 
     const camera = {
@@ -199,7 +201,9 @@
       back: 250,
       height: 58,
       lookAhead: 520,
-      fov: 720
+      fov: 720,
+      targetPlanet: null,
+      targetAssist: 0
     };
 
     const planets = [
@@ -370,26 +374,90 @@
       return { ax, ay };
     }
 
+    function chooseSoftTarget() {
+      const speed = Math.hypot(ship.vx, ship.vy);
+      const dirX = speed > 5 ? ship.vx / speed : Math.cos(ship.angle);
+      const dirY = speed > 5 ? ship.vy / speed : Math.sin(ship.angle);
+
+      let best = null;
+      let bestScore = -Infinity;
+
+      for (const p of planets) {
+        const dx = p.x - ship.x;
+        const dy = p.y - ship.y;
+        const d = Math.sqrt(dx * dx + dy * dy) + 0.0001;
+        const nx = dx / d;
+        const ny = dy / d;
+        const alignment = nx * dirX + ny * dirY;
+
+        const distanceScore = 1 / (1 + d / 1400);
+        const gravityScore = p.mass / (d * d + 1);
+        const angleScore = Math.max(-0.35, alignment);
+
+        const score = angleScore * 1.35 + distanceScore * 0.65 + gravityScore * 1800;
+
+        if (score > bestScore) {
+          bestScore = score;
+          best = p;
+        }
+      }
+
+      return best;
+    }
+
+    function blendedCameraAngle(baseAngle, targetPlanet, speed) {
+      if (!targetPlanet) return baseAngle;
+
+      const tx = targetPlanet.x - ship.x;
+      const ty = targetPlanet.y - ship.y;
+      const targetAngle = Math.atan2(ty, tx);
+      const angularDistance = Math.abs(shortestAngleDelta(baseAngle, targetAngle));
+
+      const distance = Math.hypot(tx, ty);
+      const closeBoost = Math.max(0, 1 - distance / 2300);
+      const visibleNeed = Math.min(1, angularDistance / 1.35);
+
+      let assist = 0.12 + closeBoost * 0.14 + visibleNeed * 0.14;
+      if (speed < 7) assist *= 0.45;
+      assist = Math.max(0, Math.min(0.36, assist));
+
+      camera.targetAssist += (assist - camera.targetAssist) * 0.045;
+      return lerpAngle(baseAngle, targetAngle, camera.targetAssist);
+    }
+
     function update(dt) {
       const left = input.leftIds.size > 0;
       const right = input.rightIds.size > 0;
       const burn = input.burnIds.size > 0;
 
-      if (left) ship.angle -= ship.turnRate * dt;
-      if (right) ship.angle += ship.turnRate * dt;
+      const turnTarget = left && !right ? -1 : right && !left ? 1 : 0;
+
+      const turnRampUp = 2.2;
+      const turnRampDown = 4.2;
+      const turnRamp = Math.abs(turnTarget) > Math.abs(ship.turnInput) ? turnRampUp : turnRampDown;
+      ship.turnInput += (turnTarget - ship.turnInput) * Math.min(1, dt * turnRamp);
+
+      const turnSign = Math.sign(ship.turnInput);
+      const turnEffective = turnSign * ship.turnInput * ship.turnInput;
+      const targetAngularVelocity = turnEffective * ship.turnRate;
+
+      ship.angularVelocity += (targetAngularVelocity - ship.angularVelocity) * Math.min(1, dt * 5.2);
+      ship.angle += ship.angularVelocity * dt;
 
       ship.thrustTarget = burn ? 1 : 0;
-      const rampUp = 1.12;
-      const rampDown = 3.15;
+      const rampUp = 0.86;
+      const rampDown = 3.35;
       const ramp = ship.thrustTarget > ship.thrust ? rampUp : rampDown;
       ship.thrust += (ship.thrustTarget - ship.thrust) * Math.min(1, dt * ramp);
+
+      const thrustEffective = ship.thrust * ship.thrust;
 
       const g = gravityAt(ship.x, ship.y);
       ship.vx += g.ax * dt;
       ship.vy += g.ay * dt;
 
       if (ship.thrust > 0.002) {
-        const power = ship.thrustPower * ship.thrust;
+        const power = ship.thrustPower * thrustEffective;
         ship.vx += Math.cos(ship.angle) * power * dt;
         ship.vy += Math.sin(ship.angle) * power * dt;
       }
@@ -418,16 +486,14 @@
 
       const speed = Math.hypot(ship.vx, ship.vy);
 
-      if (speed > 4.5) {
-        camera.targetAngle = Math.atan2(ship.vy, ship.vx);
-      } else {
-        camera.targetAngle = ship.angle;
-      }
+      const baseAngle = speed > 4.5 ? Math.atan2(ship.vy, ship.vx) : ship.angle;
+      camera.targetPlanet = chooseSoftTarget();
+      camera.targetAngle = blendedCameraAngle(baseAngle, camera.targetPlanet, speed);
 
-      const follow = Math.min(1, dt * (speed > 4.5 ? 2.4 : 1.15));
+      const follow = Math.min(1, dt * (speed > 4.5 ? 2.15 : 1.05));
       camera.angle = lerpAngle(camera.angle, camera.targetAngle, follow);
 
-      const back = 220 + Math.min(150, speed * 1.2);
+      const back = 220 + Math.min(165, speed * 1.25);
       camera.back += (back - camera.back) * Math.min(1, dt * 1.2);
 
       camera.x = ship.x - Math.cos(camera.angle) * camera.back;
@@ -823,15 +889,16 @@
       const left = { x: px - headingX * len * 0.18 - sideX * wid, y: py - headingY * len * 0.18 - sideY * wid };
       const right = { x: px - headingX * len * 0.18 + sideX * wid, y: py - headingY * len * 0.18 + sideY * wid };
 
-      if (ship.thrust > 0.015) {
-        const flameLen = (30 + ship.thrust * 62 + Math.sin(performance.now() * 0.04) * 6) * scale;
+      if (ship.thrust > 0.006) {
+        const thrustVisual = Math.max(0.10, ship.thrust * ship.thrust);
+        const flameLen = (14 + thrustVisual * 92 + Math.sin(performance.now() * 0.04) * 5) * scale;
         const backX = -headingX;
         const backY = -headingY;
         const flameTip = { x: tail.x + backX * flameLen, y: tail.y + backY * flameLen };
 
         const grad = ctx.createLinearGradient(tail.x, tail.y, flameTip.x, flameTip.y);
-        grad.addColorStop(0, `rgba(255,255,255,${0.38 + ship.thrust * 0.5})`);
-        grad.addColorStop(0.28, `rgba(255,198,87,${0.24 + ship.thrust * 0.55})`);
+        grad.addColorStop(0, `rgba(255,255,255,${0.28 + thrustVisual * 0.62})`);
+        grad.addColorStop(0.28, `rgba(255,198,87,${0.18 + thrustVisual * 0.66})`);
         grad.addColorStop(1, "rgba(255,80,20,0.02)");
 
         ctx.save();
@@ -925,6 +992,64 @@
       ctx.restore();
     }
 
+
+    function drawTargetAssist() {
+      const target = camera.targetPlanet;
+      if (!target) return;
+
+      const p = projectWorld(target.x, target.y, target.r * 0.15);
+      const label = target.name;
+
+      ctx.save();
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 8]);
+      ctx.strokeStyle = "rgba(255,255,255,0.42)";
+      ctx.fillStyle = "rgba(255,255,255,0.78)";
+      ctx.font = "12px system-ui";
+      ctx.textAlign = "center";
+
+      if (p && p.x > 24 && p.x < W - 24 && p.y > 34 && p.y < H - 150) {
+        ctx.globalAlpha = 0.85;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 18, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillText("target " + label, p.x, p.y + 34);
+      } else {
+        const dx = target.x - ship.x;
+        const dy = target.y - ship.y;
+        const angleWorld = Math.atan2(dy, dx);
+        const rel = shortestAngleDelta(camera.angle, angleWorld);
+
+        const cx = W / 2;
+        const cy = H / 2;
+        const margin = 34;
+        const arrowX = cx + Math.sin(rel) * (W / 2 - margin);
+        const arrowY = cy - Math.cos(rel) * (H / 2 - 92);
+
+        const clampedX = Math.max(margin, Math.min(W - margin, arrowX));
+        const clampedY = Math.max(margin + 10, Math.min(H - 172, arrowY));
+
+        ctx.globalAlpha = 0.9;
+        ctx.translate(clampedX, clampedY);
+        ctx.rotate(rel);
+        ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(255,255,255,0.82)";
+        ctx.beginPath();
+        ctx.moveTo(0, -15);
+        ctx.lineTo(-9, 9);
+        ctx.lineTo(0, 4);
+        ctx.lineTo(9, 9);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.rotate(-rel);
+        ctx.fillStyle = "rgba(255,255,255,0.74)";
+        ctx.fillText(label, 0, 30);
+      }
+
+      ctx.restore();
+    }
+
     function render() {
       ctx.clearRect(0, 0, W, H);
 
@@ -932,12 +1057,14 @@
       drawGrid();
       drawTrajectory();
       drawPlanets();
+      drawTargetAssist();
       drawAttitudeGhost();
       drawShip();
 
       const speed = Math.hypot(ship.vx, ship.vy);
-      readout.innerHTML = `v ${speed.toFixed(1)}<br>throttle ${(ship.thrust * 100).toFixed(0)}%<br>${input.burnIds.size ? "burning" : "coasting"}`;
-      burnVisual.style.opacity = `${0.58 + ship.thrust * 0.42}`;
+      const thrustEffective = ship.thrust * ship.thrust;
+      readout.innerHTML = `v ${speed.toFixed(1)}<br>throttle ${(thrustEffective * 100).toFixed(0)}%<br>turn ${(Math.abs(ship.turnInput) * 100).toFixed(0)}%<br>${input.burnIds.size ? "burning" : "coasting"}`;
+      burnVisual.style.opacity = `${0.58 + Math.max(0.1, thrustEffective) * 0.42}`;
     }
 
     function loop(now) {
