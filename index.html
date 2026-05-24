@@ -145,19 +145,36 @@ function enemyAttackOpportunity(e){
   return angleScore*.74+rangeScore*.26;
 }
 function enemyCanShootPlayer(e){let dx=ship.x-e.x,dy=ship.y-e.y,d=Math.hypot(dx,dy);if(d>enemyWeapon.range||d<1)return false;let fx=Math.cos(e.angle),fy=Math.sin(e.angle),a=Math.acos(clamp((dx/d)*fx+(dy/d)*fy,-1,1));return a<=enemyWeapon.cone}
-function aiPlayerVelocityDir(){
-  const sp=Math.hypot(ship.vx,ship.vy);
-  if(sp>10)return{x:ship.vx/sp,y:ship.vy/sp};
-  return{x:Math.cos(ship.angle),y:Math.sin(ship.angle)};
+function aiNorm(x,y){
+  const l=Math.hypot(x,y)+.0001;
+  return{x:x/l,y:y/l};
 }
 
 function aiPlayerFacingDir(){
   return{x:Math.cos(ship.angle),y:Math.sin(ship.angle)};
 }
 
-function aiNorm(x,y){
-  const l=Math.hypot(x,y)+.0001;
-  return{x:x/l,y:y/l};
+function aiPlayerOrbitBody(){
+  let best=null,bestScore=-Infinity;
+  for(const b of bodies){
+    if(b.type==='sun')continue;
+    const d=Math.hypot(ship.x-b.x,ship.y-b.y)+.0001;
+    const score=b.mass/(d*d);
+    if(score>bestScore){bestScore=score;best=b}
+  }
+  return best||bodies.find(b=>b.type!=='sun')||bodies[0];
+}
+
+function aiPolarAround(b,x,y){
+  const dx=x-b.x,dy=y-b.y;
+  const r=Math.hypot(dx,dy)+.0001;
+  const radial={x:dx/r,y:dy/r};
+  const tangent={x:-radial.y,y:radial.x};
+  return{dx,dy,r,angle:Math.atan2(dy,dx),radial,tangent};
+}
+
+function aiSignedPhase(a,b){
+  return sd(a,b);
 }
 
 function aiShotScore(e){
@@ -176,18 +193,6 @@ function aiKillzoneScore(e){
   const cone=weapon.cone*3.05;
   if(a>cone)return 0;
   return clamp(1-a/cone,0,1)*.80+clamp(1-d/(weapon.range*1.55),0,1)*.20;
-}
-
-function aiPlayerThreat(e){
-  return aiKillzoneScore(e);
-}
-
-function aiPlayerTurningTowardEnemy(e){
-  const dx=e.x-ship.x,dy=e.y-ship.y;
-  const target=Math.atan2(dy,dx);
-  const nowErr=Math.abs(sd(ship.angle,target));
-  const futureErr=Math.abs(sd(ship.angle+ship.angularVelocity*.55,target));
-  return clamp((nowErr-futureErr)/.55,0,1);
 }
 
 function aiCanShoot(e){
@@ -218,83 +223,102 @@ function aiEnemyFire(e){
 }
 
 function aiPlanetAvoidanceVector(e){
-  // Local safety only. If it fails, enemy ghosts through planets.
   let ax=0,ay=0,riskMax=0;
-
   for(const b of bodies){
     if(b.type==='sun')continue;
-
     const fx=e.x+e.vx*.85,fy=e.y+e.vy*.85;
     const dx=e.x-b.x,dy=e.y-b.y,d=Math.hypot(dx,dy)+.0001;
     const fdx=fx-b.x,fdy=fy-b.y,fd=Math.hypot(fdx,fdy)+.0001;
-
-    const danger=b.r+e.radius+125;
+    const danger=b.r+e.radius+115;
     const risk=clamp(1-(Math.min(d,fd)-b.r)/Math.max(1,danger-b.r),0,1);
     if(risk<=0)continue;
-
     const nx=dx/d,ny=dy/d;
     const inward=-(e.vx*nx+e.vy*ny);
-    const side=Math.sign(e.vx*ny-e.vy*nx)||e.side||1;
+    const side=Math.sign(e.vx*ny-e.vy*nx)||e.orbitSide||1;
     const tx=-ny*side,ty=nx*side;
-    const push=70*risk+clamp(inward,0,180)*.42*risk;
-
+    const push=65*risk+clamp(inward,0,180)*.40*risk;
     ax+=(tx*.74+nx*.26)*push;
     ay+=(ty*.74+ny*.26)*push;
     riskMax=Math.max(riskMax,risk);
   }
-
   return{ax,ay,risk:riskMax};
 }
 
-function aiDesiredVelocity(e){
-  const dx=ship.x-e.x,dy=ship.y-e.y,d=Math.hypot(dx,dy)+.0001;
-  const toPlayer={x:dx/d,y:dy/d};
-  const radialFromPlayer={x:-toPlayer.x,y:-toPlayer.y};
+function aiPlanOrbitalBurn(e){
+  const body=aiPlayerOrbitBody();
+  const pp=aiPolarAround(body,ship.x,ship.y);
+  const ep=aiPolarAround(body,e.x,e.y);
 
-  const side=e.side||1;
-  const tangent={x:-radialFromPlayer.y*side,y:radialFromPlayer.x*side};
-
-  const killzone=aiKillzoneScore(e);
+  const phase=aiSignedPhase(ep.angle,pp.angle);
+  const absPhase=Math.abs(phase);
+  const rErr=pp.r-ep.r;
+  const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
   const shot=aiShotScore(e);
-  const turning=aiPlayerTurningTowardEnemy(e);
+  const killzone=aiKillzoneScore(e);
 
-  let state='strafe_orbit';
-  let vx=0,vy=0;
-  const ideal=780;
+  const er={x:ep.radial.x,y:ep.radial.y};
+  const et={x:ep.tangent.x*(e.orbitSide||1),y:ep.tangent.y*(e.orbitSide||1)};
 
-  if((killzone>.38 || turning>.36) && shot<.64){
-    // Do not shoot. Do not approach. Slide tangentially until out of the player's nose.
-    state='killzone_escape';
-    const speed=210;
-    vx=tangent.x*speed + radialFromPlayer.x*35;
-    vy=tangent.y*speed + radialFromPlayer.y*35;
-  }else if(d>1450){
-    // Curved approach: not a straight missile line.
-    state='curved_approach';
-    const speed=clamp(150+d*.035,170,255);
-    vx=(toPlayer.x*.72+tangent.x*.28)*speed;
-    vy=(toPlayer.y*.72+tangent.y*.28)*speed;
-  }else if(d<470){
-    // Too close: slide out, do not reverse straight away.
-    state='separate_orbit';
-    const speed=190;
-    vx=(tangent.x*.78+radialFromPlayer.x*.22)*speed;
-    vy=(tangent.y*.78+radialFromPlayer.y*.22)*speed;
+  let state="phase";
+  let dir={x:0,y:0};
+  let power=92;
+  let burn=.50;
+  let coast=1.15;
+
+  if(killzone>.42 && shot<.65){
+    state="killzone_escape";
+    dir={x:et.x*.90+er.x*.12,y:et.y*.90+er.y*.12};
+    power=126;
+    burn=.48;
+    coast=1.35;
+  }else if(dPlayer<enemyWeapon.range*1.15 && shot>.52){
+    state="attack_pass";
+    dir={x:et.x*.75-er.x*.10,y:et.y*.75-er.y*.10};
+    power=48;
+    burn=.26;
+    coast=.90;
+  }else if(absPhase>.34){
+    state="phase_approach";
+    const wantsCatch = phase>0 ? 1 : -1;
+    dir={
+      x:et.x*wantsCatch + er.x*clamp(rErr/900,-.32,.32),
+      y:et.y*wantsCatch + er.y*clamp(rErr/900,-.32,.32)
+    };
+    power=112;
+    burn=.56;
+    coast=1.55;
+  }else if(Math.abs(rErr)>220){
+    state="match_radius";
+    const radialSign=Math.sign(rErr);
+    dir={
+      x:er.x*radialSign*.70+et.x*.30,
+      y:er.y*radialSign*.70+et.y*.30
+    };
+    power=88;
+    burn=.48;
+    coast=1.25;
+  }else if(dPlayer>1050){
+    state="intercept_pass";
+    const toP=aiNorm(ship.x-e.x,ship.y-e.y);
+    dir={x:et.x*.62+toP.x*.38,y:et.y*.62+toP.y*.38};
+    power=104;
+    burn=.44;
+    coast=1.10;
   }else{
-    // Combat orbit: maintain tangential velocity with radial correction.
-    state=shot>.58?'attack_orbit':'strafe_orbit';
-    const tangentialSpeed=175;
-    const radialError=d-ideal;
-    const radialSpeed=clamp(radialError*.22,-80,90);
-    vx=tangent.x*tangentialSpeed + toPlayer.x*radialSpeed;
-    vy=tangent.y*tangentialSpeed + toPlayer.y*radialSpeed;
+    state="combat_orbit";
+    const ideal=760;
+    const radialSign=Math.sign(dPlayer-ideal);
+    dir={x:et.x*.88+er.x*radialSign*.18,y:et.y*.88+er.y*radialSign*.18};
+    power=58;
+    burn=.28;
+    coast=1.20;
   }
 
-  // Blend with player's orbital velocity so movement is orbital-ish, not absolute-space drone.
-  vx+=ship.vx*.58;
-  vy+=ship.vy*.58;
-
-  return{vx,vy,state,shot,killzone,turning,d,tangent,radialFromPlayer};
+  const n=aiNorm(dir.x,dir.y);
+  return{
+    body,state,dir:n,power,burn,coast,phase,rErr,dPlayer,shot,killzone,
+    target:{x:e.x+n.x*520,y:e.y+n.y*520}
+  };
 }
 
 function updateEnemies(dt){
@@ -303,72 +327,64 @@ function updateEnemies(dt){
   for(const e of enemies){
     if(!e.alive)continue;
 
-    if(e.side==null)e.side=Math.random()<.5?-1:1;
-    if(e.thinkTimer==null)e.thinkTimer=0;
-    if(e.sideCooldown==null)e.sideCooldown=0;
-    if(e.escapeLock==null)e.escapeLock=0;
+    if(e.orbitSide==null)e.orbitSide=Math.random()<.5?-1:1;
+    if(e.planTimer==null)e.planTimer=.1;
+    if(e.burnTimerAI==null)e.burnTimerAI=0;
+    if(e.coastTimer==null)e.coastTimer=0;
     if(e.weaponCooldown==null)e.weaponCooldown=1.0;
     if(e.lastAttack==null)e.lastAttack=0;
+    if(e.currentPlan==null)e.currentPlan=aiPlanOrbitalBurn(e);
 
-    e.thinkTimer-=dt;
-    e.sideCooldown=Math.max(0,e.sideCooldown-dt);
-    e.escapeLock=Math.max(0,e.escapeLock-dt);
     e.weaponCooldown=Math.max(0,e.weaponCooldown-dt);
     e.lastAttack+=dt;
+    e.planTimer-=dt;
 
-    const desire=aiDesiredVelocity(e);
+    let plan=e.currentPlan;
 
-    if(e.thinkTimer<=0){
-      e.thinkTimer=.25;
+    if(e.burnTimerAI<=0 && e.coastTimer<=0 && e.planTimer<=0){
+      plan=aiPlanOrbitalBurn(e);
+      e.currentPlan=plan;
+      e.burnTimerAI=plan.burn;
+      e.coastTimer=plan.coast;
+      e.planTimer=plan.burn+plan.coast+.05;
 
-      if((desire.killzone>.38 || desire.turning>.36) && desire.shot<.64){
-        e.escapeLock=Math.max(e.escapeLock,1.25);
-        if(e.sideCooldown<=0){
-          e.side*=-1;
-          e.sideCooldown=1.45;
-        }
-      }
-
-      if(desire.d>1700 && e.lastAttack>5.5 && e.sideCooldown<=0){
-        e.side*=-1;
-        e.sideCooldown=1.25;
+      if(plan.state==="killzone_escape" && plan.shot<.65){
+        e.orbitSide*=-1;
       }
     }
 
-    // Recompute after possible side change.
-    const d2=aiDesiredVelocity(e);
-    let targetVX=d2.vx,targetVY=d2.vy;
+    let ax=0,ay=0;
 
-    if(e.escapeLock>0 && d2.shot<.68){
-      // Force tangent-only movement while escaping killzone.
-      const speed=225;
-      targetVX=ship.vx*.48 + d2.tangent.x*speed + d2.radialFromPlayer.x*45;
-      targetVY=ship.vy*.48 + d2.tangent.y*speed + d2.radialFromPlayer.y*45;
-      e.aiState='killzone_escape';
+    if(e.burnTimerAI>0){
+      e.burnTimerAI-=dt;
+      ax+=plan.dir.x*plan.power;
+      ay+=plan.dir.y*plan.power;
+      e.burnAngle=Math.atan2(plan.dir.y,plan.dir.x);
+      e.burnTimer=.10;
+      e.plumeTimer=.16;
+      e.aiState=plan.state+"_burn";
     }else{
-      e.aiState=d2.state;
+      e.coastTimer=Math.max(0,e.coastTimer-dt);
+      e.burnTimer=Math.max(0,(e.burnTimer||0)-dt);
+      e.plumeTimer=Math.max(0,(e.plumeTimer||0)-dt);
+      e.aiState=plan.state+"_coast";
     }
-
-    // Velocity controller: aim for desired velocity rather than desired position.
-    let ax=(targetVX-e.vx)*1.05;
-    let ay=(targetVY-e.vy)*1.05;
 
     const avoid=aiPlanetAvoidanceVector(e);
     ax+=avoid.ax;
     ay+=avoid.ay;
 
-    // Soft central containment.
     const sysR=Math.hypot(e.x,e.y)+.0001;
     if(sysR>boundary.soft*.72){
-      ax+=(-e.x/sysR)*70;
-      ay+=(-e.y/sysR)*70;
+      ax+=(-e.x/sysR)*62;
+      ay+=(-e.y/sysR)*62;
     }
 
-    const maxAccel=e.aiState==='killzone_escape'?158:145;
+    const maxA=plan.state==="killzone_escape"?142:118;
     const mag=Math.hypot(ax,ay);
-    if(mag>maxAccel){
-      ax=ax/mag*maxAccel;
-      ay=ay/mag*maxAccel;
+    if(mag>maxA){
+      ax=ax/mag*maxA;
+      ay=ay/mag*maxA;
     }
 
     e.vx+=ax*dt;
@@ -385,28 +401,28 @@ function updateEnemies(dt){
     e.hpVisible=Math.max(0,e.hpVisible-dt);
 
     const shot=aiShotScore(e);
-    const canAim=(e.escapeLock<=0 || shot>.72) && (d2.d<enemyWeapon.range*1.35 || shot>.30);
+    const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
+    const canAim=(plan.state==="attack_pass"||shot>.34||dPlayer<enemyWeapon.range*1.2) && plan.state!=="killzone_escape";
     const desiredAim=canAim
       ? Math.atan2((ship.y+ship.vy*.18)-e.y,(ship.x+ship.vx*.18)-e.x)
       : Math.atan2(e.vy,e.vx);
 
-    const maxTurn=2.02;
+    const maxTurn=1.78;
     e.angle+=clamp(sd(e.angle,desiredAim),-maxTurn*dt,maxTurn*dt);
 
-    if(Math.hypot(ax,ay)>18){
-      e.burnAngle=Math.atan2(ax,ay)-Math.PI/2;
-      e.burnAngle=Math.atan2(ay,ax);
-      e.burnTimer=.08;
-      e.plumeTimer=.13;
-    }else{
-      e.burnTimer=Math.max(0,(e.burnTimer||0)-dt);
-      e.plumeTimer=Math.max(0,(e.plumeTimer||0)-dt);
-    }
+    if(plan.state!=="killzone_escape" && e.weaponCooldown<=0 && aiCanShoot(e))aiEnemyFire(e);
 
-    if(e.escapeLock<=0 && e.weaponCooldown<=0 && aiCanShoot(e))aiEnemyFire(e);
-
-    const target={x:e.x+targetVX,y:e.y+targetVY};
-    aiDebugData.push({enemy:e,target,ax,ay,threat:d2.killzone,shot:shot,killzone:d2.killzone,state:e.aiState});
+    aiDebugData.push({
+      enemy:e,
+      target:plan.target,
+      ax,ay,
+      threat:plan.killzone,
+      shot,
+      killzone:plan.killzone,
+      state:e.aiState,
+      phase:plan.phase,
+      rErr:plan.rErr
+    });
   }
 }
 function updateCombat(dt){weaponCooldown=Math.max(0,weaponCooldown-dt);for(let i=beams.length-1;i>=0;i--){beams[i].life-=dt;if(beams[i].life<=0)beams.splice(i,1)}for(let i=enemyBeams.length-1;i>=0;i--){enemyBeams[i].life-=dt;if(enemyBeams[i].life<=0)enemyBeams.splice(i,1)}let tar=findWeaponTarget();if(tar)tar.hpVisible=Math.max(tar.hpVisible,.35);if(tar&&weaponCooldown<=0){weaponCooldown=weapon.cooldown;tar.hp-=weapon.damage;tar.hitFlash=.16;tar.hpVisible=2.5;beams.push({x1:ship.x+Math.cos(ship.angle)*22,y1:ship.y+Math.sin(ship.angle)*22,x2:tar.x,y2:tar.y,life:.115,maxLife:.115});if(tar.hp<=0){tar.alive=false;spawnParticle(tar.x,tar.y,80,'255,130,70')}}}
