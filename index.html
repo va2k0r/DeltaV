@@ -363,6 +363,16 @@
     stableBody: null
   };
 
+  let enemies = [];
+  let beams = [];
+  let weaponCooldown = 0;
+  const weapon = {
+    range: 760,
+    cone: Math.PI * 0.24,
+    cooldown: 0.85,
+    damage: 1
+  };
+
   let audioCtx = null;
   let masterGain = null;
   let musicGain = null;
@@ -503,6 +513,7 @@
 
     prediction = analyzePrediction();
     targetBody = p;
+    spawnEnemyInOrbit(p);
     updateTouchVisuals();
   }
 
@@ -1075,6 +1086,256 @@
     }
   }
 
+
+  function spawnEnemyInOrbit(p) {
+    enemies = [];
+    beams = [];
+    weaponCooldown = 0;
+
+    if (!p) return;
+
+    const orbitRadius = Math.max(p.r * 4.65, p.r + 330);
+    const a = Math.atan2(ship.y - p.y, ship.x - p.x) + Math.PI * 1.05;
+    const nx = Math.cos(a);
+    const ny = Math.sin(a);
+    const tx = -ny;
+    const ty = nx;
+    const effectiveMass = effectiveGravityMassForOrbit(p, orbitRadius);
+    const circ = Math.sqrt(effectiveMass / orbitRadius);
+
+    enemies.push({
+      id: "enemy0",
+      x: p.x + nx * orbitRadius,
+      y: p.y + ny * orbitRadius,
+      vx: tx * circ,
+      vy: ty * circ,
+      angle: Math.atan2(ty, tx),
+      radius: 13,
+      hp: 6,
+      maxHp: 6,
+      hitFlash: 0,
+      hpVisible: 0,
+      alive: true,
+      orbitBodyId: p.id
+    });
+  }
+
+  function updateEnemies(dt) {
+    for (const e of enemies) {
+      if (!e.alive) continue;
+
+      const g = gravityAt(e.x, e.y);
+      e.vx += g.ax * dt;
+      e.vy += g.ay * dt;
+      e.x += e.vx * dt;
+      e.y += e.vy * dt;
+
+      const spd = Math.hypot(e.vx, e.vy);
+      if (spd > 0.1) e.angle = Math.atan2(e.vy, e.vx);
+
+      e.hitFlash = Math.max(0, e.hitFlash - dt);
+      e.hpVisible = Math.max(0, e.hpVisible - dt);
+
+      for (const b of bodies) {
+        const d = Math.hypot(e.x - b.x, e.y - b.y);
+        if (d < b.r + e.radius) {
+          e.alive = false;
+          spawnExplosion(e.x, e.y, 36, "255,110,70");
+          break;
+        }
+      }
+    }
+
+    enemies = enemies.filter(e => e.alive || e.hitFlash > 0);
+  }
+
+  function findWeaponTarget() {
+    let best = null;
+    let bestD = Infinity;
+    const fx = Math.cos(ship.angle);
+    const fy = Math.sin(ship.angle);
+
+    for (const e of enemies) {
+      if (!e.alive) continue;
+
+      const dx = e.x - ship.x;
+      const dy = e.y - ship.y;
+      const d = Math.hypot(dx, dy);
+      if (d > weapon.range || d < 1) continue;
+
+      const ang = Math.acos(clamp((dx / d) * fx + (dy / d) * fy, -1, 1));
+      if (ang <= weapon.cone && d < bestD) {
+        best = e;
+        bestD = d;
+      }
+    }
+
+    return best;
+  }
+
+  function updateCombat(dt) {
+    weaponCooldown = Math.max(0, weaponCooldown - dt);
+
+    for (let i = beams.length - 1; i >= 0; i--) {
+      beams[i].life -= dt;
+      if (beams[i].life <= 0) beams.splice(i, 1);
+    }
+
+    const target = findWeaponTarget();
+    if (target) target.hpVisible = Math.max(target.hpVisible, 0.35);
+
+    if (target && weaponCooldown <= 0) {
+      weaponCooldown = weapon.cooldown;
+      target.hp -= weapon.damage;
+      target.hitFlash = 0.16;
+      target.hpVisible = 2.5;
+
+      beams.push({
+        x1: ship.x + Math.cos(ship.angle) * 22,
+        y1: ship.y + Math.sin(ship.angle) * 22,
+        x2: target.x,
+        y2: target.y,
+        life: 0.115,
+        maxLife: 0.115
+      });
+
+      if (target.hp <= 0) {
+        target.alive = false;
+        spawnExplosion(target.x, target.y, 70, "255,130,70");
+      }
+    }
+  }
+
+  function spawnExplosion(x, y, count, color) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const speed = 45 + Math.random() * 160;
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(a) * speed,
+        vy: Math.sin(a) * speed,
+        life: 0.28 + Math.random() * 0.48,
+        r: 1.8 + Math.random() * 4.0,
+        color: Math.random() < 0.55 ? color : "130,230,255"
+      });
+    }
+  }
+
+  function drawBeams() {
+    for (const b of beams) {
+      const a = clamp(b.life / b.maxLife, 0, 1);
+      const s1 = toScreen(b.x1, b.y1);
+      const s2 = toScreen(b.x2, b.y2);
+
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = "rgba(120,235,255,.92)";
+      ctx.lineWidth = 2.2;
+      ctx.shadowColor = "rgba(110,230,255,.95)";
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.moveTo(s1.x, s1.y);
+      ctx.lineTo(s2.x, s2.y);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(255,255,255,.92)";
+      ctx.lineWidth = 0.8;
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.moveTo(s1.x, s1.y);
+      ctx.lineTo(s2.x, s2.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function drawEnemyShip(e) {
+    const s = toScreen(e.x, e.y);
+    const r = e.radius * 1.55;
+
+    if (s.x + r < 0 || s.x - r > W || s.y + r < 0 || s.y - r > H) return;
+
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(e.angle);
+
+    const flash = e.hitFlash > 0 ? 1 : 0;
+
+    ctx.shadowColor = flash ? "rgba(255,210,150,.90)" : "rgba(255,90,80,.42)";
+    ctx.shadowBlur = flash ? 22 : 12;
+
+    ctx.fillStyle = flash ? "rgba(255,245,210,.98)" : "rgba(255,116,92,.96)";
+    ctx.strokeStyle = "rgba(30,8,12,.76)";
+    ctx.lineWidth = 1.1;
+
+    // Enemy silhouette: same family as player, more hostile and compact.
+    ctx.beginPath();
+    ctx.moveTo(17, 0);
+    ctx.lineTo(3, -6);
+    ctx.lineTo(-7, -5);
+    ctx.lineTo(-15, -10);
+    ctx.lineTo(-10, 0);
+    ctx.lineTo(-15, 10);
+    ctx.lineTo(-7, 5);
+    ctx.lineTo(3, 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    const grad = ctx.createLinearGradient(17, 0, -15, 0);
+    grad.addColorStop(0, flash ? "rgba(255,255,255,.90)" : "rgba(255,180,150,.75)");
+    grad.addColorStop(1, "rgba(110,20,28,.42)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(17, 0);
+    ctx.lineTo(3, -6);
+    ctx.lineTo(-7, -5);
+    ctx.lineTo(-15, -10);
+    ctx.lineTo(-10, 0);
+    ctx.lineTo(-15, 10);
+    ctx.lineTo(-7, 5);
+    ctx.lineTo(3, 6);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(255,230,150,.95)";
+    ctx.shadowColor = "rgba(255,200,90,.95)";
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.ellipse(4.5, 0, 3.7, 2.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+
+    const target = findWeaponTarget();
+    if (e.hpVisible > 0 || e === target) drawEnemyHpBar(e, s);
+  }
+
+  function drawEnemyHpBar(e, s) {
+    const w = 34;
+    const h = 4;
+    const x = s.x - w / 2;
+    const y = s.y - 28;
+    const t = clamp(e.hp / e.maxHp, 0, 1);
+
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,.48)";
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = e.hitFlash > 0 ? "rgba(255,235,160,.95)" : "rgba(255,104,90,.92)";
+    ctx.fillRect(x, y, w * t, h);
+    ctx.strokeStyle = "rgba(255,255,255,.28)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, h);
+    ctx.restore();
+  }
+
+  function drawEnemies() {
+    for (const e of enemies) {
+      if (e.alive) drawEnemyShip(e);
+    }
+  }
+
   function update(dt) {
     time += dt;
     updateBodies();
@@ -1155,6 +1416,8 @@
     prediction = analyzePrediction();
     chooseTarget();
     updateZoom(dt);
+    updateEnemies(dt);
+    updateCombat(dt);
     updateParticles(dt);
     setRCSSound(turnLevel * 0.022);
   }
@@ -1646,6 +1909,8 @@
     drawTrajectory();
     drawOffscreenIndicators();
     drawBodies();
+    drawEnemies();
+    drawBeams();
     drawParticles();
     drawShip();
     drawFuel();
@@ -1658,6 +1923,7 @@
       `fuel ${(ship.fuel * 100).toFixed(0)}%<br>` +
       `target ${targetBody ? targetBody.name : "—"}<br>` +
       `seed ${systemSeed}<br>` +
+      `weapon ${weaponCooldown <= 0 ? "ready" : weaponCooldown.toFixed(1)}<br>` +
       `state ${state}`;
   }
 
