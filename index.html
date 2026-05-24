@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>DeltaV - Cannon AI</title>
+<title>DeltaV - Cannon AI Inertia</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#020610;color:#eef6ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif;touch-action:none}
@@ -14,18 +14,18 @@ canvas{display:block;width:100vw;height:100dvh;background:radial-gradient(circle
 .hint{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 134px);transform:translateX(-50%);width:min(94vw,700px);color:rgba(238,246,255,.70);text-align:center;font-size:12px;line-height:1.32;pointer-events:none;z-index:10;text-shadow:0 1px 5px rgba(0,0,0,.55)}
 .turnZone{position:fixed;top:0;bottom:0;width:35vw;opacity:0;background:rgba(255,255,255,.023);pointer-events:none;z-index:7;transition:opacity 120ms}.turnZone.left{left:0;border-right:1px solid rgba(255,255,255,.035)}.turnZone.right{right:0;border-left:1px solid rgba(255,255,255,.035)}.turnZone.show{opacity:1}
 .burnButton{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);transform:translateX(-50%);width:108px;height:108px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:radial-gradient(circle at 50% 35%,rgba(255,255,255,.18),rgba(255,255,255,.04) 66%),radial-gradient(circle at 50% 50%,rgba(255,145,62,.13),rgba(255,145,62,.02));box-shadow:0 18px 52px rgba(0,0,0,.38),inset 0 0 22px rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-weight:850;letter-spacing:.12em;color:rgba(255,255,255,.9);pointer-events:none;z-index:9}.burnButton.active{background:radial-gradient(circle at 50% 35%,rgba(255,235,185,.52),rgba(255,130,55,.14) 66%),radial-gradient(circle at 50% 50%,rgba(255,118,42,.22),rgba(255,118,42,.03))}
-.actions{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);z-index:11;display:flex;flex-direction:column;gap:8px}.hudBtn{pointer-events:auto;border:1px solid rgba(255,255,255,.16);background:rgba(8,14,28,.74);color:white;border-radius:12px;padding:10px 12px;min-width:80px;font-size:12px;backdrop-filter:blur(10px);box-shadow:0 10px 24px rgba(0,0,0,.28)}
+.speedPill{position:fixed;left:18px;bottom:calc(env(safe-area-inset-bottom,0px) + 118px);z-index:11;background:rgba(5,10,22,.58);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:8px 10px;font-size:12px;font-weight:750;letter-spacing:.03em;color:rgba(238,246,255,.92);backdrop-filter:blur(12px);box-shadow:0 10px 26px rgba(0,0,0,.30);text-shadow:0 1px 5px rgba(0,0,0,.65);pointer-events:none}.speedPill .muted{font-weight:600;color:rgba(238,246,255,.58)}.actions{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);z-index:11;display:flex;flex-direction:column;gap:8px}.hudBtn{pointer-events:auto;border:1px solid rgba(255,255,255,.16);background:rgba(8,14,28,.74);color:white;border-radius:12px;padding:10px 12px;min-width:80px;font-size:12px;backdrop-filter:blur(10px);box-shadow:0 10px 24px rgba(0,0,0,.28)}
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
-<div class="hud"><div class="panel"><div class="title">DeltaV - Cannon AI</div><div class="small">AI lab: cannon-shot intercept sampling, gravity-simulated attack passes.</div></div><div class="panel" id="readout"></div></div>
+<div class="hud"><div class="panel"><div class="title">DeltaV - Cannon AI Inertia</div><div class="small">AI lab: cannon-shot sampling with barrel inertia, longer coast, less aggression.</div></div><div class="panel" id="readout"></div></div>
 <div class="hint">Lati invisibili: ruota con RCS. Centro basso: burn. Laser automatico con cono stretto.</div>
 <div class="turnZone left" id="leftGlow"></div><div class="turnZone right" id="rightGlow"></div><div class="burnButton" id="burnVisual">BURN</div>
-<div class="actions"><button class="hudBtn" id="resetBtn">Reset</button><button class="hudBtn" id="newBtn">New</button></div>
+<div class="speedPill" id="speedPill">speed 0.0</div><div class="actions"><button class="hudBtn" id="resetBtn">Reset</button><button class="hudBtn" id="newBtn">New</button></div>
 <script>
 (() => {
-const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),readout=document.getElementById('readout'),burnVisual=document.getElementById('burnVisual'),leftGlow=document.getElementById('leftGlow'),rightGlow=document.getElementById('rightGlow'),resetBtn=document.getElementById('resetBtn'),newBtn=document.getElementById('newBtn');
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),readout=document.getElementById('readout'),burnVisual=document.getElementById('burnVisual'),leftGlow=document.getElementById('leftGlow'),rightGlow=document.getElementById('rightGlow'),speedPill=document.getElementById('speedPill'),resetBtn=document.getElementById('resetBtn'),newBtn=document.getElementById('newBtn');
 let W=0,H=0,DPR=1,last=performance.now(),time=0,stars=[],glows=[],particles=[],bodies=[],planetDefs=[],systemSeed=Math.floor(Math.random()*900000)+100000,escapeWarning=0;
 const camera={zoom:.62,targetZoom:.62,zoomVel:0};
 const input={leftIds:new Set(),rightIds:new Set(),burnIds:new Set()};
@@ -259,36 +259,96 @@ function aiScoreCandidate(e,ang,power,burnDur,horizon,step,playerPath){
   return{score,bestD,bestT,bestPX,bestPY,ang,power,burnDur,endX:x,endY:y,endVX:vx,endVY:vy};
 }
 
+function aiAngleLerp(a,b,t){
+  return a+sd(a,b)*clamp(t,0,1);
+}
+
 function aiPlanCannonShot(e){
-  const horizon=3.4,step=.14;
+  const horizon=3.2,step=.14;
   const playerPath=aiSimPlayerPath(horizon,step);
+
   const toPlayer=Math.atan2(ship.y-e.y,ship.x-e.x);
   const vAng=Math.atan2(e.vy,e.vx);
   const relAng=Math.atan2((ship.vy-e.vy),(ship.vx-e.vx));
-  const baseAngles=[toPlayer,toPlayer+.28,toPlayer-.28,toPlayer+.55,toPlayer-.55,toPlayer+Math.PI/2,toPlayer-Math.PI/2,vAng,relAng];
-  for(let i=-5;i<=5;i++)baseAngles.push(toPlayer+i*.18);
 
-  const powers=[64,92,122,150],burns=[.26,.42,.62];
+  // Previous plan gives the "barrel inertia": the enemy cannot instantly choose
+  // a completely different cannon shot every cycle.
+  const previousAng = e.currentPlan && Number.isFinite(e.currentPlan.angle) ? e.currentPlan.angle : vAng;
+
+  const candidateAngles=[
+    toPlayer,
+    toPlayer+.22,
+    toPlayer-.22,
+    toPlayer+.44,
+    toPlayer-.44,
+    toPlayer+Math.PI/2,
+    toPlayer-Math.PI/2,
+    vAng,
+    relAng,
+    previousAng,
+    previousAng+.28,
+    previousAng-.28
+  ];
+
+  for(let i=-4;i<=4;i++)candidateAngles.push(toPlayer+i*.16);
+
+  // Less aggressive than previous version.
+  const powers=[52,76,104,126];
+  const burns=[.22,.36,.52];
+
   let best=null;
-  for(const a of baseAngles)for(const p of powers)for(const b of burns){
-    const c=aiScoreCandidate(e,a,p,b,horizon,step,playerPath);
-    if(!best||c.score<best.score)best=c;
+
+  for(const rawAng of candidateAngles){
+    // Barrel inertia: blend candidate toward current/previous shot direction.
+    const blendedAng=aiAngleLerp(previousAng,rawAng,.58);
+    for(const p of powers){
+      for(const b of burns){
+        const c=aiScoreCandidate(e,blendedAng,p,b,horizon,step,playerPath);
+
+        // Penalize hard changes in cannon direction.
+        const turnPenalty=Math.abs(sd(previousAng,blendedAng))*170;
+
+        // Mildly prefer not attacking every possible window.
+        const aggressionPenalty=(p>104?35:0)+(b>.5?24:0);
+
+        c.score+=turnPenalty+aggressionPenalty;
+        if(!best||c.score<best.score)best=c;
+      }
+    }
   }
 
   const killzone=aiKillzoneScore(e),shot=aiShotScore(e);
-  let state="cannon_intercept",coast=clamp(best.bestT*.55,.75,1.65);
+  let state="cannon_intercept";
+  let coast=clamp(best.bestT*.65,1.05,2.05);
 
-  if(killzone>.44&&shot<.62){
+  if(killzone>.48&&shot<.64){
     state="cannon_escape";
-    const escapeAng=toPlayer+(e.side||1)*Math.PI/2;
-    best=aiScoreCandidate(e,escapeAng,138,.44,2.6,step,playerPath);
-    coast=1.25;
-  }else if(best.bestD<enemyWeapon.range*.82){
+    const side=e.side||1;
+    const escapeAng=aiAngleLerp(previousAng,toPlayer+side*Math.PI/2,.55);
+    best=aiScoreCandidate(e,escapeAng,112,.36,2.7,step,playerPath);
+    coast=1.55;
+  }else if(best.bestD<enemyWeapon.range*.74 && shot>.30){
     state="attack_pass";
-    coast=.85;
+    coast=1.05;
   }
 
-  return{state,angle:best.ang,power:best.power,burn:best.burnDur,coast,bestD:best.bestD,bestT:best.bestT,target:{x:best.bestPX,y:best.bestPY},shot,killzone,score:best.score};
+  // Final clamp: do not let the chosen cannon angle swing too hard.
+  const maxPlanTurn=.72;
+  const finalAngle=previousAng+clamp(sd(previousAng,best.ang),-maxPlanTurn,maxPlanTurn);
+
+  return{
+    state,
+    angle:finalAngle,
+    power:best.power,
+    burn:best.burnDur,
+    coast,
+    bestD:best.bestD,
+    bestT:best.bestT,
+    target:{x:best.bestPX,y:best.bestPY},
+    shot,
+    killzone,
+    score:best.score
+  };
 }
 
 function updateEnemies(dt){
@@ -296,6 +356,7 @@ function updateEnemies(dt){
   for(const e of enemies){
     if(!e.alive)continue;
     if(e.side==null)e.side=Math.random()<.5?-1:1;
+    if(e.sideCooldown==null)e.sideCooldown=0;
     if(e.planTimer==null)e.planTimer=.1;
     if(e.burnTimerAI==null)e.burnTimerAI=0;
     if(e.coastTimer==null)e.coastTimer=0;
@@ -304,6 +365,7 @@ function updateEnemies(dt){
     if(e.currentPlan==null)e.currentPlan=aiPlanCannonShot(e);
 
     e.weaponCooldown=Math.max(0,e.weaponCooldown-dt);
+    e.sideCooldown=Math.max(0,e.sideCooldown-dt);
     e.lastAttack+=dt;
     e.planTimer-=dt;
     let plan=e.currentPlan;
@@ -313,8 +375,8 @@ function updateEnemies(dt){
       e.currentPlan=plan;
       e.burnTimerAI=plan.burn;
       e.coastTimer=plan.coast;
-      e.planTimer=plan.burn+plan.coast+.05;
-      if(plan.state==="cannon_escape")e.side*=-1;
+      e.planTimer=plan.burn+plan.coast+.18;
+      if(plan.state==="cannon_escape"&&e.sideCooldown<=0){e.side*=-1;e.sideCooldown=1.7;}
     }
 
     let ax=0,ay=0;
@@ -339,7 +401,7 @@ function updateEnemies(dt){
     const sysR=Math.hypot(e.x,e.y)+.0001;
     if(sysR>boundary.soft*.72){ax+=(-e.x/sysR)*62;ay+=(-e.y/sysR)*62}
 
-    const maxA=plan.state==="cannon_escape"?150:136;
+    const maxA=plan.state==="cannon_escape"?128:116;
     const mag=Math.hypot(ax,ay);
     if(mag>maxA){ax=ax/mag*maxA;ay=ay/mag*maxA}
 
@@ -356,7 +418,7 @@ function updateEnemies(dt){
     const canAim=plan.state!=="cannon_escape"&&(shot>.32||dPlayer<enemyWeapon.range*1.25);
     const desiredAim=canAim?Math.atan2((ship.y+ship.vy*.18)-e.y,(ship.x+ship.vx*.18)-e.x):Math.atan2(e.vy,e.vx);
 
-    const maxTurn=1.84;
+    const maxTurn=1.42;
     e.angle+=clamp(sd(e.angle,desiredAim),-maxTurn*dt,maxTurn*dt);
 
     if(plan.state!=="cannon_escape"&&e.weaponCooldown<=0&&aiCanShoot(e))aiEnemyFire(e);
@@ -458,7 +520,7 @@ function drawBeams(){for(const b of beams){let a=clamp(b.life/b.maxLife,0,1),s1=
 function drawParticles(){for(const p of particles){let s=toScreen(p.x,p.y);ctx.fillStyle=`rgba(${p.color},${Math.max(0,p.life*2.2)})`;ctx.shadowColor=`rgba(${p.color},.78)`;ctx.shadowBlur=10;ctx.beginPath();ctx.arc(s.x,s.y,Math.max(.45,p.r*camera.zoom),0,Math.PI*2);ctx.fill()}ctx.shadowBlur=0}
 function drawShip(){ctx.save();ctx.translate(W/2,H/2);ctx.rotate(ship.angle);if(ship.thrust>.008){let tv=Math.max(.12,ship.thrust*ship.thrust),len=16+tv*40;let gr=ctx.createLinearGradient(-16,0,-20-len,0);gr.addColorStop(0,`rgba(255,255,255,${.4+tv*.42})`);gr.addColorStop(.35,`rgba(255,190,82,${.2+tv*.58})`);gr.addColorStop(1,'rgba(255,78,24,.02)');ctx.fillStyle=gr;ctx.shadowColor='rgba(255,120,52,.88)';ctx.shadowBlur=18;ctx.beginPath();ctx.moveTo(-16,-4);ctx.lineTo(-20-len,0);ctx.lineTo(-16,4);ctx.fill();ctx.shadowBlur=0}ctx.fillStyle='#f3fbff';ctx.strokeStyle='rgba(6,14,28,.7)';ctx.lineWidth=1.2;ctx.shadowColor='rgba(100,225,255,.3)';ctx.shadowBlur=16;ctx.beginPath();ctx.moveTo(20,0);ctx.lineTo(5,-7);ctx.lineTo(-5,-6);ctx.lineTo(-15,-13);ctx.lineTo(-10,-3);ctx.lineTo(-18,0);ctx.lineTo(-10,3);ctx.lineTo(-15,13);ctx.lineTo(-5,6);ctx.lineTo(5,7);ctx.closePath();ctx.fill();ctx.stroke();ctx.shadowColor='rgba(90,232,255,.95)';ctx.shadowBlur=12;ctx.fillStyle='rgba(90,232,255,.95)';ctx.beginPath();ctx.ellipse(5.5,0,4.6,2.7,0,0,Math.PI*2);ctx.fill();ctx.restore()}
 function drawBars(){let x=18,y=H-86,w=160,h=12;ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(x,y,w,h);ctx.fillStyle=ship.fuel<.2?'rgba(255,120,120,.95)':'rgba(126,235,255,.95)';ctx.fillRect(x+1,y+1,(w-2)*ship.fuel,h-2);ctx.strokeStyle='rgba(255,255,255,.16)';ctx.strokeRect(x,y,w,h);let y2=y+20;ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(x,y2,w,h);ctx.fillStyle='rgba(255,75,68,.92)';ctx.fillRect(x+1,y2+1,(w-2)*clamp(ship.hp/ship.maxHp,0,1),h-2);ctx.strokeStyle='rgba(255,255,255,.16)';ctx.strokeRect(x,y2,w,h);ctx.fillStyle='rgba(255,255,255,.72)';ctx.font='10px system-ui';ctx.fillText('fuel',x,y-5);ctx.fillText('hp',x,y2-5)}
-function render(){ctx.clearRect(0,0,W,H);bg();drawTraj();drawOffscreenPlanets();for(const b of bodies)drawBody(b);drawWeaponArc();drawEnemies();drawAIDebug();drawBeams();drawParticles();drawShip();drawBars();if(ship.damageFlash>0){ctx.save();ctx.strokeStyle=`rgba(255,60,50,${ship.damageFlash*1.8})`;ctx.lineWidth=12;ctx.strokeRect(6,6,W-12,H-12);ctx.restore()}if(escapeWarning>0){ctx.save();ctx.strokeStyle=`rgba(255,90,60,${escapeWarning*.55})`;ctx.lineWidth=10;ctx.strokeRect(5,5,W-10,H-10);ctx.restore()}let speed=Math.hypot(ship.vx,ship.vy);readout.innerHTML=`v ${speed.toFixed(1)}<br>fuel ${(ship.fuel*100).toFixed(0)}%<br>hp ${ship.hp.toFixed(1)}<br>seed ${systemSeed}<br>weapon ${weaponCooldown<=0?'ready':weaponCooldown.toFixed(1)}`}
+function render(){ctx.clearRect(0,0,W,H);bg();drawTraj();drawOffscreenPlanets();for(const b of bodies)drawBody(b);drawWeaponArc();drawEnemies();drawAIDebug();drawBeams();drawParticles();drawShip();drawBars();if(ship.damageFlash>0){ctx.save();ctx.strokeStyle=`rgba(255,60,50,${ship.damageFlash*1.8})`;ctx.lineWidth=12;ctx.strokeRect(6,6,W-12,H-12);ctx.restore()}if(escapeWarning>0){ctx.save();ctx.strokeStyle=`rgba(255,90,60,${escapeWarning*.55})`;ctx.lineWidth=10;ctx.strokeRect(5,5,W-10,H-10);ctx.restore()}let speed=Math.hypot(ship.vx,ship.vy);if(speedPill)speedPill.innerHTML=`<span class="muted">speed</span> ${speed.toFixed(1)}`;readout.innerHTML=`v ${speed.toFixed(1)}<br>fuel ${(ship.fuel*100).toFixed(0)}%<br>hp ${ship.hp.toFixed(1)}<br>seed ${systemSeed}<br>weapon ${weaponCooldown<=0?'ready':weaponCooldown.toFixed(1)}`}
 function loop(now){let dt=Math.min(.033,(now-last)/1000);last=now;update(dt);render();requestAnimationFrame(loop)}
 canvas.addEventListener('pointerdown',e=>{e.preventDefault();canvas.setPointerCapture(e.pointerId);addPtr(e.pointerId,region(e.clientX,e.clientY))});canvas.addEventListener('pointerup',e=>{e.preventDefault();clrPtr(e.pointerId)});canvas.addEventListener('pointercancel',e=>{e.preventDefault();clrPtr(e.pointerId)});canvas.addEventListener('pointermove',e=>{e.preventDefault();clrPtr(e.pointerId);addPtr(e.pointerId,region(e.clientX,e.clientY))});
 window.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')input.leftIds.add('k');if(e.key==='ArrowRight')input.rightIds.add('k');if(e.key==='ArrowUp'||e.key===' ')input.burnIds.add('k');updateUI()});window.addEventListener('keyup',e=>{if(e.key==='ArrowLeft')input.leftIds.delete('k');if(e.key==='ArrowRight')input.rightIds.delete('k');if(e.key==='ArrowUp'||e.key===' ')input.burnIds.delete('k');updateUI()});
