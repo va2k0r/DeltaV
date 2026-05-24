@@ -2,137 +2,159 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>DeltaV</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>DeltaV 2D Pure</title>
   <style>
     :root {
-      --hud-bg: rgba(3, 7, 18, 0.38);
-      --hud-border: rgba(255,255,255,0.13);
-      --cyan: rgba(95, 230, 255, 0.92);
-      --orange: rgba(255, 156, 64, 0.92);
+      --panel: rgba(5,10,22,.54);
+      --border: rgba(255,255,255,.14);
+      --text: #eef6ff;
+      --muted: rgba(238,246,255,.70);
     }
-
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
     html, body {
       margin: 0;
-      padding: 0;
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #020511;
-      color: white;
-      touch-action: none;
-      user-select: none;
-      -webkit-user-select: none;
-      -webkit-tap-highlight-color: transparent;
+      background: #020610;
+      color: var(--text);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      touch-action: none;
     }
-
     canvas {
       display: block;
       width: 100vw;
-      height: 100vh;
+      height: 100dvh;
       background:
-        radial-gradient(circle at 50% 36%, rgba(25, 40, 78, 0.85), rgba(4, 7, 20, 0.92) 48%, #01030a 100%);
+        radial-gradient(circle at 25% 18%, rgba(80,130,255,.16), transparent 28%),
+        radial-gradient(circle at 70% 82%, rgba(255,180,80,.09), transparent 26%),
+        linear-gradient(180deg, #08142c, #020610);
     }
-
     .hud {
       position: fixed;
       top: calc(env(safe-area-inset-top, 0px) + 10px);
-      left: 12px;
-      right: 12px;
+      left: 10px;
+      right: 10px;
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
       gap: 10px;
       pointer-events: none;
-      font-size: 12px;
-      line-height: 1.35;
-      text-shadow: 0 1px 5px #000;
+      z-index: 10;
     }
-
     .panel {
-      background: var(--hud-bg);
-      border: 1px solid var(--hud-border);
-      border-radius: 15px;
-      padding: 8px 10px;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 12px 32px rgba(0,0,0,0.25);
-      max-width: 50vw;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 9px 11px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 12px 32px rgba(0,0,0,.32);
+      font-size: 12px;
+      line-height: 1.34;
+      text-shadow: 0 1px 4px rgba(0,0,0,.55);
+      max-width: min(60vw, 420px);
     }
-
-    .burn-button {
+    .title {
+      font-weight: 750;
+      color: white;
+      margin-bottom: 2px;
+    }
+    .small { color: var(--muted); }
+    .hint {
       position: fixed;
       left: 50%;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 134px);
       transform: translateX(-50%);
-      width: 116px;
-      height: 116px;
+      width: min(94vw, 680px);
+      color: var(--muted);
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.32;
+      pointer-events: none;
+      z-index: 10;
+      text-shadow: 0 1px 5px rgba(0,0,0,.55);
+    }
+    .turnZone {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      width: 35vw;
+      opacity: 0;
+      background: rgba(255,255,255,.023);
+      pointer-events: none;
+      z-index: 7;
+      transition: opacity 120ms ease;
+    }
+    .turnZone.left {
+      left: 0;
+      border-right: 1px solid rgba(255,255,255,.035);
+    }
+    .turnZone.right {
+      right: 0;
+      border-left: 1px solid rgba(255,255,255,.035);
+    }
+    .turnZone.show { opacity: 1; }
+    .burnButton {
+      position: fixed;
+      left: 50%;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+      transform: translateX(-50%);
+      width: 108px;
+      height: 108px;
       border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.22);
+      border: 1px solid rgba(255,255,255,.18);
       background:
-        radial-gradient(circle at 50% 34%, rgba(255,255,255,0.21), rgba(255,255,255,0.06) 70%),
-        radial-gradient(circle at 50% 50%, rgba(255,160,60,0.14), rgba(255,160,60,0.02));
-      color: rgba(255,255,255,0.9);
+        radial-gradient(circle at 50% 35%, rgba(255,255,255,.18), rgba(255,255,255,.04) 66%),
+        radial-gradient(circle at 50% 50%, rgba(255,145,62,.13), rgba(255,145,62,.02));
+      box-shadow: 0 18px 52px rgba(0,0,0,.38), inset 0 0 22px rgba(255,255,255,.06);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 800;
-      font-size: 14px;
-      letter-spacing: 0.12em;
+      font-weight: 850;
+      letter-spacing: .12em;
+      color: rgba(255,255,255,.9);
       pointer-events: none;
-      box-shadow:
-        0 16px 40px rgba(0,0,0,0.42),
-        inset 0 0 24px rgba(255,255,255,0.06);
-      backdrop-filter: blur(9px);
+      z-index: 9;
     }
-
-    .burn-button.active {
+    .burnButton.active {
       background:
-        radial-gradient(circle at 50% 35%, rgba(255,230,155,0.62), rgba(255,107,31,0.14) 68%),
-        radial-gradient(circle at 50% 50%, rgba(255,140,40,0.28), rgba(255,80,20,0.04));
-      transform: translateX(-50%) scale(0.985);
+        radial-gradient(circle at 50% 35%, rgba(255,235,185,.52), rgba(255,130,55,.14) 66%),
+        radial-gradient(circle at 50% 50%, rgba(255,118,42,.22), rgba(255,118,42,.03));
     }
-
-    .touch-hints {
+    .actions {
       position: fixed;
-      inset: 0;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 140ms ease;
+      right: 12px;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+      z-index: 11;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
-
-    .touch-hints.show { opacity: 1; }
-
-    .left-hint, .right-hint {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 35%;
-      background: rgba(255,255,255,0.027);
-    }
-
-    .left-hint {
-      left: 0;
-      border-right: 1px solid rgba(255,255,255,0.045);
-    }
-
-    .right-hint {
-      right: 0;
-      border-left: 1px solid rgba(255,255,255,0.045);
-    }
-
-    .note {
-      position: fixed;
-      left: 50%;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 143px);
-      transform: translateX(-50%);
-      width: min(92vw, 560px);
-      text-align: center;
+    .hudBtn {
+      pointer-events: auto;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(8,14,28,.74);
+      color: white;
+      border-radius: 12px;
+      padding: 10px 12px;
+      min-width: 80px;
       font-size: 12px;
-      line-height: 1.35;
-      opacity: 0.69;
-      text-shadow: 0 1px 5px #000;
-      pointer-events: none;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 24px rgba(0,0,0,.28);
+    }
+    .hudBtn.active {
+      background: rgba(255,211,127,.92);
+      color: #0f1524;
+    }
+    @media (max-height: 740px) {
+      .panel, .hint, .hudBtn { font-size: 11px; }
+      .burnButton { width: 96px; height: 96px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); }
+      .hint { bottom: calc(env(safe-area-inset-bottom, 0px) + 118px); }
     }
   </style>
 </head>
@@ -141,848 +163,1495 @@
 
   <div class="hud">
     <div class="panel">
-      DeltaV prototype<br>
-      Camera sulla traiettoria, non sul muso<br>
-      Lati invisibili: ruota nave
+      <div class="title">DeltaV 2D pure</div>
+      <div class="small">Camera 2D pura, pianeti senza anelli, nudge orbitale disattivato per testare orbite nude e crude.</div>
     </div>
-    <div class="panel" id="readout">
-      v 0<br>
-      throttle 0%
-    </div>
+    <div class="panel" id="readout">v 0<br>fuel 100%<br>target —<br>state coasting</div>
   </div>
 
-  <div class="touch-hints" id="touchHints">
-    <div class="left-hint"></div>
-    <div class="right-hint"></div>
+  <div class="hint">
+    Lati invisibili: ruota con RCS. Centro basso: burn. Linee bordo sfumate, senza nomi: lunghezza coerente col diametro apparente del pianeta.
   </div>
 
-  <div class="note">
-    Azzurro: traiettoria futura davanti al movimento. Arancione: traiettoria dietro la nave, utile per capire il retrograde. Nessun marker.
+  <div class="turnZone left" id="leftGlow"></div>
+  <div class="turnZone right" id="rightGlow"></div>
+  <div class="burnButton" id="burnVisual">BURN</div>
+
+  <div class="actions">
+    <button class="hudBtn" id="audioBtn">Audio</button>
+    <button class="hudBtn" id="resetBtn">Reset</button>
+    <button class="hudBtn" id="newSystemBtn">New</button>
   </div>
 
-  <div class="burn-button" id="burnVisual">BURN</div>
+<script>
+(() => {
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const readout = document.getElementById("readout");
+  const burnVisual = document.getElementById("burnVisual");
+  const audioBtn = document.getElementById("audioBtn");
+  const resetBtn = document.getElementById("resetBtn");
+  const newSystemBtn = document.getElementById("newSystemBtn");
+  const leftGlow = document.getElementById("leftGlow");
+  const rightGlow = document.getElementById("rightGlow");
 
-  <script>
-    const canvas = document.getElementById("game");
-    const ctx = canvas.getContext("2d");
-    const readout = document.getElementById("readout");
-    const burnVisual = document.getElementById("burnVisual");
-    const touchHints = document.getElementById("touchHints");
+  let W = 0, H = 0, DPR = 1;
+  let last = performance.now();
+  let time = 0;
+  let stars = [];
+  let nebulas = [];
+  let particles = [];
+  let bodies = [];
+  let targetBody = null;
+  let crashTimer = 0;
+  let flashTimer = 0;
 
-    let W = 0, H = 0, DPR = 1;
-    let last = performance.now();
+  const camera = {
+    x: 0,
+    y: 0,
+    zoom: 0.52,
+    targetZoom: 0.52,
+    desiredZoom: 0.52,
+    zoomVel: 0,
+    zoomHold: 0
+  };
 
-    const input = {
-      leftIds: new Set(),
-      rightIds: new Set(),
-      burnIds: new Set()
+  const input = {
+    leftIds: new Set(),
+    rightIds: new Set(),
+    burnIds: new Set()
+  };
+
+  const sun = {
+    id: "sol",
+    name: "Sol",
+    type: "sun",
+    x: 0,
+    y: 0,
+    r: 175,
+    mass: 2100000,
+    a: [255, 232, 165],
+    b: [255, 125, 44],
+    seed: 7.4
+  };
+
+  let systemSeed = Math.floor(Math.random() * 900000) + 100000;
+  let systemAttempt = 0;
+  let planetDefs = [];
+
+  const planetPalette = [
+    { a: [115,236,255], b: [35,110,220] },
+    { a: [255,216,130], b: [180,82,50] },
+    { a: [218,175,255], b: [76,56,148] },
+    { a: [162,255,201], b: [39,140,120] },
+    { a: [255,154,128], b: [140,58,68] },
+    { a: [210,230,255], b: [80,105,160] },
+    { a: [255,235,165], b: [160,130,48] }
+  ];
+
+  const nameA = ["A", "No", "Ve", "Ka", "Io", "Cy", "Ma", "Re", "Tha", "El", "Or", "Lu"];
+  const nameB = ["ster", "x", "sta", "rios", "n", "ra", "mir", "don", "lis", "var", "os", "tis"];
+
+  function rngFactory(seed) {
+    let t = seed >>> 0;
+    return function() {
+      t += 0x6D2B79F5;
+      let r = Math.imul(t ^ (t >>> 15), 1 | t);
+      r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
     };
+  }
 
-    const ship = {
-      x: 0,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      angle: -Math.PI / 2,
-      turnRate: 2.1,
-      thrust: 0,
-      thrustTarget: 0,
-      thrustPower: 155,
-      radius: 14
-    };
+  function rr(rng, min, max) { return min + rng() * (max - min); }
+  function ri(rng, min, max) { return Math.floor(rr(rng, min, max + 1)); }
 
-    const camera = {
-      x: 0,
-      y: 0,
-      angle: ship.angle,
-      targetAngle: ship.angle,
-      back: 250,
-      height: 58,
-      lookAhead: 520,
-      fov: 720
-    };
-
-    const planets = [
-      {
-        name: "Aster",
-        x: -620,
-        y: 1120,
-        r: 92,
-        mass: 250000,
-        color1: [104, 223, 255],
-        color2: [27, 92, 210],
-        ring: false,
-        seed: 0.2
-      },
-      {
-        name: "Vesta",
-        x: 720,
-        y: 1840,
-        r: 136,
-        mass: 520000,
-        color1: [255, 214, 134],
-        color2: [157, 78, 52],
-        ring: true,
-        seed: 1.6
-      },
-      {
-        name: "Nox",
-        x: -460,
-        y: 2760,
-        r: 62,
-        mass: 130000,
-        color1: [210, 177, 255],
-        color2: [79, 61, 148],
-        ring: false,
-        seed: 2.5
-      }
-    ];
-
-    let stars = [];
-    let nebula = [];
-
-    function resize() {
-      DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-      W = window.innerWidth;
-      H = window.innerHeight;
-      canvas.width = Math.floor(W * DPR);
-      canvas.height = Math.floor(H * DPR);
-      canvas.style.width = W + "px";
-      canvas.style.height = H + "px";
-      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-      makeBackground();
-    }
-
-    function makeBackground() {
-      stars = [];
-      nebula = [];
-      for (let i = 0; i < 340; i++) {
-        stars.push({
-          x: Math.random() * W,
-          y: Math.random() * H,
-          s: Math.random() * 1.7 + 0.2,
-          a: Math.random() * 0.72 + 0.18,
-          layer: Math.random() * 0.55 + 0.45
-        });
-      }
-      for (let i = 0; i < 18; i++) {
-        nebula.push({
-          x: Math.random() * W,
-          y: Math.random() * H,
-          r: Math.random() * 240 + 120,
-          a: Math.random() * 0.055 + 0.018
-        });
+  function generateName(rng, used) {
+    for (let i = 0; i < 20; i++) {
+      const n = nameA[ri(rng, 0, nameA.length - 1)] + nameB[ri(rng, 0, nameB.length - 1)];
+      if (!used.has(n)) {
+        used.add(n);
+        return n;
       }
     }
+    const fallback = "P" + ri(rng, 100, 999);
+    used.add(fallback);
+    return fallback;
+  }
 
-    window.addEventListener("resize", resize);
-    resize();
+  function generateSystem(seed, attempt = 0) {
+    const rng = rngFactory(seed + attempt * 10007);
+    const count = ri(rng, 4, 6);
+    const usedNames = new Set(["Aster"]);
+    const defs = [];
+    const baseRadii = [700, 1120, 1580, 2100, 2720, 3420];
+    let lastColor = -1;
 
-    function shortestAngleDelta(a, b) {
-      return Math.atan2(Math.sin(b - a), Math.cos(b - a));
+    for (let i = 0; i < count; i++) {
+      const orbitBase = baseRadii[i];
+      const orbitR = orbitBase + rr(rng, -90, 130) + i * rr(rng, 0, 45);
+      const radiusClass = rng();
+      let r;
+      if (radiusClass < 0.35) r = rr(rng, 58, 78);
+      else if (radiusClass < 0.78) r = rr(rng, 80, 112);
+      else r = rr(rng, 116, 150);
+
+      const density = rr(rng, 58, 76);
+      const mass = Math.round(r * r * density);
+      let colorIndex = ri(rng, 0, planetPalette.length - 1);
+      if (colorIndex === lastColor) colorIndex = (colorIndex + 2) % planetPalette.length;
+      lastColor = colorIndex;
+      const pal = planetPalette[colorIndex];
+
+      defs.push({
+        id: "p" + i,
+        name: i === 0 ? "Aster" : generateName(rng, usedNames),
+        orbitR,
+        omega: 0,
+        angle0: rr(rng, 0, Math.PI * 2),
+        r: Math.round(r),
+        mass,
+        a: pal.a,
+        b: pal.b,
+        seed: rr(rng, 0, 10)
+      });
     }
 
-    function lerpAngle(a, b, t) {
-      return a + shortestAngleDelta(a, b) * t;
+    defs[0].angle0 = rr(rng, 0.15, 0.95);
+    defs[0].orbitR = rr(rng, 680, 850);
+    defs[0].r = clamp(defs[0].r, 72, 105);
+    defs[0].mass = Math.round(defs[0].r * defs[0].r * rr(rng, 62, 78));
+    return defs;
+  }
+
+  function newSystem(seed = Math.floor(Math.random() * 900000) + 100000) {
+    systemSeed = seed;
+    systemAttempt = 0;
+    planetDefs = generateSystem(systemSeed, systemAttempt);
+    time = 0;
+    updateBodies();
+    reset();
+  }
+
+  const ship = {
+    x: 0,
+    y: 0,
+    vx: 0,
+    vy: 0,
+    angle: -Math.PI / 2,
+    radius: 12,
+    turnInput: 0,
+    angularVelocity: 0,
+    turnRate: 2.35,
+    thrust: 0,
+    thrustTarget: 0,
+    thrustPower: 160,
+    fuel: 1,
+    fuelMax: 1,
+    burnFuelUse: 0.56,
+    turnFuelUse: 0.36,
+    fuelRegen: 0.14,
+    rcsCooldown: 0,
+    burnSounding: false
+  };
+
+  let prediction = {
+    points: [],
+    scores: new Map(),
+    closest: new Map(),
+    primary: null,
+    secondary: null,
+    stableBody: null
+  };
+
+  let audioCtx = null;
+  let masterGain = null;
+  let musicGain = null;
+  let sfxGain = null;
+  let rcsGain = null;
+  let rcsNoise = null;
+  let soundOn = false;
+  let musicTimer = null;
+  let musicStep = 0;
+
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function rgb(arr, alpha = 1) { return `rgba(${arr[0]},${arr[1]},${arr[2]},${alpha})`; }
+  function dist(a, b, c, d) { return Math.hypot(a - c, b - d); }
+  function shortDelta(a, b) { return Math.atan2(Math.sin(b - a), Math.cos(b - a)); }
+
+  function resize() {
+    DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    makeBackground();
+  }
+
+  function makeBackground() {
+    stars = [];
+    nebulas = [];
+    for (let i = 0; i < 520; i++) {
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: Math.random() * 1.55 + 0.18,
+        a: Math.random() * 0.72 + 0.18,
+        l: Math.random() * 0.55 + 0.45
+      });
+    }
+    for (let i = 0; i < 20; i++) {
+      nebulas.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: Math.random() * 280 + 120,
+        a: Math.random() * 0.055 + 0.018,
+        h: Math.random() < 0.5 ? "90,130,255" : "255,170,100"
+      });
+    }
+  }
+
+  function bodyState(def, t) {
+    if (def.type === "sun") return { ...def, x: 0, y: 0, vx: 0, vy: 0 };
+    const ang = def.angle0;
+    const x = Math.cos(ang) * def.orbitR;
+    const y = Math.sin(ang) * def.orbitR;
+    return { ...def, angle: ang, x, y, vx: 0, vy: 0 };
+  }
+
+  function updateBodies() {
+    bodies = [bodyState(sun, 0), ...planetDefs.map(p => bodyState(p, 0))];
+  }
+
+  function getBody(id) {
+    return bodies.find(b => b.id === id);
+  }
+
+  function reset() {
+    updateBodies();
+    const p = bodies.find(b => b.type !== "sun") || bodies[1];
+
+    const angle = p.angle + Math.PI * 0.72;
+    const d = p.r * 4.35;
+    const x = p.x + Math.cos(angle) * d;
+    const y = p.y + Math.sin(angle) * d;
+    const nx = (x - p.x) / d;
+    const ny = (y - p.y) / d;
+    const tx = -ny;
+    const ty = nx;
+    const circ = Math.sqrt(p.mass / d);
+
+    ship.x = x;
+    ship.y = y;
+    ship.vx = tx * circ;
+    ship.vy = ty * circ;
+    ship.angle = Math.atan2(ship.vy, ship.vx);
+    ship.turnInput = 0;
+    ship.angularVelocity = 0;
+    ship.thrust = 0;
+    ship.thrustTarget = 0;
+    ship.fuel = 1;
+    ship.burnSounding = false;
+
+    for (let attempt = 0; attempt < 24; attempt++) {
+      let safe = true;
+      for (const b of bodies) {
+        const minD = b.r + ship.radius + 95;
+        if (Math.hypot(ship.x - b.x, ship.y - b.y) < minD) {
+          safe = false;
+          break;
+        }
+      }
+      if (safe) break;
+
+      const a = p.angle + Math.PI * 0.72 + attempt * Math.PI * 0.29;
+      ship.x = p.x + Math.cos(a) * d;
+      ship.y = p.y + Math.sin(a) * d;
+      const nnx = (ship.x - p.x) / d;
+      const nny = (ship.y - p.y) / d;
+      ship.vx = -nny * circ;
+      ship.vy = nnx * circ;
+      ship.angle = Math.atan2(ship.vy, ship.vx);
     }
 
-    function regionForPointer(clientX, clientY) {
-      const burnR = 88;
-      const burnCx = W / 2;
-      const burnCy = H - 78;
-      const dx = clientX - burnCx;
-      const dy = clientY - burnCy;
+    crashTimer = 0;
+    flashTimer = 0;
+    particles = [];
+    camera.x = ship.x;
+    camera.y = ship.y;
+    camera.zoom = 0.48;
+    camera.targetZoom = 0.48;
+    camera.desiredZoom = 0.48;
+    camera.zoomVel = 0;
+    camera.zoomHold = 0;
+    prediction = analyzePrediction();
+    chooseTarget();
+    updateTouchVisuals();
+  }
 
-      if (dx * dx + dy * dy < burnR * burnR) return "burn";
-      if (clientX < W * 0.47) return "left";
-      if (clientX > W * 0.53) return "right";
-      return "burn";
+  function toScreen(x, y) {
+    return {
+      x: W / 2 + (x - ship.x) * camera.zoom,
+      y: H / 2 + (y - ship.y) * camera.zoom
+    };
+  }
+
+  function toScreenCamera(x, y) {
+    return {
+      x: W / 2 + (x - camera.x) * camera.zoom,
+      y: H / 2 + (y - camera.y) * camera.zoom
+    };
+  }
+
+  function gravityAt(x, y, bs = bodies) {
+    let ax = 0;
+    let ay = 0;
+
+    for (const b of bs) {
+      const dx = b.x - x;
+      const dy = b.y - y;
+      const d2 = dx * dx + dy * dy;
+      const d = Math.sqrt(d2) + 0.0001;
+      const safe = Math.max(d2, b.r * b.r * 0.82);
+      const well = b.type === "sun" ? b.r * 12 : b.r * 20;
+      const boost = 1 + 2.4 * (well / (d + well));
+      const g = b.mass * boost / safe;
+      ax += dx / d * g;
+      ay += dy / d * g;
     }
 
-    function addPointer(id, region) {
-      if (region === "left") input.leftIds.add(id);
-      if (region === "right") input.rightIds.add(id);
-      if (region === "burn") input.burnIds.add(id);
-      updateTouchVisuals();
+    return { ax, ay };
+  }
+
+  function orbitAssist(dt, x, y, vx, vy, bs = bodies, mode = "actual") {
+    // Temporarily disabled: testing raw orbital mechanics without assisted capture.
+    let nearest = null;
+    let bestD = Infinity;
+    for (const b of bs) {
+      if (b.type === "sun") continue;
+      const d = Math.hypot(x - b.x, y - b.y);
+      if (d < bestD) {
+        bestD = d;
+        nearest = b;
+      }
+    }
+    return { vx, vy, body: nearest, stable: false };
+  }
+
+  function analyzePrediction() {
+    const speed = Math.hypot(ship.vx, ship.vy);
+    if (speed < 2.1 && ship.thrust < 0.03) {
+      return { points: [], scores: new Map(), closest: new Map(), primary: null, secondary: null, stableBody: null };
     }
 
-    function clearPointer(id) {
-      input.leftIds.delete(id);
-      input.rightIds.delete(id);
-      input.burnIds.delete(id);
-      updateTouchVisuals();
-    }
+    let x = ship.x;
+    let y = ship.y;
+    let vx = ship.vx;
+    let vy = ship.vy;
 
-    function updateTouchVisuals() {
-      const touching = input.leftIds.size || input.rightIds.size || input.burnIds.size;
-      touchHints.classList.toggle("show", !!touching);
-      burnVisual.classList.toggle("active", input.burnIds.size > 0);
-    }
+    const pts = [];
+    const scores = new Map();
+    const closest = new Map();
+    const step = 0.085;
+    const steps = 720;
+    let stableBody = null;
 
-    canvas.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      canvas.setPointerCapture(e.pointerId);
-      addPointer(e.pointerId, regionForPointer(e.clientX, e.clientY));
-    });
+    let dominantId = null;
+    let dominantSwitches = 0;
+    let severeTurns = 0;
+    let prevVelAng = Math.atan2(vy, vx);
 
-    canvas.addEventListener("pointerup", (e) => {
-      e.preventDefault();
-      clearPointer(e.pointerId);
-    });
+    for (let i = 0; i < steps; i++) {
+      const futureBodies = bodies;
 
-    canvas.addEventListener("pointercancel", (e) => {
-      e.preventDefault();
-      clearPointer(e.pointerId);
-    });
+      const g = gravityAt(x, y, futureBodies);
+      vx += g.ax * step;
+      vy += g.ay * step;
 
-    canvas.addEventListener("pointermove", (e) => {
-      e.preventDefault();
-      clearPointer(e.pointerId);
-      addPointer(e.pointerId, regionForPointer(e.clientX, e.clientY));
-    });
+      // Orbital nudge disabled by orbitAssist, left in place to make future reactivation easy.
+      const assisted = orbitAssist(step, x, y, vx, vy, futureBodies, "predict");
+      vx = assisted.vx;
+      vy = assisted.vy;
 
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowLeft") input.leftIds.add("keyboard");
-      if (e.key === "ArrowRight") input.rightIds.add("keyboard");
-      if (e.key === "ArrowUp" || e.key === " ") input.burnIds.add("keyboard");
-      updateTouchVisuals();
-    });
+      x += vx * step;
+      y += vy * step;
+      pts.push({ x, y });
 
-    window.addEventListener("keyup", (e) => {
-      if (e.key === "ArrowLeft") input.leftIds.delete("keyboard");
-      if (e.key === "ArrowRight") input.rightIds.delete("keyboard");
-      if (e.key === "ArrowUp" || e.key === " ") input.burnIds.delete("keyboard");
-      updateTouchVisuals();
-    });
+      let frameDominant = null;
+      let frameBestInfluence = -Infinity;
 
-    function gravityAt(x, y) {
-      let ax = 0, ay = 0;
-      for (const p of planets) {
-        const dx = p.x - x;
-        const dy = p.y - y;
+      for (const b of futureBodies) {
+        const dx = b.x - x;
+        const dy = b.y - y;
         const d2 = dx * dx + dy * dy;
         const d = Math.sqrt(d2) + 0.0001;
-        const safe = Math.max(d2, p.r * p.r * 0.84);
-        const g = p.mass / safe;
-        ax += (dx / d) * g;
-        ay += (dy / d) * g;
-      }
-      return { ax, ay };
-    }
 
-    function startInStableOrbit() {
-      const p = planets[0];
+        // Prediction must stop on impact with any solid body, including the star.
+        if (d <= b.r) return finalizePrediction(pts, scores, closest, stableBody);
 
-      // Stable, readable initial orbit around Aster.
-      const orbitR = Math.max(p.r * 3.35, p.r + ship.radius + 185);
-      const a = -Math.PI * 0.42;
+        if (b.type === "sun") continue;
 
-      const nx = Math.cos(a);
-      const ny = Math.sin(a);
-      const tx = -ny;
-      const ty = nx;
+        const influence = b.mass / Math.max(d2, b.r * b.r * 0.82);
+        const wellProx = Math.max(0, 1 - d / (b.r * 14));
+        const timeWeight = 1 - i / steps;
 
-      ship.x = p.x + nx * orbitR;
-      ship.y = p.y + ny * orbitR;
+        scores.set(b.id, (scores.get(b.id) || 0) + influence * 2700 * (0.25 + timeWeight * 0.75) + wellProx * (1.2 + timeWeight * 1.4));
+        closest.set(b.id, Math.min(closest.get(b.id) ?? Infinity, d));
 
-      const circ = Math.sqrt(p.mass / orbitR);
-      ship.vx = tx * circ;
-      ship.vy = ty * circ;
-
-      ship.angle = Math.atan2(ship.vy, ship.vx);
-      ship.turnInput = 0;
-      ship.angularVelocity = 0;
-      ship.thrust = 0;
-      ship.thrustTarget = 0;
-
-      camera.angle = ship.angle;
-      camera.targetAngle = ship.angle;
-      camera.back = 260;
-      camera.x = ship.x - Math.cos(camera.angle) * camera.back;
-      camera.y = ship.y - Math.sin(camera.angle) * camera.back;
-    }
-
-
-    function update(dt) {
-      const left = input.leftIds.size > 0;
-      const right = input.rightIds.size > 0;
-      const burn = input.burnIds.size > 0;
-
-      if (left) ship.angle -= ship.turnRate * dt;
-      if (right) ship.angle += ship.turnRate * dt;
-
-      ship.thrustTarget = burn ? 1 : 0;
-      const rampUp = 1.12;
-      const rampDown = 3.15;
-      const ramp = ship.thrustTarget > ship.thrust ? rampUp : rampDown;
-      ship.thrust += (ship.thrustTarget - ship.thrust) * Math.min(1, dt * ramp);
-
-      const g = gravityAt(ship.x, ship.y);
-      ship.vx += g.ax * dt;
-      ship.vy += g.ay * dt;
-
-      if (ship.thrust > 0.002) {
-        const power = ship.thrustPower * ship.thrust;
-        ship.vx += Math.cos(ship.angle) * power * dt;
-        ship.vy += Math.sin(ship.angle) * power * dt;
-      }
-
-      ship.x += ship.vx * dt;
-      ship.y += ship.vy * dt;
-
-      for (const p of planets) {
-        const dx = ship.x - p.x;
-        const dy = ship.y - p.y;
-        const d = Math.sqrt(dx * dx + dy * dy);
-        if (d < p.r + ship.radius) {
-          const nx = dx / d;
-          const ny = dy / d;
-          ship.x = p.x + nx * (p.r + ship.radius);
-          ship.y = p.y + ny * (p.r + ship.radius);
-          const radial = ship.vx * nx + ship.vy * ny;
-          if (radial < 0) {
-            ship.vx -= radial * nx * 1.38;
-            ship.vy -= radial * ny * 1.38;
-          }
-          ship.vx *= 0.66;
-          ship.vy *= 0.66;
+        if (influence > frameBestInfluence) {
+          frameBestInfluence = influence;
+          frameDominant = b.id;
         }
       }
 
-      const speed = Math.hypot(ship.vx, ship.vy);
+      if (frameDominant && frameDominant !== dominantId) {
+        if (dominantId !== null && i > 24) dominantSwitches++;
+        dominantId = frameDominant;
+      }
 
-      if (speed > 4.5) {
-        camera.targetAngle = Math.atan2(ship.vy, ship.vx);
+      const velAng = Math.atan2(vy, vx);
+      const turn = Math.abs(shortDelta(prevVelAng, velAng));
+      prevVelAng = velAng;
+      if (turn > 0.26) severeTurns++;
+
+      // Cut off chaotic multi-body loops / figure-eights.
+      if (dominantSwitches >= 5 && pts.length > 130) break;
+      if (severeTurns >= 12 && pts.length > 120) break;
+    }
+
+    return finalizePrediction(pts, scores, closest, stableBody);
+  }
+
+  function finalizePrediction(pts, scores, closest, stableBody) {
+    const ranked = planetDefs
+      .map(def => ({ id: def.id, score: scores.get(def.id) || 0 }))
+      .sort((a, b) => b.score - a.score);
+
+    const primary = ranked[0]?.score > 0.05 ? bodies.find(b => b.id === ranked[0].id) : null;
+    const secondary = ranked[1]?.score > (ranked[0]?.score || 0) * 0.30 ? bodies.find(b => b.id === ranked[1].id) : null;
+
+    return { points: pts, scores, closest, primary, secondary, stableBody };
+  }
+
+  function chooseTarget() {
+    const speed = Math.hypot(ship.vx, ship.vy);
+    const dirX = speed > 5 ? ship.vx / speed : Math.cos(ship.angle);
+    const dirY = speed > 5 ? ship.vy / speed : Math.sin(ship.angle);
+
+    let best = null;
+    let bestScore = -Infinity;
+
+    for (const b of bodies) {
+      if (b.type === "sun") continue;
+      const dx = b.x - ship.x;
+      const dy = b.y - ship.y;
+      const d = Math.hypot(dx, dy) + 0.0001;
+      const align = dx / d * dirX + dy / d * dirY;
+      const predScore = prediction.scores.get(b.id) || 0;
+      const score = Math.max(-0.35, align) * 0.95 + 1 / (1 + d / 1900) + b.mass / (d * d) * 2600 + predScore * 0.025;
+      if (score > bestScore) {
+        bestScore = score;
+        best = b;
+      }
+    }
+
+    targetBody = prediction.primary || best;
+  }
+
+  function updateZoom(dt) {
+    const pts = prediction.points;
+    const relevant = [prediction.primary, prediction.secondary].filter(Boolean);
+    if (!relevant.length && targetBody) relevant.push(targetBody);
+
+    let minX = ship.x, maxX = ship.x, minY = ship.y, maxY = ship.y;
+
+    const step = relevant.length ? 8 : 12;
+    const limit = relevant.length ? 84 : 120;
+
+    for (let i = 0; i < pts.length && i < limit * step; i += step) {
+      const p = pts[i];
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+
+    // Always include at least one complete planet with breathing room.
+    if (!relevant.length) {
+      let nearest = null;
+      let bestD = Infinity;
+      for (const b of bodies) {
+        if (b.type === "sun") continue;
+        const d = Math.hypot(b.x - ship.x, b.y - ship.y);
+        if (d < bestD) {
+          bestD = d;
+          nearest = b;
+        }
+      }
+      if (nearest) relevant.push(nearest);
+    }
+
+    for (const b of relevant) {
+      const pad = b.r * 2.85 + 170;
+      minX = Math.min(minX, b.x - pad);
+      maxX = Math.max(maxX, b.x + pad);
+      minY = Math.min(minY, b.y - pad);
+      maxY = Math.max(maxY, b.y + pad);
+    }
+
+    const spanX = Math.max(520, maxX - minX);
+    const spanY = Math.max(400, maxY - minY);
+    let fit = Math.min(W * 0.82 / spanX, H * 0.74 / spanY);
+
+    let fullVisible = relevant.some(b => {
+      const s = {
+        x: W / 2 + (b.x - ship.x) * fit,
+        y: H / 2 + (b.y - ship.y) * fit
+      };
+      const r = b.r * fit;
+      const air = Math.max(30, r * 0.55);
+      return s.x - r - air > 0 && s.x + r + air < W && s.y - r - air > 0 && s.y + r + air < H;
+    });
+    if (!fullVisible && relevant.length) fit *= 0.72;
+
+    const computed = clamp(fit, 0.035, 1.25);
+
+    // Hysteresis: zoom-out requests are urgent; zoom-in requests must be persistent.
+    const zoomingOut = computed < camera.desiredZoom;
+    const largeChange = Math.abs(computed - camera.desiredZoom) / Math.max(camera.desiredZoom, 0.001) > 0.16;
+
+    if (zoomingOut) {
+      camera.desiredZoom = computed;
+      camera.zoomHold = 0.22;
+    } else {
+      camera.zoomHold -= dt;
+      if (largeChange && camera.zoomHold <= 0) {
+        camera.desiredZoom = computed;
+        camera.zoomHold = 0.34;
+      } else if (!largeChange) {
+        // Tiny changes are absorbed slowly, preventing jitter.
+        camera.desiredZoom += (computed - camera.desiredZoom) * Math.min(1, dt * 0.55);
+      }
+    }
+
+    camera.targetZoom = camera.desiredZoom;
+
+    // Critically damped-ish spring with velocity cap.
+    const delta = camera.targetZoom - camera.zoom;
+    const stiffness = delta < 0 ? 9.5 : 4.2;   // zoom out faster than zoom in
+    const damping = delta < 0 ? 7.0 : 5.5;
+    camera.zoomVel += delta * stiffness * dt;
+    camera.zoomVel *= Math.exp(-damping * dt);
+
+    // Cap zoom speed to avoid visible pops, but allow emergency zoom-out.
+    const maxSpeed = delta < 0 ? 1.35 : 0.42;
+    camera.zoomVel = clamp(camera.zoomVel, -maxSpeed, maxSpeed);
+    camera.zoom += camera.zoomVel * dt;
+
+    // Prevent micro-oscillation around the target.
+    if (Math.abs(delta) < 0.0025 && Math.abs(camera.zoomVel) < 0.006) {
+      camera.zoom = camera.targetZoom;
+      camera.zoomVel = 0;
+    }
+
+    camera.x = ship.x;
+    camera.y = ship.y;
+  }
+
+  function regionForPointer(x, y) {
+    const bx = W / 2;
+    const by = H - 72;
+    const br = 86;
+    const dx = x - bx;
+    const dy = y - by;
+    if (dx * dx + dy * dy < br * br) return "burn";
+    if (x < W * 0.47) return "left";
+    if (x > W * 0.53) return "right";
+    return "burn";
+  }
+
+  function addPointer(id, region) {
+    if (region === "left") input.leftIds.add(id);
+    if (region === "right") input.rightIds.add(id);
+    if (region === "burn") input.burnIds.add(id);
+    updateTouchVisuals();
+  }
+
+  function clearPointer(id) {
+    input.leftIds.delete(id);
+    input.rightIds.delete(id);
+    input.burnIds.delete(id);
+    updateTouchVisuals();
+  }
+
+  function updateTouchVisuals() {
+    leftGlow.classList.toggle("show", input.leftIds.size > 0);
+    rightGlow.classList.toggle("show", input.rightIds.size > 0);
+    burnVisual.classList.toggle("active", input.burnIds.size > 0);
+  }
+
+  function initAudio() {
+    if (audioCtx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AC();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.62;
+    masterGain.connect(audioCtx.destination);
+
+    musicGain = audioCtx.createGain();
+    musicGain.gain.value = 0.12;
+    musicGain.connect(masterGain);
+
+    sfxGain = audioCtx.createGain();
+    sfxGain.gain.value = 0.32;
+    sfxGain.connect(masterGain);
+
+    rcsGain = audioCtx.createGain();
+    rcsGain.gain.value = 0.0001;
+    rcsGain.connect(sfxGain);
+
+    const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+
+    rcsNoise = audioCtx.createBufferSource();
+    rcsNoise.buffer = buffer;
+    rcsNoise.loop = true;
+
+    const hp = audioCtx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 1200;
+
+    const lp = audioCtx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 2400;
+
+    rcsNoise.connect(hp);
+    hp.connect(lp);
+    lp.connect(rcsGain);
+    rcsNoise.start();
+  }
+
+  function tone(freq, dur, type = "sine", gain = 0.04, dest = null, when = 0) {
+    if (!audioCtx || !soundOn) return;
+    const t = audioCtx.currentTime + when;
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.018);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g);
+    g.connect(dest || sfxGain);
+    osc.start(t);
+    osc.stop(t + dur + 0.03);
+  }
+
+  function noiseBurst(dur = 0.08, gain = 0.04) {
+    if (!audioCtx || !soundOn) return;
+    const buffer = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * dur), audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 1.8);
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    const g = audioCtx.createGain();
+    const hp = audioCtx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 740;
+    g.gain.setValueAtTime(gain, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+    src.connect(hp);
+    hp.connect(g);
+    g.connect(sfxGain);
+    src.start();
+    src.stop(audioCtx.currentTime + dur);
+  }
+
+  function setRCSSound(level) {
+    if (!audioCtx || !soundOn || !rcsGain) return;
+    const t = audioCtx.currentTime;
+    rcsGain.gain.cancelScheduledValues(t);
+    rcsGain.gain.linearRampToValueAtTime(clamp(level, 0.0001, 0.025), t + 0.055);
+  }
+
+  function sfx(name) {
+    if (!audioCtx || !soundOn) return;
+    if (name === "toggle") {
+      tone(392, 0.08, "sine", 0.06);
+      tone(784, 0.12, "sine", 0.05, sfxGain, 0.06);
+    }
+    if (name === "burn") {
+      tone(170, 0.16, "sawtooth", 0.04);
+      noiseBurst(0.10, 0.025);
+    }
+    if (name === "crash") {
+      noiseBurst(0.24, 0.08);
+      tone(90, 0.34, "sawtooth", 0.07);
+    }
+    if (name === "orbit") {
+      tone(523, 0.12, "triangle", 0.07);
+      tone(659, 0.16, "triangle", 0.06, sfxGain, 0.10);
+    }
+  }
+
+  function startMusic() {
+    if (musicTimer || !audioCtx || !soundOn) return;
+    const melody = [261.63,329.63,392,329.63,440,392,329.63,493.88,392,329.63,293.66,349.23,440,349.23,329.63,261.63];
+    musicTimer = setInterval(() => {
+      if (!soundOn || !audioCtx) return;
+      const n = melody[musicStep % melody.length];
+      tone(n, 0.25, "sine", 0.026, musicGain);
+      if (musicStep % 4 === 0) tone(n / 2, 0.58, "triangle", 0.019, musicGain);
+      musicStep++;
+    }, 360);
+  }
+
+  function stopMusic() {
+    if (musicTimer) clearInterval(musicTimer);
+    musicTimer = null;
+  }
+
+  async function toggleAudio() {
+    initAudio();
+    if (audioCtx.state === "suspended") await audioCtx.resume();
+    soundOn = !soundOn;
+    if (soundOn) {
+      audioBtn.classList.add("active");
+      audioBtn.textContent = "Audio On";
+      startMusic();
+      sfx("toggle");
+    } else {
+      audioBtn.classList.remove("active");
+      audioBtn.textContent = "Audio";
+      stopMusic();
+      setRCSSound(0);
+    }
+  }
+
+  function spawnMainExhaust(strength) {
+    const count = 3 + Math.floor(strength * 5);
+    for (let i = 0; i < count; i++) {
+      const a = ship.angle + Math.PI + (Math.random() - 0.5) * 0.25;
+      const speed = 70 + Math.random() * 46 + strength * 95;
+      particles.push({
+        x: ship.x - Math.cos(ship.angle) * 12,
+        y: ship.y - Math.sin(ship.angle) * 12,
+        vx: Math.cos(a) * speed + ship.vx * 0.12,
+        vy: Math.sin(a) * speed + ship.vy * 0.12,
+        life: 0.22 + Math.random() * 0.20,
+        r: 2.2 + Math.random() * 3.1,
+        color: Math.random() < 0.6 ? "255,175,78" : "120,230,255"
+      });
+    }
+  }
+
+  function spawnRCS(side, intensity) {
+    const lateral = side === "left" ? 1 : -1;
+    const hx = Math.cos(ship.angle);
+    const hy = Math.sin(ship.angle);
+    const sx = -hy;
+    const sy = hx;
+    const px = ship.x - hx * 4 + sx * lateral * 10;
+    const py = ship.y - hy * 4 + sy * lateral * 10;
+    const a = ship.angle + (side === "left" ? Math.PI / 2 : -Math.PI / 2) + (Math.random() - 0.5) * 0.25;
+
+    for (let i = 0; i < 2 + Math.floor(intensity * 3); i++) {
+      const speed = 30 + Math.random() * 24 + intensity * 42;
+      particles.push({
+        x: px,
+        y: py,
+        vx: Math.cos(a) * speed + ship.vx * 0.12,
+        vy: Math.sin(a) * speed + ship.vy * 0.12,
+        life: 0.10 + Math.random() * 0.08,
+        r: 1.4 + Math.random() * 1.5,
+        color: "165,235,255"
+      });
+    }
+  }
+
+  function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.life -= dt;
+      p.r *= 0.992;
+      if (p.life <= 0 || p.r < 0.2) particles.splice(i, 1);
+    }
+  }
+
+  function crash() {
+    if (crashTimer > 0) return;
+    crashTimer = 1.2;
+    flashTimer = 0.25;
+    sfx("crash");
+
+    for (let i = 0; i < 80; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const speed = 45 + Math.random() * 150;
+      particles.push({
+        x: ship.x,
+        y: ship.y,
+        vx: Math.cos(a) * speed + ship.vx * 0.12,
+        vy: Math.sin(a) * speed + ship.vy * 0.12,
+        life: 0.35 + Math.random() * 0.50,
+        r: 2 + Math.random() * 4.5,
+        color: Math.random() < 0.5 ? "255,160,70" : "135,230,255"
+      });
+    }
+  }
+
+  function update(dt) {
+    time += dt;
+    updateBodies();
+
+    if (crashTimer > 0) {
+      crashTimer -= dt;
+      flashTimer = Math.max(0, flashTimer - dt);
+      updateParticles(dt);
+      if (crashTimer <= 0) reset();
+      return;
+    }
+
+    const left = input.leftIds.size > 0;
+    const right = input.rightIds.size > 0;
+    const burn = input.burnIds.size > 0;
+
+    const turnTarget = left && !right ? -1 : right && !left ? 1 : 0;
+    const turnRamp = Math.abs(turnTarget) > Math.abs(ship.turnInput) ? 3.2 : 5.5;
+    ship.turnInput += (turnTarget - ship.turnInput) * Math.min(1, dt * turnRamp);
+
+    const turnEff = Math.sign(ship.turnInput) * ship.turnInput * ship.turnInput;
+    const turnLevel = Math.abs(turnEff);
+    ship.angularVelocity += (turnEff * ship.turnRate - ship.angularVelocity) * Math.min(1, dt * 6.6);
+    ship.angle += ship.angularVelocity * dt;
+
+    if (turnLevel > 0.03) {
+      ship.fuel -= ship.turnFuelUse * turnLevel * dt;
+      ship.rcsCooldown -= dt;
+      if (ship.rcsCooldown <= 0) {
+        ship.rcsCooldown = 0.055;
+        spawnRCS(turnEff < 0 ? "left" : "right", turnLevel);
+      }
+    }
+
+    ship.thrustTarget = burn && ship.fuel > 0.01 ? 1 : 0;
+    ship.thrust += (ship.thrustTarget - ship.thrust) * Math.min(1, dt * (ship.thrustTarget > ship.thrust ? 1.0 : 3.4));
+    const thrustEff = ship.thrust * ship.thrust;
+
+    if (!ship.burnSounding && ship.thrust > 0.06) {
+      ship.burnSounding = true;
+      sfx("burn");
+    }
+    if (ship.thrust < 0.02) ship.burnSounding = false;
+
+    if (thrustEff > 0.001) ship.fuel -= ship.burnFuelUse * thrustEff * dt;
+    else {
+      ship.fuel += ship.fuelRegen * dt;
+    }
+
+    ship.fuel = clamp(ship.fuel, 0, ship.fuelMax);
+
+    const g = gravityAt(ship.x, ship.y);
+    ship.vx += g.ax * dt;
+    ship.vy += g.ay * dt;
+
+    if (thrustEff > 0.001 && ship.fuel > 0) {
+      const power = ship.thrustPower * thrustEff;
+      ship.vx += Math.cos(ship.angle) * power * dt;
+      ship.vy += Math.sin(ship.angle) * power * dt;
+      spawnMainExhaust(thrustEff);
+    }
+
+    const assist = orbitAssist(dt, ship.x, ship.y, ship.vx, ship.vy, bodies, "actual");
+    ship.vx = assist.vx;
+    ship.vy = assist.vy;
+
+    ship.x += ship.vx * dt;
+    ship.y += ship.vy * dt;
+
+    for (const b of bodies) {
+      const d = dist(ship.x, ship.y, b.x, b.y);
+      if (d < b.r + ship.radius) {
+        crash();
+        break;
+      }
+    }
+
+    prediction = analyzePrediction();
+    chooseTarget();
+    updateZoom(dt);
+    updateParticles(dt);
+    setRCSSound(turnLevel * 0.022);
+  }
+
+  function drawBackground() {
+    for (const n of nebulas) {
+      const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
+      g.addColorStop(0, `rgba(${n.h},${n.a})`);
+      g.addColorStop(1, `rgba(${n.h},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const dx = ((ship.x * 0.010) % W + W) % W;
+    const dy = ((ship.y * 0.010) % H + H) % H;
+    for (const s of stars) {
+      const x = (s.x - dx * s.l + W * 3) % W;
+      const y = (s.y - dy * s.l + H * 3) % H;
+      ctx.globalAlpha = s.a;
+      ctx.fillStyle = "white";
+      ctx.beginPath();
+      ctx.arc(x, y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawGrid() {
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,.04)";
+    ctx.lineWidth = 1;
+    const spacing = 180;
+    const halfX = W / camera.zoom / 2 + 220;
+    const halfY = H / camera.zoom / 2 + 220;
+    const startX = Math.floor((ship.x - halfX) / spacing) * spacing;
+    const endX = Math.ceil((ship.x + halfX) / spacing) * spacing;
+    const startY = Math.floor((ship.y - halfY) / spacing) * spacing;
+    const endY = Math.ceil((ship.y + halfY) / spacing) * spacing;
+
+    for (let x = startX; x <= endX; x += spacing) {
+      const a = toScreen(x, startY);
+      const b = toScreen(x, endY);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+
+    for (let y = startY; y <= endY; y += spacing) {
+      const a = toScreen(startX, y);
+      const b = toScreen(endX, y);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawTrajectorySegment(points, color, glow, dash, width) {
+    if (points.length < 2) return;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 5;
+    ctx.setLineDash(dash);
+    ctx.lineDashOffset = -performance.now() * 0.03;
+    ctx.beginPath();
+    const first = toScreen(points[0].x, points[0].y);
+    ctx.moveTo(first.x, first.y);
+    for (let i = 1; i < points.length; i++) {
+      const p = toScreen(points[i].x, points[i].y);
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawTrajectory() {
+    const pts = prediction.points;
+    if (pts.length < 2) return;
+
+    const speed = Math.hypot(ship.vx, ship.vy);
+    const dirX = speed > 4 ? ship.vx / speed : Math.cos(ship.angle);
+    const dirY = speed > 4 ? ship.vy / speed : Math.sin(ship.angle);
+
+    const front = [];
+    const back = [];
+
+    for (const p of pts) {
+      const dot = (p.x - ship.x) * dirX + (p.y - ship.y) * dirY;
+      if (dot >= 0) {
+        front.push(p);
+        back.push(null);
       } else {
-        camera.targetAngle = ship.angle;
+        back.push(p);
+        front.push(null);
       }
-
-      const follow = Math.min(1, dt * (speed > 4.5 ? 2.4 : 1.15));
-      camera.angle = lerpAngle(camera.angle, camera.targetAngle, follow);
-
-      const back = 220 + Math.min(150, speed * 1.2);
-      camera.back += (back - camera.back) * Math.min(1, dt * 1.2);
-
-      camera.x = ship.x - Math.cos(camera.angle) * camera.back;
-      camera.y = ship.y - Math.sin(camera.angle) * camera.back;
     }
 
-    function cameraBasis() {
-      const forward2 = { x: Math.cos(camera.angle), y: Math.sin(camera.angle) };
-
-      const cam = { x: camera.x, y: camera.height, z: camera.y };
-      const target = {
-        x: ship.x + forward2.x * camera.lookAhead,
-        y: 0,
-        z: ship.y + forward2.y * camera.lookAhead
-      };
-
-      let fx = target.x - cam.x;
-      let fy = target.y - cam.y;
-      let fz = target.z - cam.z;
-      const fl = Math.hypot(fx, fy, fz);
-      fx /= fl; fy /= fl; fz /= fl;
-
-      const upx = 0, upy = 1, upz = 0;
-      let rx = fy * upz - fz * upy;
-      let ry = fz * upx - fx * upz;
-      let rz = fx * upy - fy * upx;
-      const rl = Math.hypot(rx, ry, rz);
-      rx /= rl; ry /= rl; rz /= rl;
-
-      let ux = ry * fz - rz * fy;
-      let uy = rz * fx - rx * fz;
-      let uz = rx * fy - ry * fx;
-
-      return {
-        cam,
-        f: {x: fx, y: fy, z: fz},
-        r: {x: rx, y: ry, z: rz},
-        u: {x: ux, y: uy, z: uz}
-      };
-    }
-
-    function projectWorld(x, y, height = 0) {
-      const b = cameraBasis();
-      const px = x, py = height, pz = y;
-      const vx = px - b.cam.x;
-      const vy = py - b.cam.y;
-      const vz = pz - b.cam.z;
-
-      const cx = vx * b.r.x + vy * b.r.y + vz * b.r.z;
-      const cy = vx * b.u.x + vy * b.u.y + vz * b.u.z;
-      const cz = vx * b.f.x + vy * b.f.y + vz * b.f.z;
-
-      if (cz <= 8) return null;
-
-      const scale = camera.fov / cz;
-      return {
-        x: W / 2 + cx * scale,
-        y: H * 0.51 - cy * scale,
-        z: cz,
-        scale
-      };
-    }
-
-    function drawBackground() {
-      ctx.save();
-
-      for (const n of nebula) {
-        const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
-        grad.addColorStop(0, `rgba(85, 130, 255, ${n.a})`);
-        grad.addColorStop(1, "rgba(85, 130, 255, 0)");
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      const driftX = ((camera.x * 0.012) % W + W) % W;
-      const driftY = ((camera.y * 0.012) % H + H) % H;
-
-      for (const s of stars) {
-        ctx.globalAlpha = s.a;
-        ctx.fillStyle = "white";
-        const px = (s.x - driftX * s.layer + W * 2) % W;
-        const py = (s.y - driftY * s.layer + H * 2) % H;
-        ctx.beginPath();
-        ctx.arc(px, py, s.s, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      ctx.restore();
-    }
-
-    function drawGrid() {
-      ctx.save();
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = "rgba(255,255,255,0.045)";
-
-      const spacing = 220;
-      const extent = 3400;
-      const startX = Math.floor((ship.x - extent) / spacing) * spacing;
-      const endX = Math.ceil((ship.x + extent) / spacing) * spacing;
-      const startY = Math.floor((ship.y - extent) / spacing) * spacing;
-      const endY = Math.ceil((ship.y + extent) / spacing) * spacing;
-
-      for (let gx = startX; gx <= endX; gx += spacing) {
-        let started = false;
-        ctx.beginPath();
-        for (let gy = startY; gy <= endY; gy += 90) {
-          const p = projectWorld(gx, gy, -2);
-          if (!p) { started = false; continue; }
-          if (!started) { ctx.moveTo(p.x, p.y); started = true; }
-          else ctx.lineTo(p.x, p.y);
-        }
-        ctx.stroke();
-      }
-
-      for (let gy = startY; gy <= endY; gy += spacing) {
-        let started = false;
-        ctx.beginPath();
-        for (let gx = startX; gx <= endX; gx += 90) {
-          const p = projectWorld(gx, gy, -2);
-          if (!p) { started = false; continue; }
-          if (!started) { ctx.moveTo(p.x, p.y); started = true; }
-          else ctx.lineTo(p.x, p.y);
-        }
-        ctx.stroke();
-      }
-
-      ctx.restore();
-    }
-
-    function predictTrajectory() {
-      const speed = Math.hypot(ship.vx, ship.vy);
-      if (speed < 2.3 && ship.thrust < 0.035) return [];
-
-      const points = [];
-      let x = ship.x;
-      let y = ship.y;
-      let vx = ship.vx;
-      let vy = ship.vy;
-
-      const step = 0.075;
-      const steps = 790;
-
-      for (let i = 0; i < steps; i++) {
-        const g = gravityAt(x, y);
-        vx += g.ax * step;
-        vy += g.ay * step;
-        x += vx * step;
-        y += vy * step;
-        points.push({ x, y });
-
-        for (const p of planets) {
-          const dx = x - p.x;
-          const dy = y - p.y;
-          if (Math.sqrt(dx * dx + dy * dy) < p.r) return points;
-        }
-      }
-
-      return points;
-    }
-
-    function splitNulls(arr) {
-      const chunks = [];
+    function split(arr) {
+      const out = [];
       let chunk = [];
       for (const p of arr) {
         if (p) chunk.push(p);
         else if (chunk.length) {
-          chunks.push(chunk);
+          out.push(chunk);
           chunk = [];
         }
       }
-      if (chunk.length) chunks.push(chunk);
-      return chunks;
+      if (chunk.length) out.push(chunk);
+      return out;
     }
 
-    function drawTrajectorySegment(points, color, dashA, dashB, height, glow, width = 2.7) {
-      if (points.length < 2) return;
+    for (const seg of split(back)) drawTrajectorySegment(seg, "rgba(255,172,92,.74)", "rgba(255,130,50,.42)", [5,14], 1.15);
+    for (const seg of split(front)) drawTrajectorySegment(seg, prediction.stableBody ? "rgba(145,255,190,.78)" : "rgba(110,236,255,.78)", prediction.stableBody ? "rgba(130,255,185,.44)" : "rgba(72,210,255,.44)", [12,10], 1.35);
+  }
 
-      ctx.save();
-      ctx.lineWidth = width;
-      ctx.strokeStyle = color;
-      ctx.shadowColor = glow;
-      ctx.shadowBlur = 9;
-      ctx.setLineDash([dashA, dashB]);
-      ctx.lineDashOffset = -performance.now() * 0.035;
+  function drawSun(b) {
+    const s = toScreen(b.x, b.y);
+    const r = b.r * camera.zoom;
+    if (s.x + r * 2.2 < 0 || s.x - r * 2.2 > W || s.y + r * 2.2 < 0 || s.y - r * 2.2 > H) return;
 
-      let drawing = false;
+    const glow = ctx.createRadialGradient(s.x, s.y, r * 0.4, s.x, s.y, r * 2.4);
+    glow.addColorStop(0, "rgba(255,225,165,.32)");
+    glow.addColorStop(0.55, "rgba(255,165,72,.14)");
+    glow.addColorStop(1, "rgba(255,140,50,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, r * 2.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    const body = ctx.createRadialGradient(s.x - r * 0.35, s.y - r * 0.45, r * 0.10, s.x, s.y, r);
+    body.addColorStop(0, "rgba(255,248,210,1)");
+    body.addColorStop(0.45, "rgba(255,201,108,1)");
+    body.addColorStop(1, "rgba(255,118,42,1)");
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, Math.max(1, r), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawPlanetTexture(x, y, r, b) {
+    if (r < 5) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.clip();
+
+    for (let i = 0; i < 9; i++) {
+      const yy = y - r + (i + 0.5) * 2 * r / 9;
+      const wave = Math.sin(i * 1.6 + b.seed) * r * 0.12;
+      ctx.globalAlpha = 0.08 + (i % 3) * 0.025;
+      ctx.strokeStyle = i % 2 ? "rgba(255,255,255,.26)" : "rgba(0,0,0,.25)";
+      ctx.lineWidth = Math.max(0.5, r * 0.05);
       ctx.beginPath();
-
-      for (let i = 0; i < points.length; i++) {
-        const p = projectWorld(points[i].x, points[i].y, height);
-        if (!p) {
-          if (drawing) {
-            ctx.stroke();
-            ctx.beginPath();
-          }
-          drawing = false;
-          continue;
-        }
-
-        if (!drawing) {
-          ctx.moveTo(p.x, p.y);
-          drawing = true;
-        } else {
-          ctx.lineTo(p.x, p.y);
-        }
-      }
-
-      if (drawing) ctx.stroke();
-      ctx.restore();
-    }
-
-    function drawTrajectory() {
-      const all = predictTrajectory();
-      if (all.length < 2) return;
-
-      const front = [];
-      const back = [];
-
-      const speed = Math.hypot(ship.vx, ship.vy);
-      const dirX = speed > 4 ? ship.vx / speed : Math.cos(ship.angle);
-      const dirY = speed > 4 ? ship.vy / speed : Math.sin(ship.angle);
-
-      for (const p of all) {
-        const dx = p.x - ship.x;
-        const dy = p.y - ship.y;
-        const dot = dx * dirX + dy * dirY;
-
-        if (dot >= 0) {
-          front.push(p);
-          back.push(null);
-        } else {
-          back.push(p);
-          front.push(null);
-        }
-      }
-
-      for (const c of splitNulls(front)) {
-        drawTrajectorySegment(c, "rgba(96,232,255,0.94)", 11, 9, 2, "rgba(72,210,255,0.82)", 2.8);
-      }
-
-      for (const c of splitNulls(back)) {
-        drawTrajectorySegment(c, "rgba(255,154,64,0.94)", 5, 12, 2, "rgba(255,120,32,0.82)", 2.6);
-      }
-    }
-
-    function rgb(arr, a = 1) {
-      return `rgba(${arr[0]},${arr[1]},${arr[2]},${a})`;
-    }
-
-    function shadeColor(arr, factor) {
-      return arr.map(v => Math.max(0, Math.min(255, Math.round(v * factor))));
-    }
-
-    function drawPlanetTexture(cx, cy, r, p) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.clip();
-
-      for (let i = 0; i < 9; i++) {
-        const yy = cy - r + (i + 0.5) * (2 * r / 9);
-        const wave = Math.sin(i * 1.7 + p.seed) * r * 0.16;
-        ctx.globalAlpha = 0.10 + (i % 3) * 0.035;
-        ctx.strokeStyle = i % 2 ? "rgba(255,255,255,0.28)" : "rgba(0,0,0,0.35)";
-        ctx.lineWidth = Math.max(1, r * 0.035);
-        ctx.beginPath();
-        ctx.ellipse(cx + wave, yy, r * (0.92 - i * 0.018), r * 0.11, Math.sin(i + p.seed) * 0.13, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      for (let i = 0; i < 7; i++) {
-        const a = i * 2.399 + p.seed;
-        const rr = r * (0.15 + ((i * 37) % 70) / 100);
-        const bx = cx + Math.cos(a) * rr * 0.72;
-        const by = cy + Math.sin(a * 1.3) * rr * 0.58;
-        ctx.globalAlpha = 0.08;
-        ctx.fillStyle = i % 2 ? "white" : "black";
-        ctx.beginPath();
-        ctx.ellipse(bx, by, r * (0.06 + i * 0.006), r * (0.025 + i * 0.004), a, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      ctx.restore();
-      ctx.globalAlpha = 1;
-    }
-
-    function drawPlanet(p) {
-      const base = projectWorld(p.x, p.y, 0);
-      const top = projectWorld(p.x, p.y, p.r * 1.72);
-      if (!base || !top) return;
-
-      const radius = Math.max(3, Math.abs(base.y - top.y) * 0.62);
-      if (radius < 2) return;
-
-      const cx = base.x;
-      const cy = base.y - radius * 0.42;
-
-      ctx.save();
-
-      const atmosphere = ctx.createRadialGradient(cx, cy, radius * 0.8, cx, cy, radius * 1.85);
-      atmosphere.addColorStop(0, rgb(p.color1, 0.0));
-      atmosphere.addColorStop(0.38, rgb(p.color1, 0.07));
-      atmosphere.addColorStop(1, rgb(p.color1, 0));
-      ctx.fillStyle = atmosphere;
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius * 1.85, 0, Math.PI * 2);
-      ctx.fill();
-
-      if (p.ring) {
-        ctx.save();
-        ctx.globalAlpha = 0.34;
-        ctx.strokeStyle = "rgba(255,226,170,0.55)";
-        ctx.lineWidth = Math.max(1, radius * 0.075);
-        ctx.beginPath();
-        ctx.ellipse(cx, cy + radius * 0.07, radius * 1.9, radius * 0.36, -0.08, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 0.18;
-        ctx.lineWidth = Math.max(1, radius * 0.045);
-        ctx.beginPath();
-        ctx.ellipse(cx, cy + radius * 0.07, radius * 2.25, radius * 0.43, -0.08, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      const grad = ctx.createRadialGradient(cx - radius * 0.42, cy - radius * 0.45, radius * 0.08, cx, cy, radius);
-      grad.addColorStop(0, rgb(p.color1, 1));
-      grad.addColorStop(0.52, rgb(p.color2, 1));
-      grad.addColorStop(1, rgb(shadeColor(p.color2, 0.45), 1));
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      drawPlanetTexture(cx, cy, radius, p);
-
-      const shade = ctx.createRadialGradient(cx - radius * 0.35, cy - radius * 0.35, radius * 0.1, cx + radius * 0.28, cy + radius * 0.38, radius * 1.05);
-      shade.addColorStop(0, "rgba(255,255,255,0.20)");
-      shade.addColorStop(0.42, "rgba(255,255,255,0.02)");
-      shade.addColorStop(1, "rgba(0,0,0,0.56)");
-      ctx.fillStyle = shade;
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.globalAlpha = 0.38;
-      ctx.strokeStyle = "rgba(255,255,255,0.7)";
-      ctx.lineWidth = Math.max(1, radius * 0.018);
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.ellipse(x + wave, yy, r * (0.90 - i * 0.028), r * 0.11, Math.sin(i + b.seed) * 0.12, 0, Math.PI * 2);
       ctx.stroke();
-
-      ctx.globalAlpha = 0.78;
-      ctx.fillStyle = "white";
-      ctx.font = `${Math.max(10, Math.min(14, radius * 0.18))}px system-ui`;
-      ctx.textAlign = "center";
-      ctx.fillText(p.name, cx, cy - radius * 1.45);
-
-      ctx.restore();
     }
 
-    function drawPlanets() {
-      const ordered = [...planets].sort((a, b) => {
-        const pa = projectWorld(a.x, a.y, 0);
-        const pb = projectWorld(b.x, b.y, 0);
-        return (pb?.z || 0) - (pa?.z || 0);
-      });
+    for (let i = 0; i < 8; i++) {
+      const a = i * 2.2 + b.seed;
+      const rr = r * (0.18 + ((i * 23) % 54) / 100);
+      ctx.globalAlpha = 0.09;
+      ctx.fillStyle = i % 2 ? "white" : "black";
+      ctx.beginPath();
+      ctx.ellipse(x + Math.cos(a) * rr * 0.7, y + Math.sin(a * 1.35) * rr * 0.5, r * (0.08 + i * 0.005), r * (0.03 + i * 0.003), a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
 
-      for (const p of ordered) drawPlanet(p);
+  function drawPlanet(b) {
+    const s = toScreen(b.x, b.y);
+    const r = b.r * camera.zoom;
+    const intersects = s.x + r > 0 && s.x - r < W && s.y + r > 0 && s.y - r < H;
+    if (!intersects) return;
+
+    const atm = ctx.createRadialGradient(s.x, s.y, Math.max(1, r * 0.45), s.x, s.y, Math.max(2, r * 1.9));
+    atm.addColorStop(0, rgb(b.a, 0.02));
+    atm.addColorStop(0.55, rgb(b.a, 0.10));
+    atm.addColorStop(1, rgb(b.a, 0));
+    ctx.fillStyle = atm;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, Math.max(1, r * 1.9), 0, Math.PI * 2);
+    ctx.fill();
+
+    const body = ctx.createRadialGradient(s.x - r * 0.40, s.y - r * 0.45, Math.max(1, r * 0.08), s.x, s.y, Math.max(1, r));
+    body.addColorStop(0, rgb(b.a, 1));
+    body.addColorStop(0.56, rgb(b.b, 1));
+    body.addColorStop(1, "rgba(20,20,30,.98)");
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, Math.max(1, r), 0, Math.PI * 2);
+    ctx.fill();
+
+    drawPlanetTexture(s.x, s.y, r, b);
+
+    const shade = ctx.createRadialGradient(s.x - r * 0.35, s.y - r * 0.40, Math.max(1, r * 0.10), s.x + r * 0.20, s.y + r * 0.28, Math.max(1, r * 1.05));
+    shade.addColorStop(0, "rgba(255,255,255,.18)");
+    shade.addColorStop(0.5, "rgba(255,255,255,.02)");
+    shade.addColorStop(1, "rgba(0,0,0,.55)");
+    ctx.fillStyle = shade;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, Math.max(1, r), 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255,255,255,.24)";
+    ctx.lineWidth = Math.max(0.4, r * 0.02);
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, Math.max(1, r), 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = b === targetBody ? "rgba(255,214,122,.22)" : "rgba(255,255,255,.08)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, Math.max(1, r * 2.45), 0, Math.PI * 2);
+    ctx.stroke();
+
+  }
+
+  function drawBodies() {
+    const ordered = [...bodies].sort((a, b) => (a.type === "sun" ? -1 : 0) - (b.type === "sun" ? -1 : 0));
+    for (const b of ordered) {
+      if (b.type === "sun") drawSun(b);
+      else drawPlanet(b);
+    }
+  }
+
+  function drawOffscreenIndicator(b) {
+    if (b.type === "sun") return;
+
+    const s = toScreen(b.x, b.y);
+    const r = Math.max(0.01, b.r * camera.zoom);
+    const diameter = r * 2;
+
+    // Absolute consistency: the edge line never exceeds the planet's apparent diameter.
+    const lineLen = diameter;
+    if (lineLen < 0.5) return;
+
+    // If the visible slice of the planet is already as large as the line, let the planet take over.
+    const intersects = s.x + r > 0 && s.x - r < W && s.y + r > 0 && s.y - r < H;
+    if (intersects) {
+      const visibleW = Math.max(0, Math.min(W, s.x + r) - Math.max(0, s.x - r));
+      const visibleH = Math.max(0, Math.min(H, s.y + r) - Math.max(0, s.y - r));
+      const visibleDiameter = Math.max(visibleW, visibleH);
+      if (visibleDiameter >= lineLen * 0.98) return;
     }
 
-    function drawShip() {
-      const noseHeight = 14;
-      const shipBase = projectWorld(ship.x, ship.y, 10);
-      if (!shipBase) return;
+    // If the full planet is already visible with a little air around it, no indicator.
+    const air = Math.max(1, r * 0.12);
+    const fullyInside = s.x - r - air > 0 && s.x + r + air < W && s.y - r - air > 0 && s.y + r + air < H;
+    if (fullyInside) return;
 
-      const px = shipBase.x;
-      const py = shipBase.y;
-      const scale = Math.max(0.45, Math.min(1.55, shipBase.scale * 1.65));
+    // Exact screen-space ray from ship center to planet center, intersecting the viewport border.
+    let dx = s.x - W / 2;
+    let dy = s.y - H / 2;
+    if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) return;
 
-      const rel = shortestAngleDelta(camera.angle, ship.angle);
-      const headingX = Math.sin(rel);
-      const headingY = -Math.cos(rel) * 0.72;
-      const sideX = Math.cos(rel);
-      const sideY = Math.sin(rel) * 0.18;
+    const halfW = W / 2 - 5;
+    const halfH = H / 2 - 5;
+    const t = Math.min(halfW / Math.max(0.0001, Math.abs(dx)), halfH / Math.max(0.0001, Math.abs(dy)));
+    const ex = W / 2 + dx * t;
+    const ey = H / 2 + dy * t;
 
-      const len = 34 * scale;
-      const wid = 16 * scale;
+    const onVerticalEdge = Math.abs(ex - W / 2) >= Math.abs(ey - H / 2);
+    const alpha = clamp(0.28 + Math.min(1, lineLen / 40) * 0.55, 0.18, 0.86);
+    const width = clamp(lineLen * 0.10, 0.65, 4.2);
+    const half = lineLen / 2;
 
-      const nose = { x: px + headingX * len, y: py + headingY * len };
-      const tail = { x: px - headingX * len * 0.72, y: py - headingY * len * 0.72 };
-      const left = { x: px - headingX * len * 0.18 - sideX * wid, y: py - headingY * len * 0.18 - sideY * wid };
-      const right = { x: px - headingX * len * 0.18 + sideX * wid, y: py - headingY * len * 0.18 + sideY * wid };
+    ctx.save();
+    ctx.lineWidth = width;
+    ctx.lineCap = "round";
+    ctx.shadowColor = rgb(b.a, alpha * 0.65);
+    ctx.shadowBlur = clamp(lineLen * 0.18, 0, 12);
 
-      if (ship.thrust > 0.015) {
-        const flameLen = (30 + ship.thrust * 62 + Math.sin(performance.now() * 0.04) * 6) * scale;
-        const backX = -headingX;
-        const backY = -headingY;
-        const flameTip = { x: tail.x + backX * flameLen, y: tail.y + backY * flameLen };
+    if (onVerticalEdge) {
+      const x = ex < W / 2 ? 5 : W - 5;
+      const y = clamp(ey, half + 8, H - half - 8);
 
-        const grad = ctx.createLinearGradient(tail.x, tail.y, flameTip.x, flameTip.y);
-        grad.addColorStop(0, `rgba(255,255,255,${0.38 + ship.thrust * 0.5})`);
-        grad.addColorStop(0.28, `rgba(255,198,87,${0.24 + ship.thrust * 0.55})`);
-        grad.addColorStop(1, "rgba(255,80,20,0.02)");
+      const grad = ctx.createLinearGradient(x, y - half, x, y + half);
+      grad.addColorStop(0, rgb(b.a, 0));
+      grad.addColorStop(0.20, rgb(b.a, alpha));
+      grad.addColorStop(0.80, rgb(b.a, alpha));
+      grad.addColorStop(1, rgb(b.a, 0));
+      ctx.strokeStyle = grad;
 
-        ctx.save();
-        ctx.globalCompositeOperation = "lighter";
-        ctx.fillStyle = grad;
-        ctx.shadowColor = "rgba(255,132,38,0.75)";
-        ctx.shadowBlur = 18;
-        ctx.beginPath();
-        ctx.moveTo(tail.x - sideX * wid * 0.45, tail.y - sideY * wid * 0.45);
-        ctx.lineTo(flameTip.x, flameTip.y);
-        ctx.lineTo(tail.x + sideX * wid * 0.45, tail.y + sideY * wid * 0.45);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-      }
+      ctx.beginPath();
+      ctx.moveTo(x, y - half);
+      ctx.lineTo(x, y + half);
+      ctx.stroke();
+    } else {
+      const y = ey < H / 2 ? 5 : H - 5;
+      const x = clamp(ex, half + 8, W - half - 8);
 
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.65)";
+      const grad = ctx.createLinearGradient(x - half, y, x + half, y);
+      grad.addColorStop(0, rgb(b.a, 0));
+      grad.addColorStop(0.20, rgb(b.a, alpha));
+      grad.addColorStop(0.80, rgb(b.a, alpha));
+      grad.addColorStop(1, rgb(b.a, 0));
+      ctx.strokeStyle = grad;
+
+      ctx.beginPath();
+      ctx.moveTo(x - half, y);
+      ctx.lineTo(x + half, y);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  function drawOffscreenIndicators() {
+    for (const b of bodies) drawOffscreenIndicator(b);
+  }
+
+  function drawParticles() {
+    for (const p of particles) {
+      const s = toScreen(p.x, p.y);
+      const r = Math.max(0.45, p.r * camera.zoom);
+      ctx.fillStyle = `rgba(${p.color},${Math.max(0, p.life * 2.2)})`;
+      ctx.shadowColor = `rgba(${p.color},.78)`;
       ctx.shadowBlur = 10;
-      ctx.fillStyle = "#dfefff";
-      ctx.strokeStyle = "rgba(0,0,0,0.6)";
-      ctx.lineWidth = 1.2;
-
       ctx.beginPath();
-      ctx.moveTo(nose.x, nose.y);
-      ctx.lineTo(left.x, left.y);
-      ctx.lineTo(tail.x, tail.y);
-      ctx.lineTo(right.x, right.y);
+      ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  function drawShip() {
+    const x = W / 2;
+    const y = H / 2;
+    const size = 20;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(ship.angle);
+
+    if (ship.thrust > 0.008) {
+      const thrustVisual = Math.max(0.12, ship.thrust * ship.thrust);
+      const flameLen = 16 + thrustVisual * 40 + Math.sin(performance.now() * 0.035) * 4;
+      const grad = ctx.createLinearGradient(-size * 0.80, 0, -size - flameLen, 0);
+      grad.addColorStop(0, `rgba(255,255,255,${0.40 + thrustVisual * 0.42})`);
+      grad.addColorStop(0.35, `rgba(255,190,82,${0.20 + thrustVisual * 0.58})`);
+      grad.addColorStop(1, "rgba(255,78,24,.02)");
+      ctx.fillStyle = grad;
+      ctx.shadowColor = "rgba(255,120,52,.88)";
+      ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.82, -4.2);
+      ctx.lineTo(-size - flameLen, 0);
+      ctx.lineTo(-size * 0.82, 4.2);
       ctx.closePath();
       ctx.fill();
-      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
 
-      const bodyGrad = ctx.createLinearGradient(nose.x, nose.y, tail.x, tail.y);
-      bodyGrad.addColorStop(0, "rgba(255,255,255,0.65)");
-      bodyGrad.addColorStop(0.48, "rgba(117,178,230,0.18)");
-      bodyGrad.addColorStop(1, "rgba(0,0,0,0.20)");
-      ctx.fillStyle = bodyGrad;
+    const turnVis = Math.abs(ship.turnInput);
+    if (turnVis > 0.05) {
+      const side = Math.sign(ship.turnInput) < 0 ? 1 : -1;
+      const rcsLen = 7 + turnVis * 10 + Math.sin(performance.now() * 0.06) * 2;
+      ctx.fillStyle = `rgba(170,235,255,${0.28 + turnVis * 0.40})`;
+      ctx.shadowColor = "rgba(170,235,255,.85)";
+      ctx.shadowBlur = 12;
       ctx.beginPath();
-      ctx.moveTo(nose.x, nose.y);
-      ctx.lineTo(left.x, left.y);
-      ctx.lineTo(tail.x, tail.y);
-      ctx.lineTo(right.x, right.y);
+      ctx.moveTo(-4, side * 11);
+      ctx.lineTo(-4 - rcsLen, side * 14);
+      ctx.lineTo(-1, side * 7);
       ctx.closePath();
       ctx.fill();
-
-      ctx.fillStyle = "rgba(95,230,255,0.95)";
-      ctx.shadowColor = "rgba(95,230,255,0.8)";
-      ctx.shadowBlur = 8;
-      ctx.beginPath();
-      ctx.ellipse(
-        px + headingX * len * 0.22,
-        py + headingY * len * 0.22,
-        Math.max(2.3, 4.2 * scale),
-        Math.max(1.6, 2.6 * scale),
-        rel,
-        0,
-        Math.PI * 2
-      );
-      ctx.fill();
-
-      ctx.restore();
+      ctx.shadowBlur = 0;
     }
 
-    function drawAttitudeGhost() {
-      const speed = Math.hypot(ship.vx, ship.vy);
-      if (speed < 4) return;
+    ctx.shadowColor = "rgba(100,225,255,.30)";
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = "#f3fbff";
+    ctx.strokeStyle = "rgba(6,14,28,.70)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(size, 0);
+    ctx.lineTo(5, -7);
+    ctx.lineTo(-5, -6);
+    ctx.lineTo(-15, -13);
+    ctx.lineTo(-10, -3);
+    ctx.lineTo(-18, 0);
+    ctx.lineTo(-10, 3);
+    ctx.lineTo(-15, 13);
+    ctx.lineTo(-5, 6);
+    ctx.lineTo(5, 7);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
 
-      const vx = ship.vx / speed;
-      const vy = ship.vy / speed;
-      const pro = projectWorld(ship.x + vx * 330, ship.y + vy * 330, 4);
-      const retro = projectWorld(ship.x - vx * 330, ship.y - vy * 330, 4);
+    const grad = ctx.createLinearGradient(size, 0, -18, 0);
+    grad.addColorStop(0, "rgba(255,255,255,.90)");
+    grad.addColorStop(0.48, "rgba(140,205,240,.40)");
+    grad.addColorStop(1, "rgba(20,40,70,.20)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(size, 0);
+    ctx.lineTo(5, -7);
+    ctx.lineTo(-5, -6);
+    ctx.lineTo(-15, -13);
+    ctx.lineTo(-10, -3);
+    ctx.lineTo(-18, 0);
+    ctx.lineTo(-10, 3);
+    ctx.lineTo(-15, 13);
+    ctx.lineTo(-5, 6);
+    ctx.lineTo(5, 7);
+    ctx.closePath();
+    ctx.fill();
 
-      ctx.save();
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([7, 9]);
+    ctx.shadowColor = "rgba(90,232,255,.95)";
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = "rgba(90,232,255,.95)";
+    ctx.beginPath();
+    ctx.ellipse(5.5, 0, 4.6, 2.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
 
-      if (pro) {
-        ctx.strokeStyle = "rgba(95,230,255,0.34)";
-        ctx.beginPath();
-        ctx.arc(pro.x, pro.y, 9, 0, Math.PI * 2);
-        ctx.stroke();
-      }
+    ctx.strokeStyle = "rgba(120,235,255,.80)";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(-18, -2.4);
+    ctx.lineTo(-18, 2.4);
+    ctx.stroke();
 
-      if (retro) {
-        ctx.strokeStyle = "rgba(255,154,64,0.34)";
-        ctx.beginPath();
-        ctx.arc(retro.x, retro.y, 9, 0, Math.PI * 2);
-        ctx.stroke();
-      }
+    ctx.strokeStyle = "rgba(255,255,255,.13)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, 25.5, 0, Math.PI * 2);
+    ctx.stroke();
 
-      ctx.restore();
-    }
+    ctx.restore();
+  }
 
-    function render() {
-      ctx.clearRect(0, 0, W, H);
+  function drawFuel() {
+    const x = 18;
+    const y = H - 86;
+    const w = 160;
+    const h = 12;
 
-      drawBackground();
-      drawGrid();
-      drawTrajectory();
-      drawPlanets();
-      drawAttitudeGhost();
-      drawShip();
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,.34)";
+    ctx.strokeStyle = "rgba(255,255,255,.16)";
+    ctx.lineWidth = 1;
+    roundRect(x, y, w, h, 8, true, true);
 
-      const speed = Math.hypot(ship.vx, ship.vy);
-      readout.innerHTML = `v ${speed.toFixed(1)}<br>throttle ${(ship.thrust * 100).toFixed(0)}%<br>${input.burnIds.size ? "burning" : "coasting"}`;
-      burnVisual.style.opacity = `${0.58 + ship.thrust * 0.42}`;
-    }
+    const fill = (w - 2) * ship.fuel;
+    const g = ctx.createLinearGradient(x, y, x + w, y);
+    g.addColorStop(0, ship.fuel < 0.2 ? "rgba(255,120,120,.95)" : "rgba(126,235,255,.95)");
+    g.addColorStop(1, ship.fuel < 0.2 ? "rgba(255,178,115,.95)" : "rgba(135,255,184,.95)");
+    ctx.fillStyle = g;
+    roundRect(x + 1, y + 1, fill, h - 2, 7, true, false);
 
-    function loop(now) {
-      const dt = Math.min(0.033, (now - last) / 1000);
-      last = now;
-      update(dt);
-      render();
-      startInStableOrbit();
+    ctx.fillStyle = "rgba(255,255,255,.84)";
+    ctx.font = "11px system-ui";
+    ctx.fillText("burn capacitor", x, y - 8);
+    ctx.restore();
+  }
+
+  function roundRect(x, y, w, h, r, fill, stroke) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+    if (fill) ctx.fill();
+    if (stroke) ctx.stroke();
+  }
+
+  function drawFlash() {
+    if (flashTimer <= 0) return;
+    ctx.fillStyle = `rgba(255,190,140,${flashTimer * 1.5})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    drawBackground();
+    drawGrid();
+    drawTrajectory();
+    drawOffscreenIndicators();
+    drawBodies();
+    drawParticles();
+    drawShip();
+    drawFuel();
+    drawFlash();
+
+    const speed = Math.hypot(ship.vx, ship.vy);
+    const state = crashTimer > 0 ? "crashed" : (prediction.stableBody ? `stable ${prediction.stableBody.name}` : "coasting");
+    readout.innerHTML =
+      `v ${speed.toFixed(1)}<br>` +
+      `fuel ${(ship.fuel * 100).toFixed(0)}%<br>` +
+      `target ${targetBody ? targetBody.name : "—"}<br>` +
+      `seed ${systemSeed}<br>` +
+      `state ${state}`;
+  }
+
+  function loop(now) {
+    const dt = Math.min(0.033, (now - last) / 1000);
+    last = now;
+    update(dt);
+    render();
     requestAnimationFrame(loop);
-    }
+  }
 
-    requestAnimationFrame(loop);
-  </script>
+  canvas.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+    canvas.setPointerCapture(e.pointerId);
+    addPointer(e.pointerId, regionForPointer(e.clientX, e.clientY));
+  });
+
+  canvas.addEventListener("pointerup", e => {
+    e.preventDefault();
+    clearPointer(e.pointerId);
+  });
+
+  canvas.addEventListener("pointercancel", e => {
+    e.preventDefault();
+    clearPointer(e.pointerId);
+  });
+
+  canvas.addEventListener("pointermove", e => {
+    e.preventDefault();
+    clearPointer(e.pointerId);
+    addPointer(e.pointerId, regionForPointer(e.clientX, e.clientY));
+  });
+
+  window.addEventListener("keydown", e => {
+    if (e.key === "ArrowLeft") input.leftIds.add("k");
+    if (e.key === "ArrowRight") input.rightIds.add("k");
+    if (e.key === "ArrowUp" || e.key === " ") input.burnIds.add("k");
+    updateTouchVisuals();
+  });
+
+  window.addEventListener("keyup", e => {
+    if (e.key === "ArrowLeft") input.leftIds.delete("k");
+    if (e.key === "ArrowRight") input.rightIds.delete("k");
+    if (e.key === "ArrowUp" || e.key === " ") input.burnIds.delete("k");
+    updateTouchVisuals();
+  });
+
+  audioBtn.addEventListener("click", toggleAudio);
+  resetBtn.addEventListener("click", () => {
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+    reset();
+  });
+  newSystemBtn.addEventListener("click", () => {
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+    newSystem();
+  });
+
+  window.addEventListener("resize", resize);
+  resize();
+  planetDefs = generateSystem(systemSeed, systemAttempt);
+  updateBodies();
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
 </body>
 </html>
