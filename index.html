@@ -145,10 +145,38 @@ function enemyAttackOpportunity(e){
   return angleScore*.74+rangeScore*.26;
 }
 function enemyCanShootPlayer(e){let dx=ship.x-e.x,dy=ship.y-e.y,d=Math.hypot(dx,dy);if(d>enemyWeapon.range||d<1)return false;let fx=Math.cos(e.angle),fy=Math.sin(e.angle),a=Math.acos(clamp((dx/d)*fx+(dy/d)*fy,-1,1));return a<=enemyWeapon.cone}
-function aiPlayerForward(){
+function aiPlayerVelocityDir(){
   const sp=Math.hypot(ship.vx,ship.vy);
   if(sp>10)return{x:ship.vx/sp,y:ship.vy/sp};
   return{x:Math.cos(ship.angle),y:Math.sin(ship.angle)};
+}
+
+function aiPlayerFacingDir(){
+  return{x:Math.cos(ship.angle),y:Math.sin(ship.angle)};
+}
+
+function aiBlendDir(a,b,t){
+  const x=a.x*(1-t)+b.x*t;
+  const y=a.y*(1-t)+b.y*t;
+  const l=Math.hypot(x,y)+.0001;
+  return{x:x/l,y:y/l};
+}
+
+function aiPlayerForwardForEnemy(e){
+  // Far away, use orbital velocity. If the player is aiming at the enemy, use facing direction more.
+  const v=aiPlayerVelocityDir();
+  const f=aiPlayerFacingDir();
+
+  const dx=e.x-ship.x,dy=e.y-ship.y,d=Math.hypot(dx,dy)+.0001;
+  const facingDot=(dx/d)*f.x+(dy/d)*f.y;
+  const facingThreat=clamp((facingDot-.12)/.88,0,1);
+  const close=clamp(1-d/1700,0,1);
+
+  return aiBlendDir(v,f,clamp(facingThreat*.85+close*.35,0,1));
+}
+
+function aiPlayerForward(){
+  return aiPlayerVelocityDir();
 }
 
 function aiShotScore(e){
@@ -169,24 +197,62 @@ function aiPlayerThreat(e){
   return clamp(1-a/cone,0,1)*.75+clamp(1-d/(weapon.range*1.45),0,1)*.25;
 }
 
+function aiKillzoneScore(e){
+  const dx=e.x-ship.x,dy=e.y-ship.y,d=Math.hypot(dx,dy)+.0001;
+  const f=aiPlayerFacingDir();
+  const a=Math.acos(clamp((dx/d)*f.x+(dy/d)*f.y,-1,1));
+  const cone=weapon.cone*3.15;
+  if(a>cone||d>weapon.range*1.52)return 0;
+  return clamp(1-a/cone,0,1)*.78+clamp(1-d/(weapon.range*1.52),0,1)*.22;
+}
+
+function aiPlayerTurningTowardEnemy(e){
+  const dx=e.x-ship.x,dy=e.y-ship.y;
+  const target=Math.atan2(dy,dx);
+  const nowErr=Math.abs(sd(ship.angle,target));
+  const futureErr=Math.abs(sd(ship.angle+ship.angularVelocity*.55,target));
+  return clamp((nowErr-futureErr)/.55,0,1);
+}
+
+function aiTacticalMode(e,shot,killzone){
+  const turning=aiPlayerTurningTowardEnemy(e);
+  const hpRatio=e.hp/e.maxHp;
+  if(shot>.50 && hpRatio>.35)return "commit";
+  if(killzone>.45 || turning>.35)return "avoid_killzone";
+  return "orbit";
+}
+
 function aiDesiredPoint(e){
   const d=Math.hypot(ship.x-e.x,ship.y-e.y);
+  const shot=aiShotScore(e);
+  const killzone=aiKillzoneScore(e);
+  const mode=aiTacticalMode(e,shot,killzone);
+
   const lead=clamp(d/780,.35,2.8);
-  const f=aiPlayerForward();
+  const f=aiPlayerForwardForEnemy(e);
   const side=e.side||1;
   const sideX=-f.y,sideY=f.x;
 
   const futureX=ship.x+ship.vx*lead;
   const futureY=ship.y+ship.vy*lead;
 
-  // Far away: enter the fight. Near: maintain a rear/lateral combat orbit.
-  const behind=d>1800?390:690;
-  const lateral=d>1800?110:260;
+  let behind=d>1800?390:720;
+  let lateral=d>1800?120:300;
+
+  if(mode==="avoid_killzone"){
+    // Strong lateral/rear reposition. Do not continue through the player's nose.
+    behind=820;
+    lateral=520;
+  }else if(mode==="commit"){
+    // Accept the trade, but still bias slightly to the side, not pure head-on.
+    behind=520;
+    lateral=190;
+  }
 
   return{
     x:futureX-f.x*behind+sideX*lateral*side,
     y:futureY-f.y*behind+sideY*lateral*side,
-    lead,behind,lateral
+    lead,behind,lateral,mode,killzone,shot
   };
 }
 
@@ -270,12 +336,15 @@ function updateEnemies(dt){
     const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
     const threat=aiPlayerThreat(e);
     const shot=aiShotScore(e);
+    const killzone=aiKillzoneScore(e);
+    const turning=aiPlayerTurningTowardEnemy(e);
 
     if(e.thinkTimer<=0){
       e.thinkTimer=.25;
 
-      // Proactive defense: change the desired combat-orbit side, do not flee.
-      if(threat>.55&&shot<.42)e.side*=-1;
+      // If the player is bringing the nose onto the enemy and the enemy has no shot,
+      // flip the combat-orbit side before entering the cone.
+      if((killzone>.34||turning>.36||threat>.55) && shot<.46)e.side*=-1;
 
       // If far for too long, change approach geometry.
       if(dPlayer>1700&&e.lastAttack>5.0)e.side*=-1;
@@ -288,23 +357,29 @@ function updateEnemies(dt){
 
     // PD controller: position error pulls, relative velocity damps.
     const far=clamp((dPlayer-900)/1800,0,1);
-    const kp=.050+far*.022;
-    const kd=.58+(1-far)*.34;
+    let kp=.050+far*.022;
+    let kd=.58+(1-far)*.34;
+
+    // In killzone avoidance, prioritize lateral displacement and damping.
+    if(target.mode==="avoid_killzone"){
+      kp*=1.18;
+      kd*=1.08;
+    }
 
     let ax=errX*kp-relVX*kd;
     let ay=errY*kp-relVY*kd;
 
     if(dPlayer<420){
       const dx=e.x-ship.x,dy=e.y-ship.y,d=Math.hypot(dx,dy)+.0001;
-      ax+=(-dy/d)*(e.side||1)*85+(dx/d)*35;
-      ay+=( dx/d)*(e.side||1)*85+(dy/d)*35;
+      ax+=(-dy/d)*(e.side||1)*95+(dx/d)*30;
+      ay+=( dx/d)*(e.side||1)*95+(dy/d)*30;
       e.aiState='separate';
+    }else if(target.mode==="commit"){
+      e.aiState='commit';
+    }else if(target.mode==="avoid_killzone"){
+      e.aiState='killzone_avoid';
     }else if(dPlayer>1250){
       e.aiState='rendezvous';
-    }else if(threat>.55&&shot<.42){
-      e.aiState='side_switch';
-    }else if(shot>.45){
-      e.aiState='commit';
     }else{
       e.aiState='combat_orbit';
     }
@@ -320,7 +395,7 @@ function updateEnemies(dt){
       ay+=(-e.y/sysR)*70;
     }
 
-    const maxAccel=shot>.45?152:142;
+    const maxAccel=target.mode==="avoid_killzone"?158:(shot>.45?152:142);
     const mag=Math.hypot(ax,ay);
     if(mag>maxAccel){
       ax=ax/mag*maxAccel;
@@ -347,7 +422,7 @@ function updateEnemies(dt){
     e.hitFlash=Math.max(0,e.hitFlash-dt);
     e.hpVisible=Math.max(0,e.hpVisible-dt);
 
-    const desiredAim=(dPlayer<enemyWeapon.range*1.35||shot>.25)
+    const desiredAim=(dPlayer<enemyWeapon.range*1.35||shot>.25||target.mode==="commit")
       ? Math.atan2((ship.y+ship.vy*.20)-e.y,(ship.x+ship.vx*.20)-e.x)
       : Math.atan2(ay,ax);
 
@@ -365,7 +440,7 @@ function updateEnemies(dt){
 
     if(e.weaponCooldown<=0&&aiCanShoot(e))aiEnemyFire(e);
 
-    aiDebugData.push({enemy:e,target,ax,ay,threat,shot,state:e.aiState});
+    aiDebugData.push({enemy:e,target,ax,ay,threat,shot,killzone,state:e.aiState});
   }
 }
 function updateCombat(dt){weaponCooldown=Math.max(0,weaponCooldown-dt);for(let i=beams.length-1;i>=0;i--){beams[i].life-=dt;if(beams[i].life<=0)beams.splice(i,1)}for(let i=enemyBeams.length-1;i>=0;i--){enemyBeams[i].life-=dt;if(enemyBeams[i].life<=0)enemyBeams.splice(i,1)}let tar=findWeaponTarget();if(tar)tar.hpVisible=Math.max(tar.hpVisible,.35);if(tar&&weaponCooldown<=0){weaponCooldown=weapon.cooldown;tar.hp-=weapon.damage;tar.hitFlash=.16;tar.hpVisible=2.5;beams.push({x1:ship.x+Math.cos(ship.angle)*22,y1:ship.y+Math.sin(ship.angle)*22,x2:tar.x,y2:tar.y,life:.115,maxLife:.115});if(tar.hp<=0){tar.alive=false;spawnParticle(tar.x,tar.y,80,'255,130,70')}}}
