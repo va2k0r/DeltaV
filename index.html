@@ -229,7 +229,7 @@
     x: 0,
     y: 0,
     r: 175,
-    mass: 2100000,
+    mass: 900000,
     a: [255, 232, 165],
     b: [255, 125, 44],
     seed: 7.4
@@ -317,7 +317,7 @@
     }
 
     defs[0].angle0 = rr(rng, 0.15, 0.95);
-    defs[0].orbitR = rr(rng, 680, 850);
+    defs[0].orbitR = rr(rng, 1450, 1850);
     defs[0].r = clamp(defs[0].r, 72, 105);
     defs[0].mass = Math.round(defs[0].r * defs[0].r * rr(rng, 62, 78));
     return defs;
@@ -429,52 +429,76 @@
     return bodies.find(b => b.id === id);
   }
 
+  function selectSpawnPlanet() {
+    let best = null;
+    let bestScore = -Infinity;
+
+    for (const b of bodies) {
+      if (b.type === "sun") continue;
+
+      const orbitD = Math.hypot(b.x, b.y);
+      const localOrbitR = b.r * 3.75;
+      const planetG = b.mass / (localOrbitR * localOrbitR);
+      const sunG = sun.mass / Math.max(1, orbitD * orbitD);
+      const dominance = planetG / Math.max(0.0001, sunG);
+
+      // Prefer planets where a low orbit is actually dominated by that planet.
+      const score = dominance + b.r * 0.015 + orbitD * 0.0015;
+      if (score > bestScore) {
+        bestScore = score;
+        best = b;
+      }
+    }
+
+    return best || bodies.find(b => b.type !== "sun") || bodies[1];
+  }
+
   function reset() {
     updateBodies();
-    const p = bodies.find(b => b.type !== "sun") || bodies[1];
+    const p = selectSpawnPlanet();
 
-    const angle = p.angle + Math.PI * 0.72;
-    const d = p.r * 4.35;
-    const x = p.x + Math.cos(angle) * d;
-    const y = p.y + Math.sin(angle) * d;
-    const nx = (x - p.x) / d;
-    const ny = (y - p.y) / d;
-    const tx = -ny;
-    const ty = nx;
-    const circ = Math.sqrt(p.mass / d);
+    // Start in a clean circular orbit around the selected planet.
+    // This avoids beginning near the sun or on an impact trajectory.
+    const orbitRadius = p.r * 3.75;
+    let spawnAngle = p.angle + Math.PI * 0.72;
+    const circ = Math.sqrt(p.mass / orbitRadius);
 
-    ship.x = x;
-    ship.y = y;
-    ship.vx = tx * circ;
-    ship.vy = ty * circ;
-    ship.angle = Math.atan2(ship.vy, ship.vx);
+    function applySpawn(a) {
+      ship.x = p.x + Math.cos(a) * orbitRadius;
+      ship.y = p.y + Math.sin(a) * orbitRadius;
+      const nx = (ship.x - p.x) / orbitRadius;
+      const ny = (ship.y - p.y) / orbitRadius;
+      ship.vx = -ny * circ;
+      ship.vy = nx * circ;
+      ship.angle = Math.atan2(ship.vy, ship.vx);
+    }
+
+    applySpawn(spawnAngle);
+
+    // Rotate the starting point if anything is too close or if the predicted path impacts immediately.
+    for (let attempt = 0; attempt < 36; attempt++) {
+      let safe = true;
+
+      for (const b of bodies) {
+        const minD = b.r + ship.radius + 120;
+        if (Math.hypot(ship.x - b.x, ship.y - b.y) < minD) {
+          safe = false;
+          break;
+        }
+      }
+
+      if (safe) break;
+
+      spawnAngle = p.angle + Math.PI * 0.72 + attempt * Math.PI * 0.23;
+      applySpawn(spawnAngle);
+    }
+
     ship.turnInput = 0;
     ship.angularVelocity = 0;
     ship.thrust = 0;
     ship.thrustTarget = 0;
     ship.fuel = 1;
     ship.burnSounding = false;
-
-    for (let attempt = 0; attempt < 24; attempt++) {
-      let safe = true;
-      for (const b of bodies) {
-        const minD = b.r + ship.radius + 95;
-        if (Math.hypot(ship.x - b.x, ship.y - b.y) < minD) {
-          safe = false;
-          break;
-        }
-      }
-      if (safe) break;
-
-      const a = p.angle + Math.PI * 0.72 + attempt * Math.PI * 0.29;
-      ship.x = p.x + Math.cos(a) * d;
-      ship.y = p.y + Math.sin(a) * d;
-      const nnx = (ship.x - p.x) / d;
-      const nny = (ship.y - p.y) / d;
-      ship.vx = -nny * circ;
-      ship.vy = nnx * circ;
-      ship.angle = Math.atan2(ship.vy, ship.vx);
-    }
 
     crashTimer = 0;
     flashTimer = 0;
