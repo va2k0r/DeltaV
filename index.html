@@ -229,7 +229,7 @@
     x: 0,
     y: 0,
     r: 175,
-    mass: 900000,
+    mass: 180000,
     a: [255, 232, 165],
     b: [255, 125, 44],
     seed: 7.4
@@ -317,9 +317,9 @@
     }
 
     defs[0].angle0 = rr(rng, 0.15, 0.95);
-    defs[0].orbitR = rr(rng, 1450, 1850);
-    defs[0].r = clamp(defs[0].r, 72, 105);
-    defs[0].mass = Math.round(defs[0].r * defs[0].r * rr(rng, 62, 78));
+    defs[0].orbitR = rr(rng, 2200, 2800);
+    defs[0].r = clamp(defs[0].r, 86, 120);
+    defs[0].mass = Math.round(defs[0].r * defs[0].r * rr(rng, 260, 340));
     return defs;
   }
 
@@ -430,67 +430,54 @@
   }
 
   function selectSpawnPlanet() {
-    let best = null;
-    let bestScore = -Infinity;
-
-    for (const b of bodies) {
-      if (b.type === "sun") continue;
-
-      const orbitD = Math.hypot(b.x, b.y);
-      const localOrbitR = b.r * 3.75;
-      const planetG = b.mass / (localOrbitR * localOrbitR);
-      const sunG = sun.mass / Math.max(1, orbitD * orbitD);
-      const dominance = planetG / Math.max(0.0001, sunG);
-
-      // Prefer planets where a low orbit is actually dominated by that planet.
-      const score = dominance + b.r * 0.015 + orbitD * 0.0015;
-      if (score > bestScore) {
-        bestScore = score;
-        best = b;
-      }
-    }
-
-    return best || bodies.find(b => b.type !== "sun") || bodies[1];
+    // For now the game must always begin in a clearly readable planet orbit.
+    // Use the guaranteed starter planet generated as p0 / Aster.
+    return bodies.find(b => b.id === "p0") || bodies.find(b => b.name === "Aster") || bodies.find(b => b.type !== "sun") || bodies[1];
   }
 
   function reset() {
     updateBodies();
     const p = selectSpawnPlanet();
 
-    // Start in a clean circular orbit around the selected planet.
-    // This avoids beginning near the sun or on an impact trajectory.
-    const orbitRadius = p.r * 3.75;
-    let spawnAngle = p.angle + Math.PI * 0.72;
-    const circ = Math.sqrt(p.mass / orbitRadius);
+    // Tight, planet-dominated circular orbit.
+    // Tight enough that the star cannot visually or physically steal the initial path,
+    // but still comfortably outside the collision radius.
+    const orbitRadius = Math.max(p.r * 2.55, p.r + ship.radius + 120);
+    let spawnAngle = Math.atan2(p.y, p.x) + Math.PI * 0.5;
 
-    function applySpawn(a) {
-      ship.x = p.x + Math.cos(a) * orbitRadius;
-      ship.y = p.y + Math.sin(a) * orbitRadius;
-      const nx = (ship.x - p.x) / orbitRadius;
-      const ny = (ship.y - p.y) / orbitRadius;
-      ship.vx = -ny * circ;
-      ship.vy = nx * circ;
+    function placeAt(a) {
+      const nx = Math.cos(a);
+      const ny = Math.sin(a);
+      const tx = -ny;
+      const ty = nx;
+
+      ship.x = p.x + nx * orbitRadius;
+      ship.y = p.y + ny * orbitRadius;
+
+      const circ = Math.sqrt(p.mass / orbitRadius);
+      ship.vx = tx * circ;
+      ship.vy = ty * circ;
       ship.angle = Math.atan2(ship.vy, ship.vx);
     }
 
-    applySpawn(spawnAngle);
+    placeAt(spawnAngle);
 
-    // Rotate the starting point if anything is too close or if the predicted path impacts immediately.
-    for (let attempt = 0; attempt < 36; attempt++) {
+    // Rotate if the spawn point is obstructed by any other body.
+    for (let attempt = 0; attempt < 64; attempt++) {
       let safe = true;
-
       for (const b of bodies) {
-        const minD = b.r + ship.radius + 120;
+        const minD = b.r + ship.radius + 80;
         if (Math.hypot(ship.x - b.x, ship.y - b.y) < minD) {
           safe = false;
           break;
         }
       }
 
-      if (safe) break;
+      const farFromSun = Math.hypot(ship.x - sun.x, ship.y - sun.y) > sun.r + 650;
+      if (safe && farFromSun) break;
 
-      spawnAngle = p.angle + Math.PI * 0.72 + attempt * Math.PI * 0.23;
-      applySpawn(spawnAngle);
+      spawnAngle += Math.PI * 0.173;
+      placeAt(spawnAngle);
     }
 
     ship.turnInput = 0;
@@ -505,13 +492,14 @@
     particles = [];
     camera.x = ship.x;
     camera.y = ship.y;
-    camera.zoom = 0.48;
-    camera.targetZoom = 0.48;
-    camera.desiredZoom = 0.48;
+    camera.zoom = 0.62;
+    camera.targetZoom = 0.62;
+    camera.desiredZoom = 0.62;
     camera.zoomVel = 0;
     camera.zoomHold = 0;
+
     prediction = analyzePrediction();
-    chooseTarget();
+    targetBody = p;
     updateTouchVisuals();
   }
 
@@ -579,13 +567,17 @@
     const scores = new Map();
     const closest = new Map();
     const step = 0.085;
-    const steps = 720;
+    const steps = 520;
     let stableBody = null;
 
     let dominantId = null;
     let dominantSwitches = 0;
     let severeTurns = 0;
     let prevVelAng = Math.atan2(vy, vx);
+
+    let orbitTrackId = null;
+    let orbitTrackLastAng = 0;
+    let orbitTrackAccum = 0;
 
     for (let i = 0; i < steps; i++) {
       const futureBodies = bodies;
@@ -633,6 +625,23 @@
       if (frameDominant && frameDominant !== dominantId) {
         if (dominantId !== null && i > 24) dominantSwitches++;
         dominantId = frameDominant;
+      }
+
+      // If the prediction is looping around one planet, show only about 1–1.5 revolutions.
+      if (frameDominant) {
+        const ref = futureBodies.find(b => b.id === frameDominant);
+        if (ref) {
+          const a = Math.atan2(y - ref.y, x - ref.x);
+          if (orbitTrackId !== frameDominant) {
+            orbitTrackId = frameDominant;
+            orbitTrackLastAng = a;
+            orbitTrackAccum = 0;
+          } else {
+            orbitTrackAccum += shortDelta(orbitTrackLastAng, a);
+            orbitTrackLastAng = a;
+            if (Math.abs(orbitTrackAccum) > Math.PI * 2 * 1.35 && pts.length > 90) break;
+          }
+        }
       }
 
       const velAng = Math.atan2(vy, vx);
