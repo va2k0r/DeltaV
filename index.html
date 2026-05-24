@@ -14,138 +14,175 @@ canvas{display:block;width:100vw;height:100dvh;background:radial-gradient(circle
 .hint{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 134px);transform:translateX(-50%);width:min(94vw,700px);color:rgba(238,246,255,.70);text-align:center;font-size:12px;line-height:1.32;pointer-events:none;z-index:10;text-shadow:0 1px 5px rgba(0,0,0,.55)}
 .turnZone{position:fixed;top:0;bottom:0;width:35vw;opacity:0;background:rgba(255,255,255,.023);pointer-events:none;z-index:7;transition:opacity 120ms}.turnZone.left{left:0;border-right:1px solid rgba(255,255,255,.035)}.turnZone.right{right:0;border-left:1px solid rgba(255,255,255,.035)}.turnZone.show{opacity:1}
 .burnButton{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);transform:translateX(-50%);width:108px;height:108px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:radial-gradient(circle at 50% 35%,rgba(255,255,255,.18),rgba(255,255,255,.04) 66%),radial-gradient(circle at 50% 50%,rgba(255,145,62,.13),rgba(255,145,62,.02));box-shadow:0 18px 52px rgba(0,0,0,.38),inset 0 0 22px rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-weight:850;letter-spacing:.12em;color:rgba(255,255,255,.9);pointer-events:none;z-index:9}.burnButton.active{background:radial-gradient(circle at 50% 35%,rgba(255,235,185,.52),rgba(255,130,55,.14) 66%),radial-gradient(circle at 50% 50%,rgba(255,118,42,.22),rgba(255,118,42,.03))}
-.actions{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);z-index:11;display:flex;flex-direction:column;gap:8px}.hudBtn{pointer-events:auto;border:1px solid rgba(255,255,255,.16);background:rgba(8,14,28,.74);color:white;border-radius:12px;padding:10px 12px;min-width:80px;font-size:12px;backdrop-filter:blur(10px);box-shadow:0 10px 24px rgba(0,0,0,.28)}
+.actions{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);z-index:11;display:flex;flex-direction:column;gap:8px}.hudBtn{pointer-events:auto;border:1px solid rgba(255,255,255,.16);background:rgba(8,14,28,.74);color:white;border-radius:12px;padding:10px 12px;min-width:80px;font-size:12px;backdrop-filter:blur(10px);box-shadow:0 10px 24px rgba(0,0,0,.28)}.hudBtn.active{background:rgba(255,211,127,.92);color:#0f1524}
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
-<div class="hud"><div class="panel"><div class="title">DeltaV combat prototype</div><div class="small">AI v2: intercept lane, breakaway anticipato, attack pass, HP rossa non rigenerante.</div></div><div class="panel" id="readout"></div></div>
-<div class="hint">Lati invisibili: ruota con RCS. Centro basso: burn. Laser automatico con cono stretto.</div>
+<div class="hud"><div class="panel"><div class="title">DeltaV combat prototype</div><div class="small">Sistema procedurale senza pianeti sovrapposti. Un nemico in orbita, marker rosso off-screen, arco arma visibile.</div></div><div class="panel" id="readout"></div></div>
+<div class="hint">Lati invisibili: ruota con RCS. Centro basso: burn. Laser automatico se il nemico entra nel cono frontale.</div>
 <div class="turnZone left" id="leftGlow"></div><div class="turnZone right" id="rightGlow"></div><div class="burnButton" id="burnVisual">BURN</div>
 <div class="actions"><button class="hudBtn" id="resetBtn">Reset</button><button class="hudBtn" id="newBtn">New</button></div>
 <script>
 (() => {
 const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),readout=document.getElementById('readout'),burnVisual=document.getElementById('burnVisual'),leftGlow=document.getElementById('leftGlow'),rightGlow=document.getElementById('rightGlow'),resetBtn=document.getElementById('resetBtn'),newBtn=document.getElementById('newBtn');
-let W=0,H=0,DPR=1,last=performance.now(),time=0,stars=[],particles=[],bodies=[],planetDefs=[],systemSeed=Math.floor(Math.random()*900000)+100000,escapeWarning=0;
-const camera={zoom:.62,targetZoom:.62,zoomVel:0};
+let W=0,H=0,DPR=1,last=performance.now(),time=0,stars=[],particles=[],bodies=[],planetDefs=[],systemSeed=Math.floor(Math.random()*900000)+100000;
+const camera={zoom:.62,targetZoom:.62,desiredZoom:.62,zoomVel:0,zoomHold:0};
 const input={leftIds:new Set(),rightIds:new Set(),burnIds:new Set()};
-const sun={id:'sun',name:'Sol',type:'sun',x:0,y:0,r:145,mass:145000,a:[255,232,165],b:[255,125,44],seed:9};
-const ship={x:0,y:0,vx:0,vy:0,angle:0,radius:12,turnInput:0,angularVelocity:0,turnRate:2.35,thrust:0,thrustTarget:0,thrustPower:160,fuel:1,burnFuelUse:.56,turnFuelUse:.36,fuelRegen:.14,hp:8,maxHp:8,damageFlash:0};
-let prediction={points:[],scores:new Map(),primary:null,secondary:null,impact:false,escape:false},targetBody=null,enemies=[],beams=[],enemyBeams=[],weaponCooldown=0;
-const weapon={range:760,cone:Math.PI*.075,cooldown:.85,damage:1},enemyWeapon={range:690,cone:Math.PI*.095,cooldown:1.15,damage:1},boundary={soft:6200,hard:9000,pull:34};
-function clamp(v,a,b){return Math.max(a,Math.min(b,v))}function rgb(a,o=1){return`rgba(${a[0]},${a[1]},${a[2]},${o})`}function sd(a,b){return Math.atan2(Math.sin(b-a),Math.cos(b-a))}
-function rngFactory(seed){let t=seed>>>0;return()=>{t+=0x6D2B79F5;let r=Math.imul(t^(t>>>15),1|t);r^=r+Math.imul(r^(r>>>7),61|r);return((r^(r>>>14))>>>0)/4294967296}}function rr(r,min,max){return min+r()*(max-min)}function ri(r,min,max){return Math.floor(rr(r,min,max+1))}
+const sun={id:'sun',name:'Sol',type:'sun',x:0,y:0,r:150,mass:150000,a:[255,232,165],b:[255,125,44],seed:9};
+const ship={x:0,y:0,vx:0,vy:0,angle:0,radius:12,turnInput:0,angularVelocity:0,turnRate:2.35,thrust:0,thrustTarget:0,thrustPower:160,fuel:1,burnFuelUse:.56,turnFuelUse:.36,fuelRegen:.14,rcsCooldown:0};
+let prediction={points:[],scores:new Map(),closest:new Map(),primary:null,secondary:null,stableBody:null,impact:false};
+let targetBody=null,enemies=[],beams=[],weaponCooldown=0;
+const weapon={range:760,cone:Math.PI*.24,cooldown:.85,damage:1};
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function rgb(a,o=1){return`rgba(${a[0]},${a[1]},${a[2]},${o})`}
+function sd(a,b){return Math.atan2(Math.sin(b-a),Math.cos(b-a))}
+function rngFactory(seed){let t=seed>>>0;return()=>{t+=0x6D2B79F5;let r=Math.imul(t^(t>>>15),1|t);r^=r+Math.imul(r^(r>>>7),61|r);return((r^(r>>>14))>>>0)/4294967296}}
+function rr(r,min,max){return min+r()*(max-min)}function ri(r,min,max){return Math.floor(rr(r,min,max+1))}
 const palette=[[[115,236,255],[35,110,220]],[[255,216,130],[180,82,50]],[[218,175,255],[76,56,148]],[[162,255,201],[39,140,120]],[[255,154,128],[140,58,68]],[[210,230,255],[80,105,160]],[[255,235,165],[160,130,48]]];
 function resize(){DPR=Math.max(1,Math.min(2,devicePixelRatio||1));W=innerWidth;H=innerHeight;canvas.width=Math.floor(W*DPR);canvas.height=Math.floor(H*DPR);ctx.setTransform(DPR,0,0,DPR,0,0);stars=[];for(let i=0;i<520;i++)stars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.5+.15,a:Math.random()*.7+.18,l:Math.random()*.55+.45})}
-function genSystem(seed,attempt=0){const r=rngFactory(seed+attempt*10007),count=ri(r,4,6),defs=[],base=[1500,2150,2850,3650,4550,5600];let last=-1;for(let i=0;i<count;i++){let rad=rr(r,70,135),ci=ri(r,0,palette.length-1);if(ci===last)ci=(ci+2)%palette.length;last=ci;defs.push({id:'p'+i,name:i===0?'Aster':'P'+i,type:'planet',or:base[i]+rr(r,-120,180),ang:rr(r,0,Math.PI*2),r:Math.round(rad),mass:Math.round(rad*rad*rr(r,220,340)),a:palette[ci][0],b:palette[ci][1],seed:rr(r,0,10)})}defs[0].or=rr(r,2400,3100);defs[0].ang=rr(r,.2,.9);defs[0].r=clamp(defs[0].r,96,130);defs[0].mass=Math.round(defs[0].r*defs[0].r*rr(r,320,420));return defs}
+function genSystem(seed,attempt=0){const r=rngFactory(seed+attempt*10007),count=ri(r,4,6),defs=[],base=[1500,2150,2850,3650,4550,5600];let last=-1;for(let i=0;i<count;i++){let rad=rr(r,70,135),ci=ri(r,0,palette.length-1);if(ci===last)ci=(ci+2)%palette.length;last=ci;defs.push({id:'p'+i,name:i===0?'Aster':'P'+i,or:base[i]+rr(r,-120,180),ang:rr(r,0,Math.PI*2),r:Math.round(rad),mass:Math.round(rad*rad*rr(r,220,340)),a:palette[ci][0],b:palette[ci][1],seed:rr(r,0,10),type:'planet'})}defs[0].or=rr(r,2400,3100);defs[0].ang=rr(r,.2,.9);defs[0].r=clamp(defs[0].r,96,130);defs[0].mass=Math.round(defs[0].r*defs[0].r*rr(r,320,420));return defs}
 function overlap(defs){for(let i=0;i<defs.length;i++){let a=defs[i],ax=Math.cos(a.ang)*a.or,ay=Math.sin(a.ang)*a.or;for(let j=i+1;j<defs.length;j++){let b=defs[j],bx=Math.cos(b.ang)*b.or,by=Math.sin(b.ang)*b.or;if(Math.hypot(ax-bx,ay-by)<a.r+b.r+360)return true}}return false}
 function validSystem(seed){for(let a=0;a<80;a++){let d=genSystem(seed,a);if(!overlap(d))return d}let d=genSystem(seed,999),step=Math.PI*2/d.length;for(let i=0;i<d.length;i++){d[i].ang=.35+i*step;d[i].or+=i*180}return d}
-function bodyState(d){if(d.type==='sun')return{...d,x:0,y:0,vx:0,vy:0};return{...d,x:Math.cos(d.ang)*d.or,y:Math.sin(d.ang)*d.or,vx:0,vy:0}}function updateBodies(){bodies=[bodyState(sun),...planetDefs.map(bodyState)]}
+function bodyState(d){if(d.type==='sun')return{...d,x:0,y:0,vx:0,vy:0};return{...d,x:Math.cos(d.ang)*d.or,y:Math.sin(d.ang)*d.or,vx:0,vy:0}}
+function updateBodies(){bodies=[bodyState(sun),...planetDefs.map(bodyState)]}
 function toScreen(x,y){return{x:W/2+(x-ship.x)*camera.zoom,y:H/2+(y-ship.y)*camera.zoom}}
-function gravityAt(x,y,bs=bodies){let soi=null,score=-1e9;for(const b of bs){if(b.type==='sun')continue;let d=Math.hypot(b.x-x,b.y-y)+.0001,soiR=b.r*8.5;if(d<soiR){let s=(1-d/soiR)*100+b.mass/(d*d+1);if(s>score){score=s;soi=b}}}let act=soi?[soi]:bs,ax=0,ay=0;for(const b of act){let dx=b.x-x,dy=b.y-y,d2=dx*dx+dy*dy,d=Math.sqrt(d2)+.0001,safe=Math.max(d2,b.r*b.r*.82),well=b.type==='sun'?b.r*10:b.r*16,boost=1+1.55*(well/(d+well)),g=b.mass*boost/safe;ax+=dx/d*g;ay+=dy/d*g}let R=Math.hypot(x,y);if(R>boundary.soft){let t=clamp((R-boundary.soft)/(boundary.hard-boundary.soft),0,1),extra=boundary.pull*t*t*(.35+.65*t);ax+=(-x/(R+.0001))*extra;ay+=(-y/(R+.0001))*extra}return{ax,ay}}
+function gravityAt(x,y,bs=bodies){let soi=null,score=-1e9;for(const b of bs){if(b.type==='sun')continue;let d=Math.hypot(b.x-x,b.y-y)+.0001,soiR=b.r*8.5;if(d<soiR){let s=(1-d/soiR)*100+b.mass/(d*d+1);if(s>score){score=s;soi=b}}}let act=soi?[soi]:bs,ax=0,ay=0;for(const b of act){let dx=b.x-x,dy=b.y-y,d2=dx*dx+dy*dy,d=Math.sqrt(d2)+.0001,safe=Math.max(d2,b.r*b.r*.82),well=b.type==='sun'?b.r*10:b.r*16,boost=1+1.55*(well/(d+well)),g=b.mass*boost/safe;ax+=dx/d*g;ay+=dy/d*g}return{ax,ay}}
 function effMass(b,r){let well=b.type==='sun'?b.r*10:b.r*16,boost=1+1.55*(well/(r+well));return b.mass*boost}
-function reset(){updateBodies();const p=bodies.find(b=>b.id==='p0')||bodies.find(b=>b.type!=='sun');let R=Math.max(p.r*3.45,p.r+ship.radius+180),ang=Math.atan2(p.y,p.x)+Math.PI*.45;function place(a){let nx=Math.cos(a),ny=Math.sin(a),tx=-ny,ty=nx,c=Math.sqrt(effMass(p,R)/R);ship.x=p.x+nx*R;ship.y=p.y+ny*R;ship.vx=tx*c;ship.vy=ty*c;ship.angle=Math.atan2(ship.vy,ship.vx)}place(ang);ship.turnInput=0;ship.angularVelocity=0;ship.thrust=0;ship.thrustTarget=0;ship.fuel=1;ship.hp=ship.maxHp;ship.damageFlash=0;particles=[];camera.zoom=.62;camera.targetZoom=.62;camera.zoomVel=0;prediction=analyzePrediction();targetBody=p;spawnEnemy(p);updateUI()}
+function reset(){updateBodies();const p=bodies.find(b=>b.id==='p0')||bodies.find(b=>b.type!=='sun');let R=Math.max(p.r*3.45,p.r+ship.radius+180),ang=Math.atan2(p.y,p.x)+Math.PI*.45;function place(a){let nx=Math.cos(a),ny=Math.sin(a),tx=-ny,ty=nx,c=Math.sqrt(effMass(p,R)/R);ship.x=p.x+nx*R;ship.y=p.y+ny*R;ship.vx=tx*c;ship.vy=ty*c;ship.angle=Math.atan2(ship.vy,ship.vx)}place(ang);ship.turnInput=0;ship.angularVelocity=0;ship.thrust=0;ship.thrustTarget=0;ship.fuel=1;particles=[];camera.zoom=.62;camera.targetZoom=.62;camera.desiredZoom=.62;camera.zoomVel=0;prediction=analyzePrediction();targetBody=p;spawnEnemy(p);updateUI()}
 function newSystem(){systemSeed=Math.floor(Math.random()*900000)+100000;planetDefs=validSystem(systemSeed);time=0;reset()}
-function spawnEnemy(playerPlanet){enemies=[];beams=[];enemyBeams=[];weaponCooldown=0;const ep=bodies.find(b=>b.type!=='sun'&&b.id!==playerPlanet.id)||playerPlanet;if(!ep)return;let R=Math.max(ep.r*4.4,ep.r+320),a=Math.atan2(ep.y,ep.x)+Math.PI*.78,nx=Math.cos(a),ny=Math.sin(a),tx=-ny,ty=nx,c=Math.sqrt(effMass(ep,R)/R);enemies.push({x:ep.x+nx*R,y:ep.y+ny*R,vx:tx*c,vy:ty*c,angle:Math.atan2(ty,tx),radius:13,hp:6,maxHp:6,hitFlash:0,hpVisible:0,alive:true,weaponCooldown:1.2,aiState:'patrol',aiLock:.8,burnCooldown:1.4,burnTimer:0,burnPower:0,burnAngle:0,plumeTimer:0,side:Math.random()<.5?-1:1})}
-function analyzePrediction(){let speed=Math.hypot(ship.vx,ship.vy);if(speed<2.1&&ship.thrust<.03)return{points:[],scores:new Map(),primary:null,secondary:null,impact:false,escape:false};let x=ship.x,y=ship.y,vx=ship.vx,vy=ship.vy,pts=[],scores=new Map(),dom=null,lastAng=0,acc=0;for(let i=0;i<430;i++){let g=gravityAt(x,y,bodies);vx+=g.ax*.085;vy+=g.ay*.085;x+=vx*.085;y+=vy*.085;pts.push({x,y});if(Math.hypot(x,y)>boundary.hard)return{points:pts,scores,primary:null,secondary:null,impact:false,escape:true};let best=null,inf=-1;for(const b of bodies){let dx=b.x-x,dy=b.y-y,d2=dx*dx+dy*dy,d=Math.sqrt(d2)+.0001;if(d<=b.r)return{points:pts,scores,primary:best,secondary:null,impact:true,escape:false};if(b.type==='sun')continue;let f=b.mass/Math.max(d2,b.r*b.r*.82);scores.set(b.id,(scores.get(b.id)||0)+f*2700);if(f>inf){inf=f;best=b}}if(best){let a=Math.atan2(y-best.y,x-best.x);if(dom!==best.id){dom=best.id;lastAng=a;acc=0}else{acc+=sd(lastAng,a);lastAng=a;if(Math.abs(acc)>Math.PI*2*1.05&&pts.length>80)break}}}let ranked=[...bodies.filter(b=>b.type!=='sun')].sort((a,b)=>(scores.get(b.id)||0)-(scores.get(a.id)||0));return{points:pts,scores,primary:ranked[0],secondary:ranked[1],impact:false,escape:false}}
+function spawnEnemy(p){enemies=[];beams=[];weaponCooldown=0;let R=Math.max(p.r*4.65,p.r+330),a=Math.atan2(ship.y-p.y,ship.x-p.x)+Math.PI*1.05,nx=Math.cos(a),ny=Math.sin(a),tx=-ny,ty=nx,c=Math.sqrt(effMass(p,R)/R);enemies.push({x:p.x+nx*R,y:p.y+ny*R,vx:tx*c,vy:ty*c,angle:Math.atan2(ty,tx),radius:13,hp:6,maxHp:6,hitFlash:0,hpVisible:0,alive:true})}
+function analyzePrediction(){let speed=Math.hypot(ship.vx,ship.vy);if(speed<2.1&&ship.thrust<.03)return{points:[],scores:new Map(),closest:new Map(),primary:null,secondary:null,stableBody:null,impact:false};let x=ship.x,y=ship.y,vx=ship.vx,vy=ship.vy,pts=[],scores=new Map(),closest=new Map(),dom=null,lastAng=0,acc=0;for(let i=0;i<430;i++){let g=gravityAt(x,y,bodies);vx+=g.ax*.085;vy+=g.ay*.085;x+=vx*.085;y+=vy*.085;pts.push({x,y});let best=null,inf=-1;for(const b of bodies){let dx=b.x-x,dy=b.y-y,d2=dx*dx+dy*dy,d=Math.sqrt(d2)+.0001;if(d<=b.r)return{points:pts,scores,closest,primary:best,secondary:null,stableBody:null,impact:true};if(b.type==='sun')continue;let f=b.mass/Math.max(d2,b.r*b.r*.82);scores.set(b.id,(scores.get(b.id)||0)+f*2700);closest.set(b.id,Math.min(closest.get(b.id)??Infinity,d));if(f>inf){inf=f;best=b}}if(best){let a=Math.atan2(y-best.y,x-best.x);if(dom!==best.id){dom=best.id;lastAng=a;acc=0}else{acc+=sd(lastAng,a);lastAng=a;if(Math.abs(acc)>Math.PI*2*1.05&&pts.length>80)break}}}let ranked=[...bodies.filter(b=>b.type!=='sun')].sort((a,b)=>(scores.get(b.id)||0)-(scores.get(a.id)||0));return{points:pts,scores,closest,primary:ranked[0],secondary:ranked[1],stableBody:ranked[0],impact:false}}
 function chooseTarget(){targetBody=prediction.primary||bodies.find(b=>b.type!=='sun')}
-function updateZoom(dt){let rel=[prediction.primary,prediction.secondary].filter(Boolean);if(!rel.length&&targetBody)rel=[targetBody];let minX=ship.x,maxX=ship.x,minY=ship.y,maxY=ship.y,pts=prediction.points,maxSamples=prediction.escape?30:72;for(let i=0;i<pts.length&&i<maxSamples*8;i+=8){let p=pts[i];minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y)}for(const b of rel){let pad=b.r*2.55+145;minX=Math.min(minX,b.x-pad);maxX=Math.max(maxX,b.x+pad);minY=Math.min(minY,b.y-pad);maxY=Math.max(maxY,b.y+pad)}const e=enemies.find(e=>e.alive);if(e&&!prediction.escape){let d=Math.hypot(e.x-ship.x,e.y-ship.y);if(d<2100){minX=Math.min(minX,e.x-260);maxX=Math.max(maxX,e.x+260);minY=Math.min(minY,e.y-260);maxY=Math.max(maxY,e.y+260)}if(d<1300){minX-=180;maxX+=180;minY-=180;maxY+=180}}let fit=Math.min(W*.82/Math.max(520,maxX-minX),H*.74/Math.max(400,maxY-minY));if(e&&Math.hypot(e.x-ship.x,e.y-ship.y)<1500)fit=Math.min(fit,.58);if(prediction.escape)fit=Math.max(fit,.16);camera.targetZoom=clamp(fit,.055,1.12);let delta=camera.targetZoom-camera.zoom,stiff=delta<0?9.5:4.2,damp=delta<0?7:5.5;camera.zoomVel+=delta*stiff*dt;camera.zoomVel*=Math.exp(-damp*dt);camera.zoomVel=clamp(camera.zoomVel,delta<0?-1.35:-.42,delta<0?.42:.42);camera.zoom+=camera.zoomVel*dt}
-function region(x,y){let bx=W/2,by=H-72,br=86,dx=x-bx,dy=y-by;if(dx*dx+dy*dy<br*br)return'burn';if(x<W*.47)return'left';if(x>W*.53)return'right';return'burn'}function addPtr(id,r){if(r==='left')input.leftIds.add(id);if(r==='right')input.rightIds.add(id);if(r==='burn')input.burnIds.add(id);updateUI()}function clrPtr(id){input.leftIds.delete(id);input.rightIds.delete(id);input.burnIds.delete(id);updateUI()}function updateUI(){leftGlow.classList.toggle('show',input.leftIds.size>0);rightGlow.classList.toggle('show',input.rightIds.size>0);burnVisual.classList.toggle('active',input.burnIds.size>0)}
+function updateZoom(dt){
+  let rel=[prediction.primary,prediction.secondary].filter(Boolean);
+  if(!rel.length&&targetBody)rel=[targetBody];
+
+  let minX=ship.x,maxX=ship.x,minY=ship.y,maxY=ship.y;
+  let pts=prediction.points;
+
+  const maxSamples=prediction.escape?30:72;
+  for(let i=0;i<pts.length&&i<maxSamples*8;i+=8){
+    let p=pts[i];
+    minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);
+    minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);
+  }
+
+  for(const b of rel){
+    let pad=b.r*2.55+145;
+    minX=Math.min(minX,b.x-pad);maxX=Math.max(maxX,b.x+pad);
+    minY=Math.min(minY,b.y-pad);maxY=Math.max(maxY,b.y+pad);
+  }
+
+  const liveEnemy=enemies.find(e=>e.alive);
+  let dEnemy=Infinity;
+  if(liveEnemy){
+    dEnemy=Math.hypot(liveEnemy.x-ship.x,liveEnemy.y-ship.y);
+    if(dEnemy<2100 && !prediction.escape){
+      const pad=230;
+      minX=Math.min(minX,liveEnemy.x-pad);maxX=Math.max(maxX,liveEnemy.x+pad);
+      minY=Math.min(minY,liveEnemy.y-pad);maxY=Math.max(maxY,liveEnemy.y+pad);
+    }
+    if(dEnemy<1300 && !prediction.escape){
+      const combatPad=150;
+      minX-=combatPad;maxX+=combatPad;
+      minY-=combatPad;maxY+=combatPad;
+    }
+  }
+
+  let fit=Math.min(W*.82/Math.max(520,maxX-minX),H*.74/Math.max(400,maxY-minY));
+
+  // Pre-combat readability: do not let zoom-out hide the firing arc.
+  if(liveEnemy&&!prediction.escape){
+    if(dEnemy<2500)fit=Math.max(fit,.20);
+    if(dEnemy<1750)fit=Math.max(fit,.26);
+    if(dEnemy<1150)fit=Math.max(fit,.32);
+    if(dEnemy<1500)fit=Math.min(fit,.62);
+  }
+
+  if(prediction.escape)fit=Math.max(fit,.16);
+
+  camera.targetZoom=clamp(fit,.055,1.12);
+  let delta=camera.targetZoom-camera.zoom,stiff=delta<0?9.5:4.2,damp=delta<0?7:5.5;
+  camera.zoomVel+=delta*stiff*dt;
+  camera.zoomVel*=Math.exp(-damp*dt);
+  camera.zoomVel=clamp(camera.zoomVel,delta<0?-1.35:-.42,delta<0?.42:.42);
+  camera.zoom+=camera.zoomVel*dt;
+}
+function region(x,y){let bx=W/2,by=H-72,br=86,dx=x-bx,dy=y-by;if(dx*dx+dy*dy<br*br)return'burn';if(x<W*.47)return'left';if(x>W*.53)return'right';return'burn'}
+function addPtr(id,r){if(r==='left')input.leftIds.add(id);if(r==='right')input.rightIds.add(id);if(r==='burn')input.burnIds.add(id);updateUI()}function clrPtr(id){input.leftIds.delete(id);input.rightIds.delete(id);input.burnIds.delete(id);updateUI()}function updateUI(){leftGlow.classList.toggle('show',input.leftIds.size>0);rightGlow.classList.toggle('show',input.rightIds.size>0);burnVisual.classList.toggle('active',input.burnIds.size>0)}
 function spawnParticle(x,y,count,color){for(let i=0;i<count;i++){let a=Math.random()*Math.PI*2,s=40+Math.random()*150;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.3+Math.random()*.45,r:2+Math.random()*4,color:Math.random()<.55?color:'130,230,255'})}}
 function findWeaponTarget(){let fx=Math.cos(ship.angle),fy=Math.sin(ship.angle),best=null,bd=1e9;for(const e of enemies){if(!e.alive)continue;let dx=e.x-ship.x,dy=e.y-ship.y,d=Math.hypot(dx,dy);if(d>weapon.range||d<1)continue;let a=Math.acos(clamp((dx/d)*fx+(dy/d)*fy,-1,1));if(a<=weapon.cone&&d<bd){best=e;bd=d}}return best}
 
-function playerWeaponDangerAt(ex,ey,lead=0){
-  const px=ship.x+ship.vx*lead, py=ship.y+ship.vy*lead;
-  const dx=ex-px, dy=ey-py, d=Math.hypot(dx,dy);
-  if(d>weapon.range*1.28||d<1)return 0;
-
-  const futureAngle=ship.angle+ship.angularVelocity*lead*.65;
-  const fx=Math.cos(futureAngle), fy=Math.sin(futureAngle);
-  const a=Math.acos(clamp((dx/d)*fx+(dy/d)*fy,-1,1));
-
-  // Wider forecast cone than real weapon cone: enemy reacts before it is already dead.
-  const forecastCone=weapon.cone*3.6;
-  if(a>forecastCone)return 0;
-
-  const angleScore=1-a/forecastCone;
-  const rangeScore=1-d/(weapon.range*1.28);
-  const ready=weaponCooldown<=.35?1:.52;
-  return clamp(angleScore*.76+rangeScore*.24,0,1)*ready;
+function segmentCircleRisk(ax,ay,bx,by,cx,cy,r){
+  const vx=bx-ax,vy=by-ay,wx=cx-ax,wy=cy-ay;
+  const len2=vx*vx+vy*vy+.0001;
+  const t=clamp((wx*vx+wy*vy)/len2,0,1);
+  if(t<.10||t>.95)return 0;
+  const px=ax+vx*t,py=ay+vy*t;
+  const d=Math.hypot(px-cx,py-cy);
+  return clamp(1-d/r,0,1);
 }
 
-function playerWeaponDanger(e){
-  const now=playerWeaponDangerAt(e.x,e.y,0);
-  const near=playerWeaponDangerAt(e.x+e.vx*.75,e.y+e.vy*.75,.75);
-  const soon=playerWeaponDangerAt(e.x+e.vx*1.45,e.y+e.vy*1.45,1.45);
-  return Math.max(now,near*.95,soon*.82);
-}
+function enemyLocalPocketRisk(e){
+  // Pocket logic is local only. Long-range routing should not care about player-planet pockets.
+  const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
+  if(dPlayer>1450)return null;
 
-function mixAngles(a,b,t){
-  return a+sd(a,b)*clamp(t,0,1);
-}
-
-function inwardAngle(x,y){
-  return Math.atan2(-y,-x);
-}
-
-function nonEscapeBurnAngle(e,baseAng,aggression=.5){
-  // Keep evasive burns from becoming pure outward escape.
-  const R=Math.hypot(e.x,e.y)+.0001;
-  const outward=Math.atan2(e.y,e.x);
-  const inward=outward+Math.PI;
-  const side=Math.sign(sd(outward,baseAng)) || (Math.random()<.5?-1:1);
-  const tangent=outward+side*Math.PI/2;
-  const far=clamp((R-3600)/2600,0,1);
-  let preferred=mixAngles(tangent,inward,far*.74);
-  let blended=mixAngles(preferred,baseAng,clamp(.24+aggression*.18,0,.46));
-  if(Math.cos(blended-outward)>.12)blended=mixAngles(blended,preferred,.78);
-  return blended;
-}
-
-function enemyBurn(e,ang,power,dur){
-  // Infinite fuel, but comparable feel: no magical acceleration.
-  e.burnAngle=ang;
-  e.burnPower=clamp(power,45,142);
-  e.burnTimer=dur;
-  e.plumeTimer=dur+.12;
-}
-
-function enemyAttackOpportunity(e){
-  const dx=ship.x-e.x,dy=ship.y-e.y,d=Math.hypot(dx,dy);
-  if(d>enemyWeapon.range*1.38)return 0;
-  const lx=(ship.x+ship.vx*.42)-e.x, ly=(ship.y+ship.vy*.42)-e.y, ld=Math.hypot(lx,ly);
-  const fx=Math.cos(e.angle),fy=Math.sin(e.angle);
-  const a=Math.acos(clamp((lx/ld)*fx+(ly/ld)*fy,-1,1));
-  const angleScore=clamp(1-a/(enemyWeapon.cone*2.15),0,1);
-  const rangeScore=clamp(1-d/(enemyWeapon.range*1.38),0,1);
-  return angleScore*.74+rangeScore*.26;
-}
-
-function enemyPlanetAvoidanceAngle(e, lookahead=1.25){
-  let best=null;
-  let bestRisk=0;
+  const tx=ship.x+ship.vx*.9,ty=ship.y+ship.vy*.9;
+  let best=null,bestRisk=0;
 
   for(const b of bodies){
     if(b.type==='sun')continue;
 
-    const px=e.x+e.vx*lookahead;
-    const py=e.y+e.vy*lookahead;
-    const dx=px-b.x,dy=py-b.y;
-    const d=Math.hypot(dx,dy)+.0001;
-    const dangerR=b.r+e.radius+190;
+    const lineRisk=segmentCircleRisk(e.x,e.y,tx,ty,b.x,b.y,b.r+80);
+    const dToBody=Math.hypot(e.x-b.x,e.y-b.y);
+    const local=clamp(1-(dToBody-(b.r+240))/520,0,1);
+    const risk=lineRisk*local;
 
-    if(d<dangerR){
-      const risk=1-d/dangerR;
+    if(risk>bestRisk){
+      bestRisk=risk;
+      best=b;
+    }
+  }
+
+  return best?{body:best,risk:bestRisk}:null;
+}
+
+function enemyPocketBypassAngle(e){
+  const pocket=enemyLocalPocketRisk(e);
+  if(!pocket)return null;
+
+  const b=pocket.body;
+  const lineAng=Math.atan2(ship.y-e.y,ship.x-e.x);
+  const clearance=b.r+135+pocket.risk*85;
+  const side=e.preferredSide || 1;
+  const wx=b.x+Math.cos(lineAng+side*Math.PI/2)*clearance;
+  const wy=b.y+Math.sin(lineAng+side*Math.PI/2)*clearance;
+  return Math.atan2(wy-e.y,wx-e.x);
+}
+
+function enemyPlanetAvoidanceAngle(e,lookahead=.95){
+  // Narrow collision-avoidance only: avoid actual planet impacts, not large strategic detours.
+  let best=null,bestRisk=0;
+
+  for(const b of bodies){
+    if(b.type==='sun')continue;
+
+    const px=e.x+e.vx*lookahead,py=e.y+e.vy*lookahead;
+    const dFuture=Math.hypot(px-b.x,py-b.y)+.0001;
+    const futureR=b.r+e.radius+90;
+    if(dFuture<futureR){
+      const risk=1-dFuture/futureR;
       if(risk>bestRisk){bestRisk=risk;best=b}
     }
 
-    const nowD=Math.hypot(e.x-b.x,e.y-b.y)+.0001;
-    const nx=(e.x-b.x)/nowD,ny=(e.y-b.y)/nowD;
+    const dNow=Math.hypot(e.x-b.x,e.y-b.y)+.0001;
+    const nx=(e.x-b.x)/dNow,ny=(e.y-b.y)/dNow;
     const inward=-(e.vx*nx+e.vy*ny);
-    const nearR=b.r+e.radius+230;
-
-    if(nowD<nearR && inward>25){
-      const risk=clamp((nearR-nowD)/nearR+inward/220,0,1);
+    const nearR=b.r+e.radius+125;
+    if(dNow<nearR && inward>30){
+      const risk=clamp((nearR-dNow)/nearR+inward/240,0,1);
       if(risk>bestRisk){bestRisk=risk;best=b}
     }
   }
@@ -155,113 +192,107 @@ function enemyPlanetAvoidanceAngle(e, lookahead=1.25){
   const dx=e.x-best.x,dy=e.y-best.y;
   const radial=Math.atan2(dy,dx);
   const vAng=Math.atan2(e.vy,e.vx);
-  const t1=radial+Math.PI/2;
-  const t2=radial-Math.PI/2;
+  const t1=radial+Math.PI/2,t2=radial-Math.PI/2;
   const tangent=Math.abs(sd(vAng,t1))<Math.abs(sd(vAng,t2))?t1:t2;
-
-  return {angle:nonEscapeBurnAngle(e,tangent,.65),risk:bestRisk,body:best};
+  return {angle:nonEscapeBurnAngle(e,tangent,.5),risk:bestRisk,body:best};
 }
 
-function enemySafeBurn(e,baseAng,power,dur,aggression=.6){
-  const avoid=enemyPlanetAvoidanceAngle(e,1.45);
+function enemySafeBurn(e,baseAng,power,dur,aggression=.5){
+  const avoid=enemyPlanetAvoidanceAngle(e,1.05);
   let ang=baseAng,p=power,d=dur;
 
   if(avoid){
-    ang=mixAngles(baseAng,avoid.angle,clamp(.45+avoid.risk*.45,.45,.9));
-    p=Math.max(power,90+avoid.risk*35);
-    d=Math.max(dur,.34+avoid.risk*.20);
+    ang=mixAngles(baseAng,avoid.angle,clamp(.18+avoid.risk*.42,.18,.68));
+    p=Math.max(power,64+avoid.risk*30);
+    d=Math.max(dur,.22+avoid.risk*.16);
   }
 
   enemyBurn(e,nonEscapeBurnAngle(e,ang,aggression),p,d);
 }
 
-function enemyCanShootPlayer(e){let dx=ship.x-e.x,dy=ship.y-e.y,d=Math.hypot(dx,dy);if(d>enemyWeapon.range||d<1)return false;let fx=Math.cos(e.angle),fy=Math.sin(e.angle),a=Math.acos(clamp((dx/d)*fx+(dy/d)*fy,-1,1));return a<=enemyWeapon.cone}
 function updateEnemies(dt){
   for(const e of enemies){
     if(!e.alive)continue;
 
+    const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
+    const danger=playerWeaponDanger(e);
+    const sysR=Math.hypot(e.x,e.y);
+    const pocket=enemyLocalPocketRisk(e);
+
+    if(e.aiState==null)e.aiState='patrol';
     if(e.aiLock==null)e.aiLock=0;
     if(e.burnCooldown==null)e.burnCooldown=0;
-    if(e.side==null)e.side=Math.random()<.5?-1:1;
-
-    const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
-    const sysR=Math.hypot(e.x,e.y);
-    const danger=playerWeaponDanger(e);
-    const opportunity=enemyAttackOpportunity(e);
+    if(e.preferredSide==null)e.preferredSide=Math.random()<.5?-1:1;
 
     e.aiLock=Math.max(0,e.aiLock-dt);
     e.burnCooldown=Math.max(0,e.burnCooldown-dt);
-    e.weaponCooldown=Math.max(0,(e.weaponCooldown||0)-dt);
 
     const canDecide=e.aiLock<=0;
 
     if(canDecide){
-      if(sysR>boundary.soft*.76){
+      if(sysR>systemBoundary.soft*.78){
         e.aiState='return_core';
-        e.aiLock=1.35;
-        e.burnCooldown=1.1;
-        enemyBurn(e,nonEscapeBurnAngle(e,inwardAngle(e.x,e.y),.92),118,.58);
-      }else if(danger>.62){
-        e.aiState='emergency_flank';
-        e.aiLock=1.10;
-        e.burnCooldown=1.75;
-        const away=Math.atan2(e.y-ship.y,e.x-ship.x);
-        const lateral=away+e.side*Math.PI*.58;
-        enemyBurn(e,nonEscapeBurnAngle(e,lateral,.78),128,.55);
-        e.side*=-1;
-      }else if(danger>.26 || (dPlayer<weapon.range*1.85 && playerWeaponDangerAt(e.x+e.vx*1.65,e.y+e.vy*1.65,1.65)>.20)){
-        e.aiState='pre_flank';
         e.aiLock=1.25;
-        e.burnCooldown=2.2;
-        const toPlayer=Math.atan2(ship.y-e.y,ship.x-e.x);
-        const lateral=toPlayer+e.side*Math.PI*.64;
-        enemyBurn(e,nonEscapeBurnAngle(e,lateral,.45),88,.45);
-      }else if(opportunity>.58){
-        e.aiState='attack_pass';
-        e.aiLock=.95;
-      }else if(dPlayer<2100){
-        e.aiState='intercept_lane';
-        e.aiLock=.85;
+        e.burnCooldown=.95;
+        enemySafeBurn(e,inwardBiasAngle(e.x,e.y),118,.52,.85);
+      } else if(pocket && pocket.risk>.20 && dPlayer<1450){
+        // Only local pocket avoidance. At long range, ignore pockets and close distance.
+        e.aiState='local_bypass';
+        e.aiLock=.75;
         if(e.burnCooldown<=0){
-          // Move toward a future crossing lane, not directly toward player.
-          const leadX=ship.x+ship.vx*2.2, leadY=ship.y+ship.vy*2.2;
-          const toLead=Math.atan2(leadY-e.y,leadX-e.x);
-          const lane=toLead+e.side*Math.PI*.22;
-          enemyBurn(e,nonEscapeBurnAngle(e,lane,.35),64,.34);
-          e.burnCooldown=2.6+Math.random()*1.2;
+          const bypass=enemyPocketBypassAngle(e);
+          if(bypass!=null)enemySafeBurn(e,bypass,78,.32,.45);
+          e.burnCooldown=.75;
         }
-      }else{
+      } else if(danger>.62){
+        e.aiState='emergency_flank';
+        e.aiLock=1.0;
+        e.burnCooldown=1.45;
+        const away=Math.atan2(e.y-ship.y,e.x-ship.x);
+        const lateral=away + e.preferredSide*Math.PI*.58;
+        enemySafeBurn(e,lateral,118,.48,.70);
+        e.preferredSide*=-1;
+      } else if(danger>.26 || (dPlayer<weapon.range*1.65 && playerWeaponDangerAt(e.x+e.vx*1.4,e.y+e.vy*1.4,1.4)>.20)){
+        e.aiState='pre_flank';
+        e.aiLock=1.0;
+        e.burnCooldown=1.65;
+        const toPlayer=Math.atan2(ship.y-e.y,ship.x-e.x);
+        const lateral=toPlayer + e.preferredSide*Math.PI*.60;
+        enemySafeBurn(e,lateral,82,.38,.42);
+      } else if(dPlayer<1850){
+        e.aiState='circle_player';
+        e.aiLock=.75;
+        if(e.burnCooldown<=0 && dPlayer>900){
+          const leadX=ship.x+ship.vx*1.15,leadY=ship.y+ship.vy*1.15;
+          const toLead=Math.atan2(leadY-e.y,leadX-e.x);
+          enemySafeBurn(e,toLead+e.preferredSide*Math.PI*.18,66,.30,.35);
+          e.burnCooldown=1.9+Math.random()*.8;
+        }
+      } else {
         e.aiState='patrol';
-        e.aiLock=.95;
+        e.aiLock=.9;
       }
     }
 
-    let desired=null;
+    let desiredAngle=null;
+
     if(e.aiState==='return_core'){
-      desired=inwardAngle(e.x,e.y);
-    }else if(e.aiState==='emergency_flank'||e.aiState==='pre_flank'){
-      desired=e.burnAngle;
-    }else if(e.aiState==='attack_pass'){
-      desired=Math.atan2((ship.y+ship.vy*.38)-e.y,(ship.x+ship.vx*.38)-e.x);
-      if(e.weaponCooldown<=0&&enemyCanShootPlayer(e)){
-        e.weaponCooldown=enemyWeapon.cooldown;
-        enemyBeams.push({x1:e.x+Math.cos(e.angle)*20,y1:e.y+Math.sin(e.angle)*20,x2:ship.x,y2:ship.y,life:.12,maxLife:.12});
-        ship.damageFlash=.22;
-        ship.hp=Math.max(0,ship.hp-enemyWeapon.damage);
-        if(ship.hp<=0){spawnParticle(ship.x,ship.y,90,'255,130,70');reset();return}
-      }
-    }else if(e.aiState==='intercept_lane'){
-      const leadX=ship.x+ship.vx*1.4, leadY=ship.y+ship.vy*1.4;
-      desired=Math.atan2(leadY-e.y,leadX-e.x)+e.side*Math.PI*.18;
-    }else{
-      const spd=Math.hypot(e.vx,e.vy);
-      desired=spd>.1?Math.atan2(e.vy,e.vx):e.angle;
+      desiredAngle=inwardBiasAngle(e.x,e.y);
+    } else if(e.aiState==='local_bypass'){
+      const bypass=enemyPocketBypassAngle(e);
+      desiredAngle=bypass!=null?bypass:enemyDesiredOrbitAngle(e);
+    } else if(e.aiState==='emergency_flank' || e.aiState==='pre_flank'){
+      desiredAngle=e.burnAngle;
+    } else if(e.aiState==='circle_player'){
+      const toPlayer=Math.atan2(ship.y-e.y,ship.x-e.x);
+      desiredAngle=toPlayer + e.preferredSide*Math.PI*.42;
+    } else {
+      desiredAngle=enemyDesiredOrbitAngle(e);
     }
 
-    // Comparable turn rate: no instant jerk.
-    if(desired!=null){
-      const maxTurn=1.95;
-      const delta=sd(e.angle,desired);
+    if(desiredAngle!=null){
+      const maxTurn=1.90;
+      const delta=sd(e.angle,desiredAngle);
       e.angle+=clamp(delta,-maxTurn*dt,maxTurn*dt);
     }
 
@@ -270,15 +301,20 @@ function updateEnemies(dt){
       e.vx+=Math.cos(e.burnAngle)*e.burnPower*dt;
       e.vy+=Math.sin(e.burnAngle)*e.burnPower*dt;
     }
+
     e.plumeTimer=Math.max(0,(e.plumeTimer||0)-dt);
 
-    // Physics after AI burn.
+    if((e.aiState==='patrol'||e.aiState==='circle_player') && e.burnCooldown<=0 && dPlayer<2400 && danger<.22){
+      const base=enemyDesiredOrbitAngle(e);
+      enemySafeBurn(e,base,54,.28,.22);
+      e.burnCooldown=3.0+Math.random()*1.4;
+    }
+
     let g=gravityAt(e.x,e.y);
     e.vx+=g.ax*dt;
     e.vy+=g.ay*dt;
 
-    // Soft anti-escape velocity trim: removes excessive outward speed only.
-    if(sysR>boundary.soft*.72){
+    if(sysR>systemBoundary.soft*.72){
       const ox=e.x/(sysR+.0001),oy=e.y/(sysR+.0001);
       const outwardV=e.vx*ox+e.vy*oy;
       if(outwardV>28){
@@ -287,44 +323,72 @@ function updateEnemies(dt){
       }
     }
 
-    const avoidNow=enemyPlanetAvoidanceAngle(e,.85);if(avoidNow&&avoidNow.risk>.38){e.vx+=Math.cos(avoidNow.angle)*(42+avoidNow.risk*58)*dt;e.vy+=Math.sin(avoidNow.angle)*(42+avoidNow.risk*58)*dt;}
+    // Narrow continuous planet avoidance. If it still fails, the enemy ghosts through.
+    const avoidNow=enemyPlanetAvoidanceAngle(e,.75);
+    if(avoidNow&&avoidNow.risk>.34){
+      e.vx+=Math.cos(avoidNow.angle)*(34+avoidNow.risk*50)*dt;
+      e.vy+=Math.sin(avoidNow.angle)*(34+avoidNow.risk*50)*dt;
+    }
+
     e.x+=e.vx*dt;
     e.y+=e.vy*dt;
 
     e.hitFlash=Math.max(0,e.hitFlash-dt);
     e.hpVisible=Math.max(0,e.hpVisible-dt);
-
-    // Enemy cannot disappear in crashes: push it outside the body and remove inward radial velocity.
-    for(const b of bodies){
-      const dx=e.x-b.x,dy=e.y-b.y,d=Math.hypot(dx,dy),minD=b.r+e.radius+18;
-      if(d<minD){
-        const nx=dx/(d+.0001),ny=dy/(d+.0001);
-        e.x=b.x+nx*minD;
-        e.y=b.y+ny*minD;
-        const radial=e.vx*nx+e.vy*ny;
-        if(radial<0){e.vx-=nx*radial*1.25;e.vy-=ny*radial*1.25}
-        enemyBurn(e,nonEscapeBurnAngle(e,Math.atan2(ny,nx)+Math.PI/2,.75),108,.34);
-        e.aiState='return_core';
-        e.aiLock=1.0;
-        e.hitFlash=.12;
-      }
-    }
   }
 }
-function updateCombat(dt){weaponCooldown=Math.max(0,weaponCooldown-dt);for(let i=beams.length-1;i>=0;i--){beams[i].life-=dt;if(beams[i].life<=0)beams.splice(i,1)}for(let i=enemyBeams.length-1;i>=0;i--){enemyBeams[i].life-=dt;if(enemyBeams[i].life<=0)enemyBeams.splice(i,1)}let tar=findWeaponTarget();if(tar)tar.hpVisible=Math.max(tar.hpVisible,.35);if(tar&&weaponCooldown<=0){weaponCooldown=weapon.cooldown;tar.hp-=weapon.damage;tar.hitFlash=.16;tar.hpVisible=2.5;beams.push({x1:ship.x+Math.cos(ship.angle)*22,y1:ship.y+Math.sin(ship.angle)*22,x2:tar.x,y2:tar.y,life:.115,maxLife:.115});if(tar.hp<=0){tar.alive=false;spawnParticle(tar.x,tar.y,80,'255,130,70')}}}
-function update(dt){time+=dt;updateBodies();let L=input.leftIds.size>0,R=input.rightIds.size>0,B=input.burnIds.size>0,turn=L&&!R?-1:R&&!L?1:0;ship.turnInput+=(turn-ship.turnInput)*Math.min(1,dt*(Math.abs(turn)>Math.abs(ship.turnInput)?3.2:5.5));let te=Math.sign(ship.turnInput)*ship.turnInput*ship.turnInput,tl=Math.abs(te);ship.angularVelocity+=(te*ship.turnRate-ship.angularVelocity)*Math.min(1,dt*6.6);ship.angle+=ship.angularVelocity*dt;if(tl>.03)ship.fuel-=ship.turnFuelUse*tl*dt;ship.thrustTarget=B&&ship.fuel>.01?1:0;ship.thrust+=(ship.thrustTarget-ship.thrust)*Math.min(1,dt*(ship.thrustTarget>ship.thrust?1:3.4));let th=ship.thrust*ship.thrust;if(th>.001)ship.fuel-=ship.burnFuelUse*th*dt;else ship.fuel+=ship.fuelRegen*dt;ship.fuel=clamp(ship.fuel,0,1);ship.damageFlash=Math.max(0,ship.damageFlash-dt);let g=gravityAt(ship.x,ship.y);ship.vx+=g.ax*dt;ship.vy+=g.ay*dt;if(th>.001&&ship.fuel>0){ship.vx+=Math.cos(ship.angle)*ship.thrustPower*th*dt;ship.vy+=Math.sin(ship.angle)*ship.thrustPower*th*dt;for(let i=0;i<3+th*5;i++)particles.push({x:ship.x-Math.cos(ship.angle)*12,y:ship.y-Math.sin(ship.angle)*12,vx:-Math.cos(ship.angle)*(80+Math.random()*90),vy:-Math.sin(ship.angle)*(80+Math.random()*90),life:.2+Math.random()*.2,r:2+Math.random()*3,color:'255,175,78'})}ship.x+=ship.vx*dt;ship.y+=ship.vy*dt;for(const b of bodies)if(Math.hypot(ship.x-b.x,ship.y-b.y)<b.r+ship.radius)reset();prediction=analyzePrediction();escapeWarning=prediction.escape?1:Math.max(0,escapeWarning-dt*1.4);chooseTarget();updateZoom(dt);updateEnemies(dt);updateCombat(dt);for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;if(p.life<=0)particles.splice(i,1)}}
+function updateCombat(dt){weaponCooldown=Math.max(0,weaponCooldown-dt);for(let i=beams.length-1;i>=0;i--){beams[i].life-=dt;if(beams[i].life<=0)beams.splice(i,1)}let tar=findWeaponTarget();if(tar)tar.hpVisible=Math.max(tar.hpVisible,.35);if(tar&&weaponCooldown<=0){weaponCooldown=weapon.cooldown;tar.hp-=weapon.damage;tar.hitFlash=.16;tar.hpVisible=2.5;beams.push({x1:ship.x+Math.cos(ship.angle)*22,y1:ship.y+Math.sin(ship.angle)*22,x2:tar.x,y2:tar.y,life:.115,maxLife:.115});if(tar.hp<=0){tar.alive=false;spawnParticle(tar.x,tar.y,80,'255,130,70')}}}
+function update(dt){time+=dt;updateBodies();let L=input.leftIds.size>0,R=input.rightIds.size>0,B=input.burnIds.size>0,turn=L&&!R?-1:R&&!L?1:0;ship.turnInput+=(turn-ship.turnInput)*Math.min(1,dt*(Math.abs(turn)>Math.abs(ship.turnInput)?3.2:5.5));let te=Math.sign(ship.turnInput)*ship.turnInput*ship.turnInput,tl=Math.abs(te);ship.angularVelocity+=(te*ship.turnRate-ship.angularVelocity)*Math.min(1,dt*6.6);ship.angle+=ship.angularVelocity*dt;if(tl>.03)ship.fuel-=ship.turnFuelUse*tl*dt;ship.thrustTarget=B&&ship.fuel>.01?1:0;ship.thrust+=(ship.thrustTarget-ship.thrust)*Math.min(1,dt*(ship.thrustTarget>ship.thrust?1:3.4));let th=ship.thrust*ship.thrust;if(th>.001)ship.fuel-=ship.burnFuelUse*th*dt;else ship.fuel+=ship.fuelRegen*dt;ship.fuel=clamp(ship.fuel,0,1);let g=gravityAt(ship.x,ship.y);ship.vx+=g.ax*dt;ship.vy+=g.ay*dt;if(th>.001&&ship.fuel>0){ship.vx+=Math.cos(ship.angle)*ship.thrustPower*th*dt;ship.vy+=Math.sin(ship.angle)*ship.thrustPower*th*dt;for(let i=0;i<3+th*5;i++)particles.push({x:ship.x-Math.cos(ship.angle)*12,y:ship.y-Math.sin(ship.angle)*12,vx:-Math.cos(ship.angle)*(80+Math.random()*90),vy:-Math.sin(ship.angle)*(80+Math.random()*90),life:.2+Math.random()*.2,r:2+Math.random()*3,color:'255,175,78'})}ship.x+=ship.vx*dt;ship.y+=ship.vy*dt;for(const b of bodies)if(Math.hypot(ship.x-b.x,ship.y-b.y)<b.r+ship.radius)reset();prediction=analyzePrediction();chooseTarget();updateZoom(dt);updateEnemies(dt);updateCombat(dt);for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;if(p.life<=0)particles.splice(i,1)}}
 function bg(){for(const s of stars){let x=(s.x-((ship.x*.01)%W)*s.l+W*3)%W,y=(s.y-((ship.y*.01)%H)*s.l+H*3)%H;ctx.globalAlpha=s.a;ctx.fillStyle='white';ctx.beginPath();ctx.arc(x,y,s.r,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1}
-function drawTraj(){let pts=prediction.points;if(pts.length<2)return;ctx.save();ctx.strokeStyle=prediction.impact||prediction.escape?'rgba(255,130,90,.78)':'rgba(110,236,255,.78)';ctx.lineWidth=1.35;ctx.shadowColor=prediction.impact||prediction.escape?'rgba(255,90,60,.44)':'rgba(72,210,255,.44)';ctx.shadowBlur=5;ctx.setLineDash([12,10]);ctx.lineDashOffset=-performance.now()*.03;let p=toScreen(pts[0].x,pts[0].y);ctx.beginPath();ctx.moveTo(p.x,p.y);for(let i=1;i<pts.length;i++){p=toScreen(pts[i].x,pts[i].y);ctx.lineTo(p.x,p.y)}ctx.stroke();ctx.restore()}
+function drawTraj(){let pts=prediction.points;if(pts.length<2)return;ctx.save();ctx.strokeStyle=prediction.impact?'rgba(255,130,90,.78)':'rgba(110,236,255,.78)';ctx.lineWidth=1.35;ctx.shadowColor=prediction.impact?'rgba(255,90,60,.44)':'rgba(72,210,255,.44)';ctx.shadowBlur=5;ctx.setLineDash([12,10]);ctx.lineDashOffset=-performance.now()*.03;let p=toScreen(pts[0].x,pts[0].y);ctx.beginPath();ctx.moveTo(p.x,p.y);for(let i=1;i<pts.length;i++){p=toScreen(pts[i].x,pts[i].y);ctx.lineTo(p.x,p.y)}ctx.stroke();ctx.restore()}
 function drawBody(b){let s=toScreen(b.x,b.y),r=b.r*camera.zoom;if(s.x+r<0||s.x-r>W||s.y+r<0||s.y-r>H)return;let grad=ctx.createRadialGradient(s.x-r*.35,s.y-r*.4,Math.max(1,r*.08),s.x,s.y,Math.max(1,r));grad.addColorStop(0,rgb(b.a,1));grad.addColorStop(.58,rgb(b.b,1));grad.addColorStop(1,'rgba(20,20,30,.98)');ctx.fillStyle=grad;ctx.shadowColor=rgb(b.a,.22);ctx.shadowBlur=Math.max(8,r*.35);ctx.beginPath();ctx.arc(s.x,s.y,Math.max(1,r),0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle='rgba(255,255,255,.22)';ctx.lineWidth=Math.max(.4,r*.02);ctx.stroke()}
 function drawOffscreenPlanets(){for(const b of bodies){if(b.type==='sun')continue;let s=toScreen(b.x,b.y),r=b.r*camera.zoom;if(s.x-r>0&&s.x+r<W&&s.y-r>0&&s.y+r<H)continue;let dx=s.x-W/2,dy=s.y-H/2,t=Math.min((W/2-5)/Math.max(.001,Math.abs(dx)),(H/2-5)/Math.max(.001,Math.abs(dy))),ex=W/2+dx*t,ey=H/2+dy*t,len=Math.max(.5,r*2);if(len<.5)continue;ctx.save();ctx.strokeStyle=rgb(b.a,.55);ctx.lineWidth=clamp(len*.1,.65,4.2);ctx.lineCap='round';if(Math.abs(ex-W/2)>Math.abs(ey-H/2)){let x=ex<W/2?5:W-5,y=clamp(ey,len/2+8,H-len/2-8);ctx.beginPath();ctx.moveTo(x,y-len/2);ctx.lineTo(x,y+len/2);ctx.stroke()}else{let y=ey<H/2?5:H-5,x=clamp(ex,len/2+8,W-len/2-8);ctx.beginPath();ctx.moveTo(x-len/2,y);ctx.lineTo(x+len/2,y);ctx.stroke()}ctx.restore()}}
-function drawWeaponArc(){let live=enemies.find(e=>e.alive);if(!live)return;let es=toScreen(live.x,live.y),on=es.x>0&&es.x<W&&es.y>0&&es.y<H,d=Math.hypot(live.x-ship.x,live.y-ship.y);if(!on||d>weapon.range*1.35)return;let tar=findWeaponTarget(),ready=weaponCooldown<=0,cx=W/2,cy=H/2,rad=weapon.range*camera.zoom;if(rad<34)return;let st=ship.angle-weapon.cone,en=ship.angle+weapon.cone,alpha=tar?(ready?.18:.1):.035,edge=tar?(ready?.52:.30):.13;ctx.save();let gr=ctx.createRadialGradient(cx,cy,18,cx,cy,rad);gr.addColorStop(0,tar?'rgba(120,235,255,.08)':'rgba(120,235,255,.018)');gr.addColorStop(1,`rgba(120,235,255,${alpha})`);ctx.fillStyle=gr;ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,rad,st,en);ctx.closePath();ctx.fill();ctx.strokeStyle=`rgba(130,240,255,${edge})`;ctx.lineWidth=tar?1.55:.9;ctx.setLineDash([7,10]);ctx.beginPath();ctx.arc(cx,cy,rad,st,en);ctx.stroke();ctx.restore()}
 function drawEnemyMarker(e){let s=toScreen(e.x,e.y),r=18;if(s.x+r>0&&s.x-r<W&&s.y+r>0&&s.y-r<H)return;let dx=s.x-W/2,dy=s.y-H/2,t=Math.min((W/2-10)/Math.max(.001,Math.abs(dx)),(H/2-10)/Math.max(.001,Math.abs(dy))),ex=W/2+dx*t,ey=H/2+dy*t,ang=Math.atan2(dy,dx),size=10;ctx.save();ctx.translate(ex,ey);ctx.rotate(ang);ctx.fillStyle='rgba(255,70,62,.9)';ctx.strokeStyle='rgba(255,230,220,.72)';ctx.lineWidth=1;ctx.shadowColor='rgba(255,65,55,.95)';ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(size,0);ctx.lineTo(-size*.65,-size*.55);ctx.lineTo(-size*.35,0);ctx.lineTo(-size*.65,size*.55);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore()}
-function drawEnemies(){let target=findWeaponTarget();for(const e of enemies){if(!e.alive)continue;drawEnemyMarker(e);let s=toScreen(e.x,e.y);if(s.x+30<0||s.x-30>W||s.y+30<0||s.y-30>H)continue;ctx.save();ctx.translate(s.x,s.y);ctx.rotate(e.angle);if(e.plumeTimer>0){ctx.fillStyle=`rgba(255,95,60,${e.burnTimer>0?.62:.28})`;ctx.shadowColor='rgba(255,80,50,.85)';ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(-14,-3);ctx.lineTo(-31,0);ctx.lineTo(-14,3);ctx.fill();ctx.shadowBlur=0;}ctx.fillStyle='rgba(255,116,92,.96)';ctx.strokeStyle='rgba(30,8,12,.76)';ctx.lineWidth=1.1;ctx.shadowColor='rgba(255,90,80,.42)';ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(17,0);ctx.lineTo(3,-6);ctx.lineTo(-7,-5);ctx.lineTo(-15,-10);ctx.lineTo(-10,0);ctx.lineTo(-15,10);ctx.lineTo(-7,5);ctx.lineTo(3,6);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();if(e===target){ctx.save();ctx.strokeStyle='rgba(255,95,82,.75)';ctx.shadowColor='rgba(255,70,58,.75)';ctx.shadowBlur=10;ctx.beginPath();ctx.arc(s.x,s.y,22,0,Math.PI*2);ctx.stroke();ctx.restore()}if(e.hpVisible>0||e===target){let w=34,h=4,x=s.x-w/2,y=s.y-28;ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(x,y,w,h);ctx.fillStyle='rgba(255,104,90,.92)';ctx.fillRect(x,y,w*clamp(e.hp/e.maxHp,0,1),h);ctx.strokeStyle='rgba(255,255,255,.28)';ctx.strokeRect(x,y,w,h)}}}
-function drawBeams(){for(const b of beams){let a=clamp(b.life/b.maxLife,0,1),s1=toScreen(b.x1,b.y1),s2=toScreen(b.x2,b.y2);ctx.save();ctx.globalAlpha=a;ctx.strokeStyle='rgba(120,235,255,.92)';ctx.lineWidth=2.2;ctx.shadowColor='rgba(110,230,255,.95)';ctx.shadowBlur=14;ctx.beginPath();ctx.moveTo(s1.x,s1.y);ctx.lineTo(s2.x,s2.y);ctx.stroke();ctx.restore()}for(const b of enemyBeams){let a=clamp(b.life/b.maxLife,0,1),s1=toScreen(b.x1,b.y1),s2=toScreen(b.x2,b.y2);ctx.save();ctx.globalAlpha=a;ctx.strokeStyle='rgba(255,86,70,.92)';ctx.lineWidth=2.2;ctx.shadowColor='rgba(255,70,55,.95)';ctx.shadowBlur=14;ctx.beginPath();ctx.moveTo(s1.x,s1.y);ctx.lineTo(s2.x,s2.y);ctx.stroke();ctx.restore()}}
+function drawWeaponArc(){
+  const live=enemies.find(e=>e.alive);
+  if(!live)return;
+
+  const d=Math.hypot(live.x-ship.x,live.y-ship.y);
+  if(d>2500)return;
+
+  const tar=findWeaponTarget(),ready=weaponCooldown<=0,cx=W/2,cy=H/2,rad=weapon.range*camera.zoom;
+  if(rad<30)return;
+
+  const st=ship.angle-weapon.cone,en=ship.angle+weapon.cone;
+  const pre=clamp(1-d/2500,0,1);
+  const near=clamp(1-d/(weapon.range*1.35),0,1);
+  const alpha=tar?(ready?.18:.1):(.026+pre*.035+near*.045);
+  const edge=tar?(ready?.52:.30):(.12+pre*.10+near*.10);
+
+  ctx.save();
+  let gr=ctx.createRadialGradient(cx,cy,18,cx,cy,rad);
+  gr.addColorStop(0,tar?'rgba(120,235,255,.08)':`rgba(120,235,255,${.012+pre*.018})`);
+  gr.addColorStop(1,`rgba(120,235,255,${alpha})`);
+  ctx.fillStyle=gr;
+  ctx.beginPath();
+  ctx.moveTo(cx,cy);
+  ctx.arc(cx,cy,rad,st,en);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle=`rgba(130,240,255,${edge})`;
+  ctx.lineWidth=tar?1.55:1.05;
+  ctx.shadowColor=tar?'rgba(105,235,255,.60)':'rgba(105,235,255,.20)';
+  ctx.shadowBlur=tar?11:4;
+  ctx.setLineDash([7,10]);
+  ctx.lineDashOffset=-performance.now()*.018;
+  ctx.beginPath();
+  ctx.arc(cx,cy,rad,st,en);
+  ctx.stroke();
+
+  ctx.restore();
+}
+function drawEnemies(){let target=findWeaponTarget();for(const e of enemies){if(!e.alive)continue;drawEnemyMarker(e);let s=toScreen(e.x,e.y);if(s.x+30<0||s.x-30>W||s.y+30<0||s.y-30>H)continue;ctx.save();ctx.translate(s.x,s.y);ctx.rotate(e.angle);ctx.fillStyle='rgba(255,116,92,.96)';ctx.strokeStyle='rgba(30,8,12,.76)';ctx.lineWidth=1.1;ctx.shadowColor='rgba(255,90,80,.42)';ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(17,0);ctx.lineTo(3,-6);ctx.lineTo(-7,-5);ctx.lineTo(-15,-10);ctx.lineTo(-10,0);ctx.lineTo(-15,10);ctx.lineTo(-7,5);ctx.lineTo(3,6);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();if(e===target){ctx.save();ctx.strokeStyle='rgba(255,95,82,.75)';ctx.shadowColor='rgba(255,70,58,.75)';ctx.shadowBlur=10;ctx.beginPath();ctx.arc(s.x,s.y,22,0,Math.PI*2);ctx.stroke();ctx.restore()}if(e.hpVisible>0||e===target){let w=34,h=4,x=s.x-w/2,y=s.y-28;ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(x,y,w,h);ctx.fillStyle='rgba(255,104,90,.92)';ctx.fillRect(x,y,w*clamp(e.hp/e.maxHp,0,1),h);ctx.strokeStyle='rgba(255,255,255,.28)';ctx.strokeRect(x,y,w,h)}}}
+function drawBeams(){for(const b of beams){let a=clamp(b.life/b.maxLife,0,1),s1=toScreen(b.x1,b.y1),s2=toScreen(b.x2,b.y2);ctx.save();ctx.globalAlpha=a;ctx.strokeStyle='rgba(120,235,255,.92)';ctx.lineWidth=2.2;ctx.shadowColor='rgba(110,230,255,.95)';ctx.shadowBlur=14;ctx.beginPath();ctx.moveTo(s1.x,s1.y);ctx.lineTo(s2.x,s2.y);ctx.stroke();ctx.strokeStyle='rgba(255,255,255,.92)';ctx.lineWidth=.8;ctx.shadowBlur=0;ctx.beginPath();ctx.moveTo(s1.x,s1.y);ctx.lineTo(s2.x,s2.y);ctx.stroke();ctx.restore()}}
 function drawParticles(){for(const p of particles){let s=toScreen(p.x,p.y);ctx.fillStyle=`rgba(${p.color},${Math.max(0,p.life*2.2)})`;ctx.shadowColor=`rgba(${p.color},.78)`;ctx.shadowBlur=10;ctx.beginPath();ctx.arc(s.x,s.y,Math.max(.45,p.r*camera.zoom),0,Math.PI*2);ctx.fill()}ctx.shadowBlur=0}
 function drawShip(){ctx.save();ctx.translate(W/2,H/2);ctx.rotate(ship.angle);if(ship.thrust>.008){let tv=Math.max(.12,ship.thrust*ship.thrust),len=16+tv*40;let gr=ctx.createLinearGradient(-16,0,-20-len,0);gr.addColorStop(0,`rgba(255,255,255,${.4+tv*.42})`);gr.addColorStop(.35,`rgba(255,190,82,${.2+tv*.58})`);gr.addColorStop(1,'rgba(255,78,24,.02)');ctx.fillStyle=gr;ctx.shadowColor='rgba(255,120,52,.88)';ctx.shadowBlur=18;ctx.beginPath();ctx.moveTo(-16,-4);ctx.lineTo(-20-len,0);ctx.lineTo(-16,4);ctx.fill();ctx.shadowBlur=0}ctx.fillStyle='#f3fbff';ctx.strokeStyle='rgba(6,14,28,.7)';ctx.lineWidth=1.2;ctx.shadowColor='rgba(100,225,255,.3)';ctx.shadowBlur=16;ctx.beginPath();ctx.moveTo(20,0);ctx.lineTo(5,-7);ctx.lineTo(-5,-6);ctx.lineTo(-15,-13);ctx.lineTo(-10,-3);ctx.lineTo(-18,0);ctx.lineTo(-10,3);ctx.lineTo(-15,13);ctx.lineTo(-5,6);ctx.lineTo(5,7);ctx.closePath();ctx.fill();ctx.stroke();ctx.shadowColor='rgba(90,232,255,.95)';ctx.shadowBlur=12;ctx.fillStyle='rgba(90,232,255,.95)';ctx.beginPath();ctx.ellipse(5.5,0,4.6,2.7,0,0,Math.PI*2);ctx.fill();ctx.restore()}
-function drawBars(){let x=18,y=H-86,w=160,h=12;ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(x,y,w,h);ctx.fillStyle=ship.fuel<.2?'rgba(255,120,120,.95)':'rgba(126,235,255,.95)';ctx.fillRect(x+1,y+1,(w-2)*ship.fuel,h-2);ctx.strokeStyle='rgba(255,255,255,.16)';ctx.strokeRect(x,y,w,h);let y2=y+20;ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(x,y2,w,h);ctx.fillStyle='rgba(255,75,68,.92)';ctx.fillRect(x+1,y2+1,(w-2)*clamp(ship.hp/ship.maxHp,0,1),h-2);ctx.strokeStyle='rgba(255,255,255,.16)';ctx.strokeRect(x,y2,w,h);ctx.fillStyle='rgba(255,255,255,.72)';ctx.font='10px system-ui';ctx.fillText('fuel',x,y-5);ctx.fillText('hp',x,y2-5)}
-function render(){ctx.clearRect(0,0,W,H);bg();drawTraj();drawOffscreenPlanets();for(const b of bodies)drawBody(b);drawWeaponArc();drawEnemies();drawBeams();drawParticles();drawShip();drawBars();if(ship.damageFlash>0){ctx.save();ctx.strokeStyle=`rgba(255,60,50,${ship.damageFlash*1.8})`;ctx.lineWidth=12;ctx.strokeRect(6,6,W-12,H-12);ctx.restore()}if(escapeWarning>0){ctx.save();ctx.strokeStyle=`rgba(255,90,60,${escapeWarning*.55})`;ctx.lineWidth=10;ctx.strokeRect(5,5,W-10,H-10);ctx.restore()}let speed=Math.hypot(ship.vx,ship.vy);readout.innerHTML=`v ${speed.toFixed(1)}<br>fuel ${(ship.fuel*100).toFixed(0)}%<br>hp ${ship.hp.toFixed(1)}<br>seed ${systemSeed}<br>weapon ${weaponCooldown<=0?'ready':weaponCooldown.toFixed(1)}`}
+function drawFuel(){let x=18,y=H-86,w=160,h=12;ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(x,y,w,h);ctx.fillStyle=ship.fuel<.2?'rgba(255,120,120,.95)':'rgba(126,235,255,.95)';ctx.fillRect(x+1,y+1,(w-2)*ship.fuel,h-2);ctx.strokeStyle='rgba(255,255,255,.16)';ctx.strokeRect(x,y,w,h)}
+function render(){ctx.clearRect(0,0,W,H);bg();drawTraj();drawOffscreenPlanets();for(const b of bodies)drawBody(b);drawWeaponArc();drawEnemies();drawBeams();drawParticles();drawShip();drawFuel();let speed=Math.hypot(ship.vx,ship.vy);readout.innerHTML=`v ${speed.toFixed(1)}<br>fuel ${(ship.fuel*100).toFixed(0)}%<br>seed ${systemSeed}<br>weapon ${weaponCooldown<=0?'ready':weaponCooldown.toFixed(1)}`}
 function loop(now){let dt=Math.min(.033,(now-last)/1000);last=now;update(dt);render();requestAnimationFrame(loop)}
 canvas.addEventListener('pointerdown',e=>{e.preventDefault();canvas.setPointerCapture(e.pointerId);addPtr(e.pointerId,region(e.clientX,e.clientY))});canvas.addEventListener('pointerup',e=>{e.preventDefault();clrPtr(e.pointerId)});canvas.addEventListener('pointercancel',e=>{e.preventDefault();clrPtr(e.pointerId)});canvas.addEventListener('pointermove',e=>{e.preventDefault();clrPtr(e.pointerId);addPtr(e.pointerId,region(e.clientX,e.clientY))});
 window.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')input.leftIds.add('k');if(e.key==='ArrowRight')input.rightIds.add('k');if(e.key==='ArrowUp'||e.key===' ')input.burnIds.add('k');updateUI()});window.addEventListener('keyup',e=>{if(e.key==='ArrowLeft')input.leftIds.delete('k');if(e.key==='ArrowRight')input.rightIds.delete('k');if(e.key==='ArrowUp'||e.key===' ')input.burnIds.delete('k');updateUI()});
