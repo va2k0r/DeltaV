@@ -217,8 +217,13 @@ function aiPlayerTurningTowardEnemy(e){
 function aiTacticalMode(e,shot,killzone){
   const turning=aiPlayerTurningTowardEnemy(e);
   const hpRatio=e.hp/e.maxHp;
-  if(shot>.50 && hpRatio>.35)return "commit";
-  if(killzone>.45 || turning>.35)return "avoid_killzone";
+
+  // Commit must be a real firing solution, not a mediocre opening.
+  const strongCommit = shot>.72 && hpRatio>.35;
+  const safeCommit = shot>.58 && killzone<.30 && turning<.30;
+
+  if(strongCommit || safeCommit)return "commit";
+  if(killzone>.42 || turning>.34)return "avoid_killzone";
   return "orbit";
 }
 
@@ -240,13 +245,14 @@ function aiDesiredPoint(e){
   let lateral=d>1800?120:300;
 
   if(mode==="avoid_killzone"){
-    // Strong lateral/rear reposition. Do not continue through the player's nose.
-    behind=820;
-    lateral=520;
+    // Do not try to go "behind" by crossing the player's nose.
+    // Slide laterally first, then re-enter the orbit.
+    behind=280;
+    lateral=860;
   }else if(mode==="commit"){
-    // Accept the trade, but still bias slightly to the side, not pure head-on.
-    behind=520;
-    lateral=190;
+    // Commit only when the shot is genuinely strong. Keep some lateral bias.
+    behind=500;
+    lateral=210;
   }
 
   return{
@@ -328,10 +334,14 @@ function updateEnemies(dt){
     if(e.weaponCooldown==null)e.weaponCooldown=1.0;
     if(e.lastAttack==null)e.lastAttack=0;
     if(e.aiState==null)e.aiState='pd_engage';
+    if(e.avoidLock==null)e.avoidLock=0;
+    if(e.sideCooldown==null)e.sideCooldown=0;
 
     e.thinkTimer-=dt;
     e.weaponCooldown=Math.max(0,e.weaponCooldown-dt);
     e.lastAttack+=dt;
+    e.avoidLock=Math.max(0,e.avoidLock-dt);
+    e.sideCooldown=Math.max(0,e.sideCooldown-dt);
 
     const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
     const threat=aiPlayerThreat(e);
@@ -339,15 +349,25 @@ function updateEnemies(dt){
     const killzone=aiKillzoneScore(e);
     const turning=aiPlayerTurningTowardEnemy(e);
 
+    const mustAvoid = (killzone>.42 || turning>.36 || threat>.62) && shot<.62;
+    const canCommit = (shot>.72 && e.hp/e.maxHp>.35) || (shot>.60 && killzone<.28 && turning<.28);
+
     if(e.thinkTimer<=0){
       e.thinkTimer=.25;
 
-      // If the player is bringing the nose onto the enemy and the enemy has no shot,
-      // flip the combat-orbit side before entering the cone.
-      if((killzone>.34||turning>.36||threat>.55) && shot<.46)e.side*=-1;
+      if(mustAvoid){
+        e.avoidLock=Math.max(e.avoidLock,1.35);
+        if(e.sideCooldown<=0){
+          e.side*=-1;
+          e.sideCooldown=1.55;
+        }
+      }
 
-      // If far for too long, change approach geometry.
-      if(dPlayer>1700&&e.lastAttack>5.0)e.side*=-1;
+      // If far for too long, change approach geometry, but do not spam side flips.
+      if(dPlayer>1700&&e.lastAttack>5.0&&e.sideCooldown<=0){
+        e.side*=-1;
+        e.sideCooldown=1.25;
+      }
     }
 
     const target=aiDesiredPoint(e);
@@ -360,10 +380,10 @@ function updateEnemies(dt){
     let kp=.050+far*.022;
     let kd=.58+(1-far)*.34;
 
-    // In killzone avoidance, prioritize lateral displacement and damping.
-    if(target.mode==="avoid_killzone"){
-      kp*=1.18;
-      kd*=1.08;
+    // While locked in killzone avoidance, prioritize completing the lateral move.
+    if(e.avoidLock>0){
+      kp*=1.26;
+      kd*=1.14;
     }
 
     let ax=errX*kp-relVX*kd;
@@ -374,7 +394,9 @@ function updateEnemies(dt){
       ax+=(-dy/d)*(e.side||1)*95+(dx/d)*30;
       ay+=( dx/d)*(e.side||1)*95+(dy/d)*30;
       e.aiState='separate';
-    }else if(target.mode==="commit"){
+    }else if(e.avoidLock>0 && !canCommit){
+      e.aiState='killzone_avoid';
+    }else if(canCommit){
       e.aiState='commit';
     }else if(target.mode==="avoid_killzone"){
       e.aiState='killzone_avoid';
@@ -395,7 +417,7 @@ function updateEnemies(dt){
       ay+=(-e.y/sysR)*70;
     }
 
-    const maxAccel=target.mode==="avoid_killzone"?158:(shot>.45?152:142);
+    const maxAccel=e.aiState==='killzone_avoid'?160:(canCommit?152:142);
     const mag=Math.hypot(ax,ay);
     if(mag>maxAccel){
       ax=ax/mag*maxAccel;
@@ -422,7 +444,7 @@ function updateEnemies(dt){
     e.hitFlash=Math.max(0,e.hitFlash-dt);
     e.hpVisible=Math.max(0,e.hpVisible-dt);
 
-    const desiredAim=(dPlayer<enemyWeapon.range*1.35||shot>.25||target.mode==="commit")
+    const desiredAim=(canCommit || dPlayer<enemyWeapon.range*1.25 || shot>.35)
       ? Math.atan2((ship.y+ship.vy*.20)-e.y,(ship.x+ship.vx*.20)-e.x)
       : Math.atan2(ay,ax);
 
