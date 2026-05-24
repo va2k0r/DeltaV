@@ -164,13 +164,13 @@
   <div class="hud">
     <div class="panel">
       <div class="title">DeltaV 2D pure</div>
-      <div class="small">Camera ortografica pura: posizioni relative stabili, zoom su traiettoria + gravity well rilevanti.</div>
+      <div class="small">Camera 2D pura, pianeti senza anelli, nudge orbitale disattivato per testare orbite nude e crude.</div>
     </div>
     <div class="panel" id="readout">v 0<br>fuel 100%<br>target —<br>state coasting</div>
   </div>
 
   <div class="hint">
-    Lati invisibili: ruota con RCS. Centro basso: burn. I pianeti fuori schermo sono linee colorate sul bordo, non corpi fisici.
+    Lati invisibili: ruota con RCS. Centro basso: burn. Linee bordo sfumate: si allungano e lasciano entrare il pianeta senza stacco.
   </div>
 
   <div class="turnZone left" id="leftGlow"></div>
@@ -407,56 +407,18 @@
   }
 
   function orbitAssist(dt, x, y, vx, vy, bs = bodies, mode = "actual") {
-    const planets = bs.filter(b => b.type !== "sun");
-    let p = null;
+    // Temporarily disabled: testing raw orbital mechanics without assisted capture.
+    let nearest = null;
     let bestD = Infinity;
-
-    for (const b of planets) {
-      const d = dist(x, y, b.x, b.y);
+    for (const b of bs) {
+      if (b.type === "sun") continue;
+      const d = Math.hypot(x - b.x, y - b.y);
       if (d < bestD) {
         bestD = d;
-        p = b;
+        nearest = b;
       }
     }
-
-    if (!p) return { vx, vy, body: null, stable: false };
-
-    const dx = x - p.x;
-    const dy = y - p.y;
-    const d = Math.hypot(dx, dy);
-    const safeR = p.r * 1.48;
-    const outer = p.r * 4.4;
-    if (d < safeR || d > outer) return { vx, vy, body: p, stable: false };
-
-    const nx = dx / d;
-    const ny = dy / d;
-    const tx = -ny;
-    const ty = nx;
-
-    const radial = vx * nx + vy * ny;
-    const tang = vx * tx + vy * ty;
-    const ideal = Math.sqrt(p.mass / Math.max(d, safeR)) * 0.90;
-    const speedErr = Math.abs(Math.abs(tang) - ideal) / ideal;
-    const radialErr = Math.abs(radial) / ideal;
-    const altitude = clamp((d - safeR) / (p.r * 1.35), 0, 1);
-    const affinity = clamp((1 - speedErr * 0.92 - radialErr * 0.72) * altitude, 0, 1);
-
-    let stable = false;
-
-    if (Math.abs(tang) > ideal * 0.38 && affinity > 0.14) {
-      const strength = (mode === "predict" ? 0.46 : 0.50) * affinity;
-      vx += (-radial * nx) * dt * (0.32 + strength * 0.46);
-      vy += (-radial * ny) * dt * (0.32 + strength * 0.46);
-
-      const desiredTang = Math.sign(tang || 1) * ideal;
-      const tangDelta = desiredTang - tang;
-      vx += tx * tangDelta * dt * (0.10 + strength * 0.18);
-      vy += ty * tangDelta * dt * (0.10 + strength * 0.18);
-
-      stable = Math.abs(radial) < ideal * 0.10 && Math.abs(tangDelta) < ideal * 0.12 && d > safeR * 1.05;
-    }
-
-    return { vx, vy, body: p, stable };
+    return { vx, vy, body: nearest, stable: false };
   }
 
   function analyzePrediction() {
@@ -474,11 +436,13 @@
     const scores = new Map();
     const closest = new Map();
     const step = 0.085;
-    const steps = 900;
+    const steps = 720;
     let stableBody = null;
-    let orbitId = null;
-    let lastAng = 0;
-    let accum = 0;
+
+    let dominantId = null;
+    let dominantSwitches = 0;
+    let severeTurns = 0;
+    let prevVelAng = Math.atan2(vy, vx);
 
     for (let i = 0; i < steps; i++) {
       const futureBodies = [bodyState(sun, time + i * step), ...planetDefs.map(p => bodyState(p, time + i * step))];
@@ -487,14 +451,17 @@
       vx += g.ax * step;
       vy += g.ay * step;
 
+      // Orbital nudge disabled by orbitAssist, left in place to make future reactivation easy.
       const assisted = orbitAssist(step, x, y, vx, vy, futureBodies, "predict");
       vx = assisted.vx;
       vy = assisted.vy;
-      if (assisted.stable && assisted.body) stableBody = assisted.body;
 
       x += vx * step;
       y += vy * step;
       pts.push({ x, y });
+
+      let frameDominant = null;
+      let frameBestInfluence = -Infinity;
 
       for (const b of futureBodies) {
         if (b.type === "sun") continue;
@@ -506,24 +473,31 @@
         const influence = b.mass / Math.max(d2, b.r * b.r * 0.82);
         const wellProx = Math.max(0, 1 - d / (b.r * 14));
         const timeWeight = 1 - i / steps;
+
         scores.set(b.id, (scores.get(b.id) || 0) + influence * 2700 * (0.25 + timeWeight * 0.75) + wellProx * (1.2 + timeWeight * 1.4));
         closest.set(b.id, Math.min(closest.get(b.id) ?? Infinity, d));
+
+        if (influence > frameBestInfluence) {
+          frameBestInfluence = influence;
+          frameDominant = b.id;
+        }
 
         if (d < b.r) return finalizePrediction(pts, scores, closest, stableBody);
       }
 
-      if (stableBody) {
-        const liveStable = futureBodies.find(b => b.id === stableBody.id) || stableBody;
-        const ang = Math.atan2(y - liveStable.y, x - liveStable.x);
-        if (!orbitId) {
-          orbitId = stableBody.id;
-          lastAng = ang;
-        } else if (orbitId === stableBody.id) {
-          accum += shortDelta(lastAng, ang);
-          lastAng = ang;
-          if (Math.abs(accum) > Math.PI * 2 * 1.03) break;
-        }
+      if (frameDominant && frameDominant !== dominantId) {
+        if (dominantId !== null && i > 24) dominantSwitches++;
+        dominantId = frameDominant;
       }
+
+      const velAng = Math.atan2(vy, vx);
+      const turn = Math.abs(shortDelta(prevVelAng, velAng));
+      prevVelAng = velAng;
+      if (turn > 0.26) severeTurns++;
+
+      // Cut off chaotic multi-body loops / figure-eights.
+      if (dominantSwitches >= 5 && pts.length > 130) break;
+      if (severeTurns >= 12 && pts.length > 120) break;
     }
 
     return finalizePrediction(pts, scores, closest, stableBody);
@@ -568,10 +542,12 @@
   function updateZoom(dt) {
     const pts = prediction.points;
     const relevant = [prediction.primary, prediction.secondary].filter(Boolean);
+    if (!relevant.length && targetBody) relevant.push(targetBody);
+
     let minX = ship.x, maxX = ship.x, minY = ship.y, maxY = ship.y;
 
     const step = relevant.length ? 8 : 12;
-    const limit = relevant.length ? 90 : 130;
+    const limit = relevant.length ? 84 : 120;
 
     for (let i = 0; i < pts.length && i < limit * step; i += step) {
       const p = pts[i];
@@ -581,32 +557,48 @@
       maxY = Math.max(maxY, p.y);
     }
 
-    if (!relevant.length && targetBody) relevant.push(targetBody);
+    // Always include at least one complete planet with breathing room.
+    if (!relevant.length) {
+      let nearest = null;
+      let bestD = Infinity;
+      for (const b of bodies) {
+        if (b.type === "sun") continue;
+        const d = Math.hypot(b.x - ship.x, b.y - ship.y);
+        if (d < bestD) {
+          bestD = d;
+          nearest = b;
+        }
+      }
+      if (nearest) relevant.push(nearest);
+    }
 
     for (const b of relevant) {
-      const pad = b.r * 2.25 + 130;
+      const pad = b.r * 2.85 + 170;
       minX = Math.min(minX, b.x - pad);
       maxX = Math.max(maxX, b.x + pad);
       minY = Math.min(minY, b.y - pad);
       maxY = Math.max(maxY, b.y + pad);
     }
 
-    const visibleRelevant = relevant.some(b => {
-      const s = toScreen(b.x, b.y);
-      const r = b.r * camera.zoom;
-      return s.x + r > 0 && s.x - r < W && s.y + r > 0 && s.y - r < H;
+    const spanX = Math.max(520, maxX - minX);
+    const spanY = Math.max(400, maxY - minY);
+    let fit = Math.min(W * 0.82 / spanX, H * 0.74 / spanY);
+
+    // If after fitting no relevant planet is fully visible, pull back more aggressively.
+    let fullVisible = relevant.some(b => {
+      const s = {
+        x: W / 2 + (b.x - ship.x) * fit,
+        y: H / 2 + (b.y - ship.y) * fit
+      };
+      const r = b.r * fit;
+      const air = Math.max(30, r * 0.55);
+      return s.x - r - air > 0 && s.x + r + air < W && s.y - r - air > 0 && s.y + r + air < H;
     });
+    if (!fullVisible && relevant.length) fit *= 0.72;
 
-    const spanX = Math.max(420, maxX - minX);
-    const spanY = Math.max(320, maxY - minY);
-    let fit = Math.min(W * 0.82 / spanX, H * 0.76 / spanY);
+    camera.targetZoom = clamp(fit, 0.035, 1.25);
 
-    if (!visibleRelevant && relevant.length) fit *= 0.72;
-    if (!pts.length && targetBody) fit = Math.min(fit, 0.42);
-
-    camera.targetZoom = clamp(fit, 0.045, 1.25);
-
-    const zoomRate = camera.targetZoom < camera.zoom ? 2.8 : 1.15;
+    const zoomRate = camera.targetZoom < camera.zoom ? 3.2 : 1.05;
     camera.zoom += (camera.targetZoom - camera.zoom) * Math.min(1, dt * zoomRate);
 
     camera.x = ship.x;
@@ -1178,10 +1170,19 @@
 
   function drawOffscreenIndicator(b) {
     if (b.type === "sun") return;
+
     const s = toScreen(b.x, b.y);
     const r = Math.max(1, b.r * camera.zoom);
-    const inside = s.x - r > 0 && s.x + r < W && s.y - r > 0 && s.y + r < H;
-    if (inside) return;
+    const air = Math.max(18, r * 0.18);
+
+    const fullyInside = s.x - r - air > 0 && s.x + r + air < W && s.y - r - air > 0 && s.y + r + air < H;
+    if (fullyInside) return;
+
+    // Once the planet's visible diameter is comparable to the edge line, let the planet take over.
+    const intersects = s.x + r > 0 && s.x - r < W && s.y + r > 0 && s.y - r < H;
+    const visibleW = Math.max(0, Math.min(W, s.x + r) - Math.max(0, s.x - r));
+    const visibleH = Math.max(0, Math.min(H, s.y + r) - Math.max(0, s.y - r));
+    const visibleDiameter = Math.max(visibleW, visibleH);
 
     const dx = b.x - ship.x;
     const dy = b.y - ship.y;
@@ -1189,22 +1190,35 @@
     const ady = Math.abs(dy);
     const d = Math.hypot(dx, dy);
     const prox = clamp(1 - d / 3400, 0, 1);
-    const len = clamp(r * 1.6 + prox * 22, 9, 64);
+
+    const apparentDiameter = r * 2;
+    const lineLen = clamp(apparentDiameter * 0.92 + prox * 18, 10, 88);
+
+    if (intersects && visibleDiameter >= lineLen * 0.88) return;
+
     const margin = 5;
 
     ctx.save();
-    ctx.strokeStyle = rgb(b.a, 0.98);
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = rgb(b.a, 0.94);
+    ctx.lineWidth = clamp(3.2 + r * 0.035, 3.2, 7);
     ctx.lineCap = "round";
-    ctx.shadowColor = rgb(b.a, 0.78);
-    ctx.shadowBlur = 14;
+    ctx.shadowColor = rgb(b.a, 0.72);
+    ctx.shadowBlur = 16;
 
     if (adx > ady) {
       const x = dx < 0 ? margin : W - margin;
-      const y = clamp(H / 2 + dy / Math.max(adx, 1) * (W / 2 - 30), 32 + len / 2, H - 155 - len / 2);
+      const y = clamp(H / 2 + dy / Math.max(adx, 1) * (W / 2 - 30), 32 + lineLen / 2, H - 155 - lineLen / 2);
+
+      const grad = ctx.createLinearGradient(x, y - lineLen / 2, x, y + lineLen / 2);
+      grad.addColorStop(0, rgb(b.a, 0.08));
+      grad.addColorStop(0.18, rgb(b.a, 0.94));
+      grad.addColorStop(0.82, rgb(b.a, 0.94));
+      grad.addColorStop(1, rgb(b.a, 0.08));
+      ctx.strokeStyle = grad;
+
       ctx.beginPath();
-      ctx.moveTo(x, y - len / 2);
-      ctx.lineTo(x, y + len / 2);
+      ctx.moveTo(x, y - lineLen / 2);
+      ctx.lineTo(x, y + lineLen / 2);
       ctx.stroke();
 
       if (prox > 0.10 || b === targetBody) {
@@ -1212,14 +1226,22 @@
         ctx.fillStyle = "rgba(255,255,255,.86)";
         ctx.font = "11px system-ui";
         ctx.textAlign = dx < 0 ? "left" : "right";
-        ctx.fillText(b.name, dx < 0 ? x + 8 : x - 8, y - len / 2 - 7);
+        ctx.fillText(b.name, dx < 0 ? x + 8 : x - 8, y - lineLen / 2 - 7);
       }
     } else {
       const y = dy < 0 ? margin : H - margin;
-      const x = clamp(W / 2 + dx / Math.max(ady, 1) * (H / 2 - 30), 26 + len / 2, W - 26 - len / 2);
+      const x = clamp(W / 2 + dx / Math.max(ady, 1) * (H / 2 - 30), 26 + lineLen / 2, W - 26 - lineLen / 2);
+
+      const grad = ctx.createLinearGradient(x - lineLen / 2, y, x + lineLen / 2, y);
+      grad.addColorStop(0, rgb(b.a, 0.08));
+      grad.addColorStop(0.18, rgb(b.a, 0.94));
+      grad.addColorStop(0.82, rgb(b.a, 0.94));
+      grad.addColorStop(1, rgb(b.a, 0.08));
+      ctx.strokeStyle = grad;
+
       ctx.beginPath();
-      ctx.moveTo(x - len / 2, y);
-      ctx.lineTo(x + len / 2, y);
+      ctx.moveTo(x - lineLen / 2, y);
+      ctx.lineTo(x + lineLen / 2, y);
       ctx.stroke();
 
       if (prox > 0.10 || b === targetBody) {
@@ -1394,11 +1416,11 @@
     drawBackground();
     drawGrid();
     drawTrajectory();
+    drawOffscreenIndicators();
     drawBodies();
     drawParticles();
     drawShip();
     drawFuel();
-    drawOffscreenIndicators();
     drawFlash();
 
     const speed = Math.hypot(ship.vx, ship.vy);
