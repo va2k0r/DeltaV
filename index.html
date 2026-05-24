@@ -19,7 +19,7 @@ canvas{display:block;width:100vw;height:100dvh;background:radial-gradient(circle
 </head>
 <body>
 <canvas id="game"></canvas>
-<div class="hud"><div class="panel"><div class="title">DeltaV combat prototype</div><div class="small">AI v5: tailing, attack_commit e trade shots quando conviene. Zoom iniziale stabilizzato.</div></div><div class="panel" id="readout"></div></div>
+<div class="hud"><div class="panel"><div class="title">DeltaV combat prototype</div><div class="small">AI v6: combat band, match velocity anti-overshoot, pressure kill se resti fermo.</div></div><div class="panel" id="readout"></div></div>
 <div class="hint">Lati invisibili: ruota con RCS. Centro basso: burn. Laser automatico con cono stretto.</div>
 <div class="turnZone left" id="leftGlow"></div><div class="turnZone right" id="rightGlow"></div><div class="burnButton" id="burnVisual">BURN</div>
 <div class="actions"><button class="hudBtn" id="resetBtn">Reset</button><button class="hudBtn" id="newBtn">New</button></div>
@@ -32,7 +32,7 @@ const input={leftIds:new Set(),rightIds:new Set(),burnIds:new Set()};
 const sun={id:'sun',name:'Sol',type:'sun',x:0,y:0,r:145,mass:145000,a:[255,232,165],b:[255,125,44],seed:9};
 const ship={x:0,y:0,vx:0,vy:0,angle:0,radius:12,turnInput:0,angularVelocity:0,turnRate:2.35,thrust:0,thrustTarget:0,thrustPower:160,fuel:1,burnFuelUse:.56,turnFuelUse:.36,fuelRegen:.14,hp:8,maxHp:8,damageFlash:0};
 let prediction={points:[],scores:new Map(),primary:null,secondary:null,impact:false,escape:false},targetBody=null,enemies=[],beams=[],enemyBeams=[],weaponCooldown=0;
-const weapon={range:760,cone:Math.PI*.075,cooldown:.85,damage:1},enemyWeapon={range:860,cone:Math.PI*.13,cooldown:1.10,damage:1},boundary={soft:6200,hard:9000,pull:34};
+const weapon={range:760,cone:Math.PI*.075,cooldown:.85,damage:1},enemyWeapon={range:920,cone:Math.PI*.145,cooldown:1.00,damage:1},boundary={soft:6200,hard:9000,pull:34};
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}function rgb(a,o=1){return`rgba(${a[0]},${a[1]},${a[2]},${o})`}function sd(a,b){return Math.atan2(Math.sin(b-a),Math.cos(b-a))}
 function rngFactory(seed){let t=seed>>>0;return()=>{t+=0x6D2B79F5;let r=Math.imul(t^(t>>>15),1|t);r^=r+Math.imul(r^(r>>>7),61|r);return((r^(r>>>14))>>>0)/4294967296}}function rr(r,min,max){return min+r()*(max-min)}function ri(r,min,max){return Math.floor(rr(r,min,max+1))}
 const palette=[[[115,236,255],[35,110,220]],[[255,216,130],[180,82,50]],[[218,175,255],[76,56,148]],[[162,255,201],[39,140,120]],[[255,154,128],[140,58,68]],[[210,230,255],[80,105,160]],[[255,235,165],[160,130,48]]];
@@ -177,6 +177,76 @@ function enemyShouldTrade(e,danger,opportunity){
 }
 
 function enemyAttackApproachBurn(e,danger){const d=Math.hypot(ship.x-e.x,ship.y-e.y),base=enemyApproachAngle(e),aggression=d>enemyWeapon.range?.78:.52,ang=nonEscapeBurnAngle(e,base,aggression),power=d>enemyWeapon.range*1.35?128:92,dur=d>enemyWeapon.range*1.35?.62:.42;enemyBurn(e,ang,power,dur)}
+
+function enemyRelativeVelocity(e){
+  const rvx=e.vx-ship.vx, rvy=e.vy-ship.vy;
+  return {x:rvx,y:rvy,speed:Math.hypot(rvx,rvy)};
+}
+
+function enemyCombatBand(e){
+  const d=Math.hypot(ship.x-e.x,ship.y-e.y);
+  return {
+    d,
+    ideal:680,
+    inner:430,
+    outer:980,
+    far:1350
+  };
+}
+
+function enemyMatchVelocityAngle(e){
+  const rv=enemyRelativeVelocity(e);
+  if(rv.speed<1)return enemyApproachAngle(e);
+  return Math.atan2(-rv.y,-rv.x);
+}
+
+function enemyClosingSpeed(e){
+  const dx=ship.x-e.x,dy=ship.y-e.y,d=Math.hypot(dx,dy)+.0001;
+  const rvx=e.vx-ship.vx,rvy=e.vy-ship.vy;
+  // positive means closing toward the player
+  return (rvx*dx+rvy*dy)/d;
+}
+
+function enemyDirectAttackAngle(e){
+  const d=Math.hypot(ship.x-e.x,ship.y-e.y);
+  const lead=clamp(d/780,.35,1.4);
+  return Math.atan2((ship.y+ship.vy*lead)-e.y,(ship.x+ship.vx*lead)-e.x);
+}
+
+function enemyBandControlBurn(e){
+  const band=enemyCombatBand(e);
+  const rel=enemyRelativeVelocity(e);
+  let ang;
+  let power;
+  let dur;
+
+  if(band.d>band.outer){
+    // Approach, but do not arrive with stupid relative velocity.
+    const approach=enemyApproachAngle(e);
+    const match=enemyMatchVelocityAngle(e);
+    const closing=enemyClosingSpeed(e);
+    const tooFast=closing>130 || rel.speed>190;
+    ang=tooFast?mixAngles(approach,match,.58):approach;
+    power=tooFast?104:130;
+    dur=tooFast?.44:.58;
+  }else if(band.d<band.inner){
+    // Too close: lateral separation, not pure escape.
+    const away=Math.atan2(e.y-ship.y,e.x-ship.x);
+    ang=away+e.side*Math.PI*.58;
+    power=88;
+    dur=.36;
+  }else{
+    // In band: match velocity and slide/tail for shot quality.
+    const match=enemyMatchVelocityAngle(e);
+    const tail=enemyTailingAngle(e);
+    ang=mixAngles(match,tail,.48);
+    power=68;
+    dur=.32;
+  }
+
+  enemyBurn(e,nonEscapeBurnAngle(e,ang,.68),power,dur);
+}
+
 function enemyCanShootPlayer(e){let dx=ship.x-e.x,dy=ship.y-e.y,d=Math.hypot(dx,dy);if(d>enemyWeapon.range||d<1)return false;let fx=Math.cos(e.angle),fy=Math.sin(e.angle),a=Math.acos(clamp((dx/d)*fx+(dy/d)*fy,-1,1));return a<=enemyWeapon.cone}
 function updateEnemies(dt){
   for(const e of enemies){
@@ -192,69 +262,77 @@ function updateEnemies(dt){
     e.weaponCooldown=Math.max(0,(e.weaponCooldown||0)-dt);
     e.lastAttack+=dt;
 
-    const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
+    const band=enemyCombatBand(e);
+    const dPlayer=band.d;
     const sysR=Math.hypot(e.x,e.y);
     const danger=playerWeaponDanger(e);
     const opportunity=enemyAttackOpportunity(e);
     const positionScore=enemyTacticalPositionScore(e);
+    const rel=enemyRelativeVelocity(e);
+    const closing=enemyClosingSpeed(e);
     const canDecide=e.aiLock<=0;
-    const trade=enemyShouldTrade(e,danger,opportunity);
+
+    // Deliberate goal: if player stays still, enemy should kill quickly.
+    // Therefore "attack_control" dominates unless it is genuinely about to die.
+    const hasGoodTrade=enemyShouldTrade(e,danger,opportunity) || (opportunity>.44 && e.hp/e.maxHp>.30);
+    const urgentPressure=e.lastAttack>3.2 || dPlayer>band.outer;
 
     if(canDecide){
       if(sysR>boundary.soft*.76){
         e.aiState='return_core';
-        e.aiLock=1.25;
-        e.burnCooldown=1.0;
-        enemyBurn(e,nonEscapeBurnAngle(e,inwardAngle(e.x,e.y),.92),118,.56);
-      }else if(trade){
-        // Important: good shot beats fear. This makes trading shots a valid strategy.
+        e.aiLock=1.15;
+        e.burnCooldown=.9;
+        enemyBurn(e,nonEscapeBurnAngle(e,inwardAngle(e.x,e.y),.92),118,.54);
+      }else if(hasGoodTrade){
+        // Good shot or imminent shot beats defensive reaction.
         e.aiState='attack_commit';
-        e.aiLock=.92;
-        if(e.burnCooldown<=0&&dPlayer>enemyWeapon.range*.56){
-          const ang=enemyTailingAngle(e);
-          enemyBurn(e,nonEscapeBurnAngle(e,ang,.72),104,.44);
-          e.burnCooldown=.95;
+        e.aiLock=.82;
+        if(e.burnCooldown<=0 && dPlayer>enemyWeapon.range*.50){
+          enemyBandControlBurn(e);
+          e.burnCooldown=.78;
         }
-      }else if(danger>.70){
+      }else if(danger>.78 && opportunity<.35){
+        // Only hard evade when we do NOT have a useful offensive window.
         e.aiState='emergency_flank';
-        e.aiLock=1.05;
-        e.burnCooldown=1.65;
+        e.aiLock=.95;
+        e.burnCooldown=1.35;
         const away=Math.atan2(e.y-ship.y,e.x-ship.x);
         const lateral=away+e.side*Math.PI*.58;
-        enemyBurn(e,nonEscapeBurnAngle(e,lateral,.78),128,.52);
+        enemyBurn(e,nonEscapeBurnAngle(e,lateral,.78),118,.45);
         e.side*=-1;
-      }else if(danger>.34 || (dPlayer<weapon.range*1.55 && playerWeaponDangerAt(e.x+e.vx*1.15,e.y+e.vy*1.15,1.15)>.28)){
-        // Defensive, but less over-eager than before.
+      }else if(danger>.42 && opportunity<.42 && e.hp/e.maxHp<.55){
+        // Damaged enemies are more cautious.
         e.aiState='pre_flank';
-        e.aiLock=.95;
-        e.burnCooldown=1.55;
+        e.aiLock=.82;
+        e.burnCooldown=1.2;
         const toPlayer=Math.atan2(ship.y-e.y,ship.x-e.x);
-        const lateral=toPlayer+e.side*Math.PI*.62;
-        enemyBurn(e,nonEscapeBurnAngle(e,lateral,.45),78,.34);
-      }else if(dPlayer<enemyWeapon.range*1.30 || opportunity>.38){
-        e.aiState='attack_pass';
-        e.aiLock=.85;
-        if(e.burnCooldown<=0 && dPlayer>enemyWeapon.range*.62){
+        const lateral=toPlayer+e.side*Math.PI*.58;
+        enemyBurn(e,nonEscapeBurnAngle(e,lateral,.42),72,.32);
+      }else if(dPlayer<enemyWeapon.range*.95 || opportunity>.34){
+        e.aiState='attack_control';
+        e.aiLock=.65;
+        if(e.burnCooldown<=0){
+          enemyBandControlBurn(e);
+          e.burnCooldown=.70;
+        }
+      }else if(urgentPressure){
+        e.aiState='attack_control';
+        e.aiLock=.75;
+        if(e.burnCooldown<=0){
+          enemyBandControlBurn(e);
+          e.burnCooldown=.82;
+        }
+      }else if(positionScore<.56){
+        e.aiState='tailing';
+        e.aiLock=.78;
+        if(e.burnCooldown<=0){
           const ang=enemyTailingAngle(e);
-          enemyBurn(e,nonEscapeBurnAngle(e,ang,.68),98,.42);
+          enemyBurn(e,nonEscapeBurnAngle(e,ang,.55),82,.38);
           e.burnCooldown=.95;
         }
-      }else if(positionScore<.55 || e.lastAttack>4.5){
-        // Get behind/lateral before attacking. This is the main "tailing" behavior.
-        e.aiState='tailing';
-        e.aiLock=.9;
-        if(e.burnCooldown<=0){
-          const ang=enemyTailingAngle(e);
-          enemyBurn(e,nonEscapeBurnAngle(e,ang,.62),96,.44);
-          e.burnCooldown=1.05;
-        }
       }else{
-        e.aiState='approach';
-        e.aiLock=.85;
-        if(e.burnCooldown<=0){
-          enemyAttackApproachBurn(e,danger);
-          e.burnCooldown=1.10;
-        }
+        e.aiState='staging';
+        e.aiLock=.8;
       }
     }
 
@@ -265,12 +343,11 @@ function updateEnemies(dt){
     }else if(e.aiState==='emergency_flank'||e.aiState==='pre_flank'){
       desired=e.burnAngle;
     }else if(e.aiState==='attack_commit'){
-      // Commit to the shot even under moderate danger.
-      desired=Math.atan2((ship.y+ship.vy*.24)-e.y,(ship.x+ship.vx*.24)-e.x);
+      desired=enemyDirectAttackAngle(e);
       if(e.weaponCooldown<=0&&enemyCanShootPlayer(e)){
         e.weaponCooldown=enemyWeapon.cooldown;
         e.lastAttack=0;
-        e.aiLock=.65;
+        e.aiLock=.55;
         enemyBeams.push({x1:e.x+Math.cos(e.angle)*20,y1:e.y+Math.sin(e.angle)*20,x2:ship.x,y2:ship.y,life:.12,maxLife:.12});
         ship.damageFlash=.22;
         ship.hp=Math.max(0,ship.hp-enemyWeapon.damage);
@@ -278,36 +355,41 @@ function updateEnemies(dt){
         e.aiState='post_attack';
         e.side*=-1;
       }
-    }else if(e.aiState==='attack_pass'){
-      desired=Math.atan2((ship.y+ship.vy*.30)-e.y,(ship.x+ship.vx*.30)-e.x);
+    }else if(e.aiState==='attack_control'){
+      // If overshooting, match velocity first. Otherwise aim directly enough to shoot.
+      if((rel.speed>175 && dPlayer<band.far) || (closing>150 && dPlayer<band.outer)){
+        desired=enemyMatchVelocityAngle(e);
+      }else if(dPlayer<enemyWeapon.range*1.05){
+        desired=enemyDirectAttackAngle(e);
+      }else{
+        desired=enemyApproachAngle(e);
+      }
+
       if(e.weaponCooldown<=0&&enemyCanShootPlayer(e)){
         e.weaponCooldown=enemyWeapon.cooldown;
         e.lastAttack=0;
-        e.aiLock=.75;
+        e.aiLock=.55;
         enemyBeams.push({x1:e.x+Math.cos(e.angle)*20,y1:e.y+Math.sin(e.angle)*20,x2:ship.x,y2:ship.y,life:.12,maxLife:.12});
         ship.damageFlash=.22;
         ship.hp=Math.max(0,ship.hp-enemyWeapon.damage);
         if(ship.hp<=0){spawnParticle(ship.x,ship.y,90,'255,130,70');reset();return}
-        e.aiState='post_attack';
-        e.side*=-1;
       }
     }else if(e.aiState==='post_attack'){
       const away=Math.atan2(e.y-ship.y,e.x-ship.x);
-      desired=nonEscapeBurnAngle(e,away+e.side*Math.PI*.52,.58);
+      desired=nonEscapeBurnAngle(e,away+e.side*Math.PI*.50,.55);
       if(e.burnCooldown<=0){
-        enemyBurn(e,desired,88,.34);
-        e.burnCooldown=1.35;
+        enemyBurn(e,desired,76,.30);
+        e.burnCooldown=1.0;
       }
     }else if(e.aiState==='tailing'){
       desired=enemyTailingAngle(e);
-    }else if(e.aiState==='approach'){
-      desired=enemyApproachAngle(e);
     }else{
-      desired=enemyInterceptAngle(e);
+      desired=enemyApproachAngle(e);
     }
 
     if(desired!=null){
-      const maxTurn=1.95;
+      // Less erratic: turn rate stays comparable and state locks are shorter but stable.
+      const maxTurn=1.82;
       const delta=sd(e.angle,desired);
       e.angle+=clamp(delta,-maxTurn*dt,maxTurn*dt);
     }
@@ -322,6 +404,13 @@ function updateEnemies(dt){
     let g=gravityAt(e.x,e.y);
     e.vx+=g.ax*dt;
     e.vy+=g.ay*dt;
+
+    // Additional anti-overshoot damping in combat band: remove a small amount of excess relative velocity.
+    if(dPlayer<band.far && rel.speed>220){
+      const rv=enemyRelativeVelocity(e);
+      e.vx-=rv.x*.010;
+      e.vy-=rv.y*.010;
+    }
 
     if(sysR>boundary.soft*.72){
       const ox=e.x/(sysR+.0001),oy=e.y/(sysR+.0001);
@@ -346,9 +435,9 @@ function updateEnemies(dt){
         e.y=b.y+ny*minD;
         const radial=e.vx*nx+e.vy*ny;
         if(radial<0){e.vx-=nx*radial*1.25;e.vy-=ny*radial*1.25}
-        enemyBurn(e,nonEscapeBurnAngle(e,Math.atan2(ny,nx)+Math.PI/2,.75),108,.34);
+        enemyBurn(e,nonEscapeBurnAngle(e,Math.atan2(ny,nx)+Math.PI/2,.75),100,.32);
         e.aiState='return_core';
-        e.aiLock=1.0;
+        e.aiLock=.9;
         e.hitFlash=.12;
       }
     }
