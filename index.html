@@ -164,13 +164,13 @@
   <div class="hud">
     <div class="panel">
       <div class="title">DeltaV 2D pure</div>
-      <div class="small">Camera 2D pura, pianeti congelati per leggibilità, niente anelli, nudge orbitale disattivato.</div>
+      <div class="small">Camera 2D pura, pianeti senza anelli, nudge orbitale disattivato per testare orbite nude e crude.</div>
     </div>
     <div class="panel" id="readout">v 0<br>fuel 100%<br>target —<br>state coasting</div>
   </div>
 
   <div class="hint">
-    Lati invisibili: ruota con RCS. Centro basso: burn. Linee bordo sfumate, senza nomi. Pianeti fermi: traiettoria stabile e più leggibile.
+    Lati invisibili: ruota con RCS. Centro basso: burn. Linee bordo sfumate, senza nomi: lunghezza coerente col diametro apparente del pianeta.
   </div>
 
   <div class="turnZone left" id="leftGlow"></div>
@@ -180,6 +180,7 @@
   <div class="actions">
     <button class="hudBtn" id="audioBtn">Audio</button>
     <button class="hudBtn" id="resetBtn">Reset</button>
+    <button class="hudBtn" id="newSystemBtn">New</button>
   </div>
 
 <script>
@@ -190,6 +191,7 @@
   const burnVisual = document.getElementById("burnVisual");
   const audioBtn = document.getElementById("audioBtn");
   const resetBtn = document.getElementById("resetBtn");
+  const newSystemBtn = document.getElementById("newSystemBtn");
   const leftGlow = document.getElementById("leftGlow");
   const rightGlow = document.getElementById("rightGlow");
 
@@ -233,13 +235,102 @@
     seed: 7.4
   };
 
-  const planetDefs = [
-    { id: "aster", name: "Aster", orbitR: 760, omega: 0.010, angle0: 0.55, r: 84, mass: 520000, a: [115,236,255], b: [35,110,220], seed: 0.12 },
-    { id: "vesta", name: "Vesta", orbitR: 1270, omega: 0.0074, angle0: 2.18, r: 112, mass: 920000, a: [255,216,130], b: [180,82,50], seed: 1.35 },
-    { id: "nox", name: "Nox", orbitR: 1760, omega: 0.0053, angle0: 3.72, r: 72, mass: 420000, a: [218,175,255], b: [76,56,148], seed: 2.1 },
-    { id: "crios", name: "Crios", orbitR: 2360, omega: 0.0040, angle0: 5.10, r: 102, mass: 720000, a: [162,255,201], b: [39,140,120], seed: 2.9 },
-    { id: "helios", name: "Helios", orbitR: 3140, omega: 0.0030, angle0: 1.15, r: 146, mass: 1450000, a: [255,223,142], b: [194,93,32], seed: 0.68 }
+  let systemSeed = Math.floor(Math.random() * 900000) + 100000;
+  let systemAttempt = 0;
+  let planetDefs = [];
+
+  const planetPalette = [
+    { a: [115,236,255], b: [35,110,220] },
+    { a: [255,216,130], b: [180,82,50] },
+    { a: [218,175,255], b: [76,56,148] },
+    { a: [162,255,201], b: [39,140,120] },
+    { a: [255,154,128], b: [140,58,68] },
+    { a: [210,230,255], b: [80,105,160] },
+    { a: [255,235,165], b: [160,130,48] }
   ];
+
+  const nameA = ["A", "No", "Ve", "Ka", "Io", "Cy", "Ma", "Re", "Tha", "El", "Or", "Lu"];
+  const nameB = ["ster", "x", "sta", "rios", "n", "ra", "mir", "don", "lis", "var", "os", "tis"];
+
+  function rngFactory(seed) {
+    let t = seed >>> 0;
+    return function() {
+      t += 0x6D2B79F5;
+      let r = Math.imul(t ^ (t >>> 15), 1 | t);
+      r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function rr(rng, min, max) { return min + rng() * (max - min); }
+  function ri(rng, min, max) { return Math.floor(rr(rng, min, max + 1)); }
+
+  function generateName(rng, used) {
+    for (let i = 0; i < 20; i++) {
+      const n = nameA[ri(rng, 0, nameA.length - 1)] + nameB[ri(rng, 0, nameB.length - 1)];
+      if (!used.has(n)) {
+        used.add(n);
+        return n;
+      }
+    }
+    const fallback = "P" + ri(rng, 100, 999);
+    used.add(fallback);
+    return fallback;
+  }
+
+  function generateSystem(seed, attempt = 0) {
+    const rng = rngFactory(seed + attempt * 10007);
+    const count = ri(rng, 4, 6);
+    const usedNames = new Set(["Aster"]);
+    const defs = [];
+    const baseRadii = [700, 1120, 1580, 2100, 2720, 3420];
+    let lastColor = -1;
+
+    for (let i = 0; i < count; i++) {
+      const orbitBase = baseRadii[i];
+      const orbitR = orbitBase + rr(rng, -90, 130) + i * rr(rng, 0, 45);
+      const radiusClass = rng();
+      let r;
+      if (radiusClass < 0.35) r = rr(rng, 58, 78);
+      else if (radiusClass < 0.78) r = rr(rng, 80, 112);
+      else r = rr(rng, 116, 150);
+
+      const density = rr(rng, 58, 76);
+      const mass = Math.round(r * r * density);
+      let colorIndex = ri(rng, 0, planetPalette.length - 1);
+      if (colorIndex === lastColor) colorIndex = (colorIndex + 2) % planetPalette.length;
+      lastColor = colorIndex;
+      const pal = planetPalette[colorIndex];
+
+      defs.push({
+        id: "p" + i,
+        name: i === 0 ? "Aster" : generateName(rng, usedNames),
+        orbitR,
+        omega: 0,
+        angle0: rr(rng, 0, Math.PI * 2),
+        r: Math.round(r),
+        mass,
+        a: pal.a,
+        b: pal.b,
+        seed: rr(rng, 0, 10)
+      });
+    }
+
+    defs[0].angle0 = rr(rng, 0.15, 0.95);
+    defs[0].orbitR = rr(rng, 680, 850);
+    defs[0].r = clamp(defs[0].r, 72, 105);
+    defs[0].mass = Math.round(defs[0].r * defs[0].r * rr(rng, 62, 78));
+    return defs;
+  }
+
+  function newSystem(seed = Math.floor(Math.random() * 900000) + 100000) {
+    systemSeed = seed;
+    systemAttempt = 0;
+    planetDefs = generateSystem(systemSeed, systemAttempt);
+    time = 0;
+    updateBodies();
+    reset();
+  }
 
   const ship = {
     x: 0,
@@ -324,16 +415,13 @@
 
   function bodyState(def, t) {
     if (def.type === "sun") return { ...def, x: 0, y: 0, vx: 0, vy: 0 };
-    const ang = def.angle0 + def.omega * t;
+    const ang = def.angle0;
     const x = Math.cos(ang) * def.orbitR;
     const y = Math.sin(ang) * def.orbitR;
-    const vx = -Math.sin(ang) * def.orbitR * def.omega;
-    const vy = Math.cos(ang) * def.orbitR * def.omega;
-    return { ...def, angle: ang, x, y, vx, vy };
+    return { ...def, angle: ang, x, y, vx: 0, vy: 0 };
   }
 
   function updateBodies() {
-    // Planets are intentionally frozen for gameplay clarity.
     bodies = [bodyState(sun, 0), ...planetDefs.map(p => bodyState(p, 0))];
   }
 
@@ -343,24 +431,23 @@
 
   function reset() {
     updateBodies();
-    const p = getBody("aster") || bodies[1];
+    const p = bodies.find(b => b.type !== "sun") || bodies[1];
 
-    // Safe spawn: place the ship in a clean orbit corridor, not on an impact trajectory.
-    const angle = p.angle + Math.PI * 0.55;
-    const d = p.r * 4.1;
+    const angle = p.angle + Math.PI * 0.72;
+    const d = p.r * 4.35;
     const x = p.x + Math.cos(angle) * d;
     const y = p.y + Math.sin(angle) * d;
     const nx = (x - p.x) / d;
     const ny = (y - p.y) / d;
     const tx = -ny;
     const ty = nx;
-    const circ = Math.sqrt(p.mass / d) * 0.94;
+    const circ = Math.sqrt(p.mass / d);
 
     ship.x = x;
     ship.y = y;
-    ship.vx = p.vx + tx * circ;
-    ship.vy = p.vy + ty * circ;
-    ship.angle = Math.atan2(ship.vy - p.vy, ship.vx - p.vx);
+    ship.vx = tx * circ;
+    ship.vy = ty * circ;
+    ship.angle = Math.atan2(ship.vy, ship.vx);
     ship.turnInput = 0;
     ship.angularVelocity = 0;
     ship.thrust = 0;
@@ -368,14 +455,25 @@
     ship.fuel = 1;
     ship.burnSounding = false;
 
-    // Last safety check: if another body is too close, push outward from Aster.
-    for (const b of bodies) {
-      const minD = b.r + ship.radius + 45;
-      const bd = Math.hypot(ship.x - b.x, ship.y - b.y);
-      if (bd < minD) {
-        ship.x = p.x + nx * Math.max(d, minD + p.r * 1.5);
-        ship.y = p.y + ny * Math.max(d, minD + p.r * 1.5);
+    for (let attempt = 0; attempt < 24; attempt++) {
+      let safe = true;
+      for (const b of bodies) {
+        const minD = b.r + ship.radius + 95;
+        if (Math.hypot(ship.x - b.x, ship.y - b.y) < minD) {
+          safe = false;
+          break;
+        }
       }
+      if (safe) break;
+
+      const a = p.angle + Math.PI * 0.72 + attempt * Math.PI * 0.29;
+      ship.x = p.x + Math.cos(a) * d;
+      ship.y = p.y + Math.sin(a) * d;
+      const nnx = (ship.x - p.x) / d;
+      const nny = (ship.y - p.y) / d;
+      ship.vx = -nny * circ;
+      ship.vy = nnx * circ;
+      ship.angle = Math.atan2(ship.vy, ship.vx);
     }
 
     crashTimer = 0;
@@ -1322,177 +1420,105 @@
   function drawShip() {
     const x = W / 2;
     const y = H / 2;
-    const size = 19;
-    const a = ship.angle;
+    const size = 20;
 
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(a);
+    ctx.rotate(ship.angle);
 
-    // Main exhaust
     if (ship.thrust > 0.008) {
       const thrustVisual = Math.max(0.12, ship.thrust * ship.thrust);
-      const flameLen = 18 + thrustVisual * 44 + Math.sin(performance.now() * 0.035) * 4;
-      const grad = ctx.createLinearGradient(-size * 0.95, 0, -size - flameLen, 0);
-      grad.addColorStop(0, `rgba(255,255,255,${0.45 + thrustVisual * 0.40})`);
-      grad.addColorStop(0.20, `rgba(150,235,255,${0.22 + thrustVisual * 0.40})`);
-      grad.addColorStop(0.55, `rgba(255,190,82,${0.20 + thrustVisual * 0.62})`);
+      const flameLen = 16 + thrustVisual * 40 + Math.sin(performance.now() * 0.035) * 4;
+      const grad = ctx.createLinearGradient(-size * 0.80, 0, -size - flameLen, 0);
+      grad.addColorStop(0, `rgba(255,255,255,${0.40 + thrustVisual * 0.42})`);
+      grad.addColorStop(0.35, `rgba(255,190,82,${0.20 + thrustVisual * 0.58})`);
       grad.addColorStop(1, "rgba(255,78,24,.02)");
       ctx.fillStyle = grad;
       ctx.shadowColor = "rgba(255,120,52,.88)";
-      ctx.shadowBlur = 20;
+      ctx.shadowBlur = 18;
       ctx.beginPath();
-      ctx.moveTo(-size * 0.95, -4.8);
+      ctx.moveTo(-size * 0.82, -4.2);
       ctx.lineTo(-size - flameLen, 0);
-      ctx.lineTo(-size * 0.95, 4.8);
+      ctx.lineTo(-size * 0.82, 4.2);
       ctx.closePath();
       ctx.fill();
       ctx.shadowBlur = 0;
     }
 
-    // RCS side jets
     const turnVis = Math.abs(ship.turnInput);
     if (turnVis > 0.05) {
       const side = Math.sign(ship.turnInput) < 0 ? 1 : -1;
-      const rcsLen = 7 + turnVis * 11 + Math.sin(performance.now() * 0.06) * 2;
+      const rcsLen = 7 + turnVis * 10 + Math.sin(performance.now() * 0.06) * 2;
       ctx.fillStyle = `rgba(170,235,255,${0.28 + turnVis * 0.40})`;
       ctx.shadowColor = "rgba(170,235,255,.85)";
       ctx.shadowBlur = 12;
       ctx.beginPath();
-      ctx.moveTo(-6, side * 12);
-      ctx.lineTo(-6 - rcsLen, side * 16);
-      ctx.lineTo(-2, side * 8);
-      ctx.closePath();
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(0, side * -12);
-      ctx.lineTo(0 + rcsLen * 0.8, side * -16);
-      ctx.lineTo(3, side * -8);
+      ctx.moveTo(-4, side * 11);
+      ctx.lineTo(-4 - rcsLen, side * 14);
+      ctx.lineTo(-1, side * 7);
       ctx.closePath();
       ctx.fill();
       ctx.shadowBlur = 0;
     }
 
-    // Soft glow around the hull
-    ctx.shadowColor = "rgba(110,226,255,.22)";
-    ctx.shadowBlur = 20;
-
-    // Wings
-    ctx.fillStyle = "rgba(207,228,246,.98)";
-    ctx.beginPath();
-    ctx.moveTo(-2, -5);
-    ctx.lineTo(-15, -15);
-    ctx.lineTo(-8, -3);
-    ctx.lineTo(-4, -1);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.moveTo(-2, 5);
-    ctx.lineTo(-15, 15);
-    ctx.lineTo(-8, 3);
-    ctx.lineTo(-4, 1);
-    ctx.closePath();
-    ctx.fill();
-
-    // Rear stabilizers
-    ctx.beginPath();
-    ctx.moveTo(-10, -5);
-    ctx.lineTo(-17, -9);
-    ctx.lineTo(-14, -1);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.moveTo(-10, 5);
-    ctx.lineTo(-17, 9);
-    ctx.lineTo(-14, 1);
-    ctx.closePath();
-    ctx.fill();
-
-    // Main hull silhouette
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = "#f5fbff";
-    ctx.strokeStyle = "rgba(8,16,26,.72)";
-    ctx.lineWidth = 1.15;
-    ctx.beginPath();
-    ctx.moveTo(size + 1, 0);
-    ctx.lineTo(8, -5.3);
-    ctx.lineTo(1.5, -7.8);
-    ctx.lineTo(-8.5, -5.2);
-    ctx.lineTo(-16, -1.8);
-    ctx.lineTo(-16, 1.8);
-    ctx.lineTo(-8.5, 5.2);
-    ctx.lineTo(1.5, 7.8);
-    ctx.lineTo(8, 5.3);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    // Hull shading
-    const hullGrad = ctx.createLinearGradient(size, 0, -18, 0);
-    hullGrad.addColorStop(0, "rgba(255,255,255,.92)");
-    hullGrad.addColorStop(0.35, "rgba(174,218,244,.72)");
-    hullGrad.addColorStop(0.85, "rgba(82,120,156,.38)");
-    hullGrad.addColorStop(1, "rgba(20,34,56,.18)");
-    ctx.fillStyle = hullGrad;
-    ctx.beginPath();
-    ctx.moveTo(size + 1, 0);
-    ctx.lineTo(8, -5.3);
-    ctx.lineTo(1.5, -7.8);
-    ctx.lineTo(-8.5, -5.2);
-    ctx.lineTo(-16, -1.8);
-    ctx.lineTo(-16, 1.8);
-    ctx.lineTo(-8.5, 5.2);
-    ctx.lineTo(1.5, 7.8);
-    ctx.lineTo(8, 5.3);
-    ctx.closePath();
-    ctx.fill();
-
-    // Cockpit
-    ctx.fillStyle = "rgba(90,232,255,.98)";
-    ctx.shadowColor = "rgba(90,232,255,.95)";
-    ctx.shadowBlur = 14;
-    ctx.beginPath();
-    ctx.ellipse(6.5, 0, 5.2, 3.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    ctx.fillStyle = "rgba(255,255,255,.50)";
-    ctx.beginPath();
-    ctx.ellipse(7.8, -0.9, 1.9, 1.0, -0.2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Center spine
-    ctx.strokeStyle = "rgba(14,38,68,.34)";
+    ctx.shadowColor = "rgba(100,225,255,.30)";
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = "#f3fbff";
+    ctx.strokeStyle = "rgba(6,14,28,.70)";
     ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(12, 0);
-    ctx.lineTo(-11, 0);
+    ctx.moveTo(size, 0);
+    ctx.lineTo(5, -7);
+    ctx.lineTo(-5, -6);
+    ctx.lineTo(-15, -13);
+    ctx.lineTo(-10, -3);
+    ctx.lineTo(-18, 0);
+    ctx.lineTo(-10, 3);
+    ctx.lineTo(-15, 13);
+    ctx.lineTo(-5, 6);
+    ctx.lineTo(5, 7);
+    ctx.closePath();
+    ctx.fill();
     ctx.stroke();
 
-    // Engine pods
-    ctx.fillStyle = "rgba(215,228,238,.92)";
+    const grad = ctx.createLinearGradient(size, 0, -18, 0);
+    grad.addColorStop(0, "rgba(255,255,255,.90)");
+    grad.addColorStop(0.48, "rgba(140,205,240,.40)");
+    grad.addColorStop(1, "rgba(20,40,70,.20)");
+    ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.roundRect(-15.5, -4.6, 4.6, 3.2, 1.4);
-    ctx.roundRect(-15.5, 1.4, 4.6, 3.2, 1.4);
+    ctx.moveTo(size, 0);
+    ctx.lineTo(5, -7);
+    ctx.lineTo(-5, -6);
+    ctx.lineTo(-15, -13);
+    ctx.lineTo(-10, -3);
+    ctx.lineTo(-18, 0);
+    ctx.lineTo(-10, 3);
+    ctx.lineTo(-15, 13);
+    ctx.lineTo(-5, 6);
+    ctx.lineTo(5, 7);
+    ctx.closePath();
     ctx.fill();
 
-    // Engine glow
-    ctx.fillStyle = "rgba(118,234,255,.90)";
-    ctx.shadowColor = "rgba(118,234,255,.95)";
+    ctx.shadowColor = "rgba(90,232,255,.95)";
     ctx.shadowBlur = 12;
+    ctx.fillStyle = "rgba(90,232,255,.95)";
     ctx.beginPath();
-    ctx.ellipse(-16.6, -3.0, 1.2, 1.0, 0, 0, Math.PI * 2);
-    ctx.ellipse(-16.6, 3.0, 1.2, 1.0, 0, 0, Math.PI * 2);
+    ctx.ellipse(5.5, 0, 4.6, 2.7, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // Targeting ring
-    ctx.strokeStyle = "rgba(255,255,255,.14)";
+    ctx.strokeStyle = "rgba(120,235,255,.80)";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(-18, -2.4);
+    ctx.lineTo(-18, 2.4);
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(255,255,255,.13)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(0, 0, 26, 0, Math.PI * 2);
+    ctx.arc(0, 0, 25.5, 0, Math.PI * 2);
     ctx.stroke();
 
     ctx.restore();
@@ -1560,6 +1586,7 @@
       `v ${speed.toFixed(1)}<br>` +
       `fuel ${(ship.fuel * 100).toFixed(0)}%<br>` +
       `target ${targetBody ? targetBody.name : "—"}<br>` +
+      `seed ${systemSeed}<br>` +
       `state ${state}`;
   }
 
@@ -1613,9 +1640,14 @@
     if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
     reset();
   });
+  newSystemBtn.addEventListener("click", () => {
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+    newSystem();
+  });
 
   window.addEventListener("resize", resize);
   resize();
+  planetDefs = generateSystem(systemSeed, systemAttempt);
   updateBodies();
   reset();
   requestAnimationFrame(loop);
