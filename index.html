@@ -19,7 +19,7 @@ canvas{display:block;width:100vw;height:100dvh;background:radial-gradient(circle
 </head>
 <body>
 <canvas id="game"></canvas>
-<div class="hud"><div class="panel"><div class="title">DeltaV combat prototype</div><div class="small">AI v2: intercept lane, breakaway anticipato, attack pass, HP rossa non rigenerante.</div></div><div class="panel" id="readout"></div></div>
+<div class="hud"><div class="panel"><div class="title">DeltaV combat prototype</div><div class="small">AI v3: pressure cycle, intercept lane, attack pass forzati se resti fermo in orbita.</div></div><div class="panel" id="readout"></div></div>
 <div class="hint">Lati invisibili: ruota con RCS. Centro basso: burn. Laser automatico con cono stretto.</div>
 <div class="turnZone left" id="leftGlow"></div><div class="turnZone right" id="rightGlow"></div><div class="burnButton" id="burnVisual">BURN</div>
 <div class="actions"><button class="hudBtn" id="resetBtn">Reset</button><button class="hudBtn" id="newBtn">New</button></div>
@@ -46,7 +46,7 @@ function gravityAt(x,y,bs=bodies){let soi=null,score=-1e9;for(const b of bs){if(
 function effMass(b,r){let well=b.type==='sun'?b.r*10:b.r*16,boost=1+1.55*(well/(r+well));return b.mass*boost}
 function reset(){updateBodies();const p=bodies.find(b=>b.id==='p0')||bodies.find(b=>b.type!=='sun');let R=Math.max(p.r*3.45,p.r+ship.radius+180),ang=Math.atan2(p.y,p.x)+Math.PI*.45;function place(a){let nx=Math.cos(a),ny=Math.sin(a),tx=-ny,ty=nx,c=Math.sqrt(effMass(p,R)/R);ship.x=p.x+nx*R;ship.y=p.y+ny*R;ship.vx=tx*c;ship.vy=ty*c;ship.angle=Math.atan2(ship.vy,ship.vx)}place(ang);ship.turnInput=0;ship.angularVelocity=0;ship.thrust=0;ship.thrustTarget=0;ship.fuel=1;ship.hp=ship.maxHp;ship.damageFlash=0;particles=[];camera.zoom=.62;camera.targetZoom=.62;camera.zoomVel=0;prediction=analyzePrediction();targetBody=p;spawnEnemy(p);updateUI()}
 function newSystem(){systemSeed=Math.floor(Math.random()*900000)+100000;planetDefs=validSystem(systemSeed);time=0;reset()}
-function spawnEnemy(playerPlanet){enemies=[];beams=[];enemyBeams=[];weaponCooldown=0;const ep=bodies.find(b=>b.type!=='sun'&&b.id!==playerPlanet.id)||playerPlanet;if(!ep)return;let R=Math.max(ep.r*4.4,ep.r+320),a=Math.atan2(ep.y,ep.x)+Math.PI*.78,nx=Math.cos(a),ny=Math.sin(a),tx=-ny,ty=nx,c=Math.sqrt(effMass(ep,R)/R);enemies.push({x:ep.x+nx*R,y:ep.y+ny*R,vx:tx*c,vy:ty*c,angle:Math.atan2(ty,tx),radius:13,hp:6,maxHp:6,hitFlash:0,hpVisible:0,alive:true,weaponCooldown:1.2,aiState:'patrol',aiLock:.8,burnCooldown:1.4,burnTimer:0,burnPower:0,burnAngle:0,plumeTimer:0,side:Math.random()<.5?-1:1})}
+function spawnEnemy(playerPlanet){enemies=[];beams=[];enemyBeams=[];weaponCooldown=0;const ep=bodies.find(b=>b.type!=='sun'&&b.id!==playerPlanet.id)||playerPlanet;if(!ep)return;let R=Math.max(ep.r*4.4,ep.r+320),a=Math.atan2(ep.y,ep.x)+Math.PI*.78,nx=Math.cos(a),ny=Math.sin(a),tx=-ny,ty=nx,c=Math.sqrt(effMass(ep,R)/R);enemies.push({x:ep.x+nx*R,y:ep.y+ny*R,vx:tx*c,vy:ty*c,angle:Math.atan2(ty,tx),radius:13,hp:6,maxHp:6,hitFlash:0,hpVisible:0,alive:true,weaponCooldown:1.2,aiState:'staging',aiLock:.6,burnCooldown:.8,burnTimer:0,burnPower:0,burnAngle:0,plumeTimer:0,side:Math.random()<.5?-1:1,lastAttack:0,attackCycle:2.0})}
 function analyzePrediction(){let speed=Math.hypot(ship.vx,ship.vy);if(speed<2.1&&ship.thrust<.03)return{points:[],scores:new Map(),primary:null,secondary:null,impact:false,escape:false};let x=ship.x,y=ship.y,vx=ship.vx,vy=ship.vy,pts=[],scores=new Map(),dom=null,lastAng=0,acc=0;for(let i=0;i<430;i++){let g=gravityAt(x,y,bodies);vx+=g.ax*.085;vy+=g.ay*.085;x+=vx*.085;y+=vy*.085;pts.push({x,y});if(Math.hypot(x,y)>boundary.hard)return{points:pts,scores,primary:null,secondary:null,impact:false,escape:true};let best=null,inf=-1;for(const b of bodies){let dx=b.x-x,dy=b.y-y,d2=dx*dx+dy*dy,d=Math.sqrt(d2)+.0001;if(d<=b.r)return{points:pts,scores,primary:best,secondary:null,impact:true,escape:false};if(b.type==='sun')continue;let f=b.mass/Math.max(d2,b.r*b.r*.82);scores.set(b.id,(scores.get(b.id)||0)+f*2700);if(f>inf){inf=f;best=b}}if(best){let a=Math.atan2(y-best.y,x-best.x);if(dom!==best.id){dom=best.id;lastAng=a;acc=0}else{acc+=sd(lastAng,a);lastAng=a;if(Math.abs(acc)>Math.PI*2*1.05&&pts.length>80)break}}}let ranked=[...bodies.filter(b=>b.type!=='sun')].sort((a,b)=>(scores.get(b.id)||0)-(scores.get(a.id)||0));return{points:pts,scores,primary:ranked[0],secondary:ranked[1],impact:false,escape:false}}
 function chooseTarget(){targetBody=prediction.primary||bodies.find(b=>b.type!=='sun')}
 function updateZoom(dt){let rel=[prediction.primary,prediction.secondary].filter(Boolean);if(!rel.length&&targetBody)rel=[targetBody];let minX=ship.x,maxX=ship.x,minY=ship.y,maxY=ship.y,pts=prediction.points,maxSamples=prediction.escape?30:72;for(let i=0;i<pts.length&&i<maxSamples*8;i+=8){let p=pts[i];minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y)}for(const b of rel){let pad=b.r*2.55+145;minX=Math.min(minX,b.x-pad);maxX=Math.max(maxX,b.x+pad);minY=Math.min(minY,b.y-pad);maxY=Math.max(maxY,b.y+pad)}const e=enemies.find(e=>e.alive);if(e&&!prediction.escape){let d=Math.hypot(e.x-ship.x,e.y-ship.y);if(d<2100){minX=Math.min(minX,e.x-260);maxX=Math.max(maxX,e.x+260);minY=Math.min(minY,e.y-260);maxY=Math.max(maxY,e.y+260)}if(d<1300){minX-=180;maxX+=180;minY-=180;maxY+=180}}let fit=Math.min(W*.82/Math.max(520,maxX-minX),H*.74/Math.max(400,maxY-minY));if(e&&Math.hypot(e.x-ship.x,e.y-ship.y)<1500)fit=Math.min(fit,.58);if(prediction.escape)fit=Math.max(fit,.16);camera.targetZoom=clamp(fit,.055,1.12);let delta=camera.targetZoom-camera.zoom,stiff=delta<0?9.5:4.2,damp=delta<0?7:5.5;camera.zoomVel+=delta*stiff*dt;camera.zoomVel*=Math.exp(-damp*dt);camera.zoomVel=clamp(camera.zoomVel,delta<0?-1.35:-.42,delta<0?.42:.42);camera.zoom+=camera.zoomVel*dt}
@@ -57,18 +57,17 @@ function findWeaponTarget(){let fx=Math.cos(ship.angle),fy=Math.sin(ship.angle),
 function playerWeaponDangerAt(ex,ey,lead=0){
   const px=ship.x+ship.vx*lead, py=ship.y+ship.vy*lead;
   const dx=ex-px, dy=ey-py, d=Math.hypot(dx,dy);
-  if(d>weapon.range*1.28||d<1)return 0;
+  if(d>weapon.range*1.30||d<1)return 0;
 
   const futureAngle=ship.angle+ship.angularVelocity*lead*.65;
   const fx=Math.cos(futureAngle), fy=Math.sin(futureAngle);
   const a=Math.acos(clamp((dx/d)*fx+(dy/d)*fy,-1,1));
 
-  // Wider forecast cone than real weapon cone: enemy reacts before it is already dead.
-  const forecastCone=weapon.cone*3.6;
+  const forecastCone=weapon.cone*3.7;
   if(a>forecastCone)return 0;
 
   const angleScore=1-a/forecastCone;
-  const rangeScore=1-d/(weapon.range*1.28);
+  const rangeScore=1-d/(weapon.range*1.30);
   const ready=weaponCooldown<=.35?1:.52;
   return clamp(angleScore*.76+rangeScore*.24,0,1)*ready;
 }
@@ -80,20 +79,14 @@ function playerWeaponDanger(e){
   return Math.max(now,near*.95,soon*.82);
 }
 
-function mixAngles(a,b,t){
-  return a+sd(a,b)*clamp(t,0,1);
-}
-
-function inwardAngle(x,y){
-  return Math.atan2(-y,-x);
-}
+function mixAngles(a,b,t){ return a+sd(a,b)*clamp(t,0,1); }
+function inwardAngle(x,y){ return Math.atan2(-y,-x); }
 
 function nonEscapeBurnAngle(e,baseAng,aggression=.5){
-  // Keep evasive burns from becoming pure outward escape.
   const R=Math.hypot(e.x,e.y)+.0001;
   const outward=Math.atan2(e.y,e.x);
   const inward=outward+Math.PI;
-  const side=Math.sign(sd(outward,baseAng)) || (Math.random()<.5?-1:1);
+  const side=Math.sign(sd(outward,baseAng)) || (e.side||1);
   const tangent=outward+side*Math.PI/2;
   const far=clamp((R-3600)/2600,0,1);
   let preferred=mixAngles(tangent,inward,far*.74);
@@ -103,7 +96,6 @@ function nonEscapeBurnAngle(e,baseAng,aggression=.5){
 }
 
 function enemyBurn(e,ang,power,dur){
-  // Infinite fuel, but comparable feel: no magical acceleration.
   e.burnAngle=ang;
   e.burnPower=clamp(power,45,142);
   e.burnTimer=dur;
@@ -112,14 +104,33 @@ function enemyBurn(e,ang,power,dur){
 
 function enemyAttackOpportunity(e){
   const dx=ship.x-e.x,dy=ship.y-e.y,d=Math.hypot(dx,dy);
-  if(d>enemyWeapon.range*1.38)return 0;
+  if(d>enemyWeapon.range*1.40)return 0;
   const lx=(ship.x+ship.vx*.42)-e.x, ly=(ship.y+ship.vy*.42)-e.y, ld=Math.hypot(lx,ly);
   const fx=Math.cos(e.angle),fy=Math.sin(e.angle);
   const a=Math.acos(clamp((lx/ld)*fx+(ly/ld)*fy,-1,1));
   const angleScore=clamp(1-a/(enemyWeapon.cone*2.15),0,1);
-  const rangeScore=clamp(1-d/(enemyWeapon.range*1.38),0,1);
+  const rangeScore=clamp(1-d/(enemyWeapon.range*1.40),0,1);
   return angleScore*.74+rangeScore*.26;
 }
+
+function enemyInterceptAngle(e){
+  // Aim for a future lateral crossing lane, not directly at the player.
+  const lead=3.2;
+  const px=ship.x+ship.vx*lead;
+  const py=ship.y+ship.vy*lead;
+  const pv=Math.hypot(ship.vx,ship.vy)+.0001;
+  const vx=ship.vx/pv, vy=ship.vy/pv;
+  const laneOffset=320*e.side;
+  const lx=px-vy*laneOffset;
+  const ly=py+vx*laneOffset;
+  return Math.atan2(ly-e.y,lx-e.x);
+}
+
+function enemyDistanceToPlayerOrbit(e){
+  const dx=e.x-ship.x,dy=e.y-ship.y;
+  return Math.hypot(dx,dy);
+}
+
 function enemyCanShootPlayer(e){let dx=ship.x-e.x,dy=ship.y-e.y,d=Math.hypot(dx,dy);if(d>enemyWeapon.range||d<1)return false;let fx=Math.cos(e.angle),fy=Math.sin(e.angle),a=Math.acos(clamp((dx/d)*fx+(dy/d)*fy,-1,1));return a<=enemyWeapon.cone}
 function updateEnemies(dt){
   for(const e of enemies){
@@ -128,15 +139,19 @@ function updateEnemies(dt){
     if(e.aiLock==null)e.aiLock=0;
     if(e.burnCooldown==null)e.burnCooldown=0;
     if(e.side==null)e.side=Math.random()<.5?-1:1;
+    if(e.lastAttack==null)e.lastAttack=0;
+    if(e.attackCycle==null)e.attackCycle=2.0;
+
+    e.aiLock=Math.max(0,e.aiLock-dt);
+    e.burnCooldown=Math.max(0,e.burnCooldown-dt);
+    e.weaponCooldown=Math.max(0,(e.weaponCooldown||0)-dt);
+    e.lastAttack+=dt;
 
     const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
     const sysR=Math.hypot(e.x,e.y);
     const danger=playerWeaponDanger(e);
     const opportunity=enemyAttackOpportunity(e);
-
-    e.aiLock=Math.max(0,e.aiLock-dt);
-    e.burnCooldown=Math.max(0,e.burnCooldown-dt);
-    e.weaponCooldown=Math.max(0,(e.weaponCooldown||0)-dt);
+    const shouldPressure=e.lastAttack>6.0 || dPlayer>1100;
 
     const canDecide=e.aiLock<=0;
 
@@ -156,27 +171,32 @@ function updateEnemies(dt){
         e.side*=-1;
       }else if(danger>.26 || (dPlayer<weapon.range*1.85 && playerWeaponDangerAt(e.x+e.vx*1.65,e.y+e.vy*1.65,1.65)>.20)){
         e.aiState='pre_flank';
-        e.aiLock=1.25;
-        e.burnCooldown=2.2;
+        e.aiLock=1.20;
+        e.burnCooldown=2.0;
         const toPlayer=Math.atan2(ship.y-e.y,ship.x-e.x);
         const lateral=toPlayer+e.side*Math.PI*.64;
         enemyBurn(e,nonEscapeBurnAngle(e,lateral,.45),88,.45);
       }else if(opportunity>.58){
         e.aiState='attack_pass';
         e.aiLock=.95;
-      }else if(dPlayer<2100){
-        e.aiState='intercept_lane';
-        e.aiLock=.85;
+      }else if(shouldPressure){
+        e.aiState='approach';
+        e.aiLock=1.15;
         if(e.burnCooldown<=0){
-          // Move toward a future crossing lane, not directly toward player.
-          const leadX=ship.x+ship.vx*2.2, leadY=ship.y+ship.vy*2.2;
-          const toLead=Math.atan2(leadY-e.y,leadX-e.x);
-          const lane=toLead+e.side*Math.PI*.22;
-          enemyBurn(e,nonEscapeBurnAngle(e,lane,.35),64,.34);
-          e.burnCooldown=2.6+Math.random()*1.2;
+          const lane=enemyInterceptAngle(e);
+          enemyBurn(e,nonEscapeBurnAngle(e,lane,.55),92,.48);
+          e.burnCooldown=1.65;
+        }
+      }else if(dPlayer<2100){
+        e.aiState='staging';
+        e.aiLock=.9;
+        if(e.burnCooldown<=0){
+          const lane=enemyInterceptAngle(e)+e.side*Math.PI*.15;
+          enemyBurn(e,nonEscapeBurnAngle(e,lane,.35),62,.34);
+          e.burnCooldown=2.3+Math.random()*1.0;
         }
       }else{
-        e.aiState='patrol';
+        e.aiState='staging';
         e.aiLock=.95;
       }
     }
@@ -188,22 +208,23 @@ function updateEnemies(dt){
       desired=e.burnAngle;
     }else if(e.aiState==='attack_pass'){
       desired=Math.atan2((ship.y+ship.vy*.38)-e.y,(ship.x+ship.vx*.38)-e.x);
+
       if(e.weaponCooldown<=0&&enemyCanShootPlayer(e)){
         e.weaponCooldown=enemyWeapon.cooldown;
+        e.lastAttack=0;
+        e.aiLock=.85;
         enemyBeams.push({x1:e.x+Math.cos(e.angle)*20,y1:e.y+Math.sin(e.angle)*20,x2:ship.x,y2:ship.y,life:.12,maxLife:.12});
         ship.damageFlash=.22;
         ship.hp=Math.max(0,ship.hp-enemyWeapon.damage);
         if(ship.hp<=0){spawnParticle(ship.x,ship.y,90,'255,130,70');reset();return}
       }
-    }else if(e.aiState==='intercept_lane'){
-      const leadX=ship.x+ship.vx*1.4, leadY=ship.y+ship.vy*1.4;
-      desired=Math.atan2(leadY-e.y,leadX-e.x)+e.side*Math.PI*.18;
+    }else if(e.aiState==='approach'||e.aiState==='staging'){
+      desired=enemyInterceptAngle(e);
     }else{
       const spd=Math.hypot(e.vx,e.vy);
       desired=spd>.1?Math.atan2(e.vy,e.vx):e.angle;
     }
 
-    // Comparable turn rate: no instant jerk.
     if(desired!=null){
       const maxTurn=1.95;
       const delta=sd(e.angle,desired);
@@ -217,12 +238,17 @@ function updateEnemies(dt){
     }
     e.plumeTimer=Math.max(0,(e.plumeTimer||0)-dt);
 
-    // Physics after AI burn.
+    // If the enemy has not attacked for a while and is close-ish, use a small orbital correction.
+    if(e.burnCooldown<=0 && e.lastAttack>4.0 && dPlayer<1800 && danger<.22 && e.aiState!=='attack_pass'){
+      const lane=enemyInterceptAngle(e);
+      enemyBurn(e,nonEscapeBurnAngle(e,lane,.42),70,.36);
+      e.burnCooldown=1.8+Math.random()*.9;
+    }
+
     let g=gravityAt(e.x,e.y);
     e.vx+=g.ax*dt;
     e.vy+=g.ay*dt;
 
-    // Soft anti-escape velocity trim: removes excessive outward speed only.
     if(sysR>boundary.soft*.72){
       const ox=e.x/(sysR+.0001),oy=e.y/(sysR+.0001);
       const outwardV=e.vx*ox+e.vy*oy;
@@ -238,7 +264,6 @@ function updateEnemies(dt){
     e.hitFlash=Math.max(0,e.hitFlash-dt);
     e.hpVisible=Math.max(0,e.hpVisible-dt);
 
-    // Enemy cannot disappear in crashes: push it outside the body and remove inward radial velocity.
     for(const b of bodies){
       const dx=e.x-b.x,dy=e.y-b.y,d=Math.hypot(dx,dy),minD=b.r+e.radius+18;
       if(d<minD){
