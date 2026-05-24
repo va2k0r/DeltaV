@@ -208,7 +208,10 @@
     x: 0,
     y: 0,
     zoom: 0.52,
-    targetZoom: 0.52
+    targetZoom: 0.52,
+    desiredZoom: 0.52,
+    zoomVel: 0,
+    zoomHold: 0
   };
 
   const input = {
@@ -340,15 +343,17 @@
   function reset() {
     updateBodies();
     const p = getBody("aster") || bodies[1];
-    const angle = Math.PI * 0.04;
-    const d = p.r * 3.0;
+
+    // Safe spawn: place the ship in a clean orbit corridor, not on an impact trajectory.
+    const angle = p.angle + Math.PI * 0.55;
+    const d = p.r * 4.1;
     const x = p.x + Math.cos(angle) * d;
     const y = p.y + Math.sin(angle) * d;
     const nx = (x - p.x) / d;
     const ny = (y - p.y) / d;
     const tx = -ny;
     const ty = nx;
-    const circ = Math.sqrt(p.mass / d) * 0.82;
+    const circ = Math.sqrt(p.mass / d) * 0.94;
 
     ship.x = x;
     ship.y = y;
@@ -361,12 +366,27 @@
     ship.thrustTarget = 0;
     ship.fuel = 1;
     ship.burnSounding = false;
+
+    // Last safety check: if another body is too close, push outward from Aster.
+    for (const b of bodies) {
+      const minD = b.r + ship.radius + 45;
+      const bd = Math.hypot(ship.x - b.x, ship.y - b.y);
+      if (bd < minD) {
+        ship.x = p.x + nx * Math.max(d, minD + p.r * 1.5);
+        ship.y = p.y + ny * Math.max(d, minD + p.r * 1.5);
+      }
+    }
+
     crashTimer = 0;
     flashTimer = 0;
     particles = [];
     camera.x = ship.x;
     camera.y = ship.y;
     camera.zoom = 0.48;
+    camera.targetZoom = 0.48;
+    camera.desiredZoom = 0.48;
+    camera.zoomVel = 0;
+    camera.zoomHold = 0;
     prediction = analyzePrediction();
     chooseTarget();
     updateTouchVisuals();
@@ -586,7 +606,6 @@
     const spanY = Math.max(400, maxY - minY);
     let fit = Math.min(W * 0.82 / spanX, H * 0.74 / spanY);
 
-    // If after fitting no relevant planet is fully visible, pull back more aggressively.
     let fullVisible = relevant.some(b => {
       const s = {
         x: W / 2 + (b.x - ship.x) * fit,
@@ -598,10 +617,45 @@
     });
     if (!fullVisible && relevant.length) fit *= 0.72;
 
-    camera.targetZoom = clamp(fit, 0.035, 1.25);
+    const computed = clamp(fit, 0.035, 1.25);
 
-    const zoomRate = camera.targetZoom < camera.zoom ? 3.2 : 1.05;
-    camera.zoom += (camera.targetZoom - camera.zoom) * Math.min(1, dt * zoomRate);
+    // Hysteresis: zoom-out requests are urgent; zoom-in requests must be persistent.
+    const zoomingOut = computed < camera.desiredZoom;
+    const largeChange = Math.abs(computed - camera.desiredZoom) / Math.max(camera.desiredZoom, 0.001) > 0.16;
+
+    if (zoomingOut) {
+      camera.desiredZoom = computed;
+      camera.zoomHold = 0.22;
+    } else {
+      camera.zoomHold -= dt;
+      if (largeChange && camera.zoomHold <= 0) {
+        camera.desiredZoom = computed;
+        camera.zoomHold = 0.34;
+      } else if (!largeChange) {
+        // Tiny changes are absorbed slowly, preventing jitter.
+        camera.desiredZoom += (computed - camera.desiredZoom) * Math.min(1, dt * 0.55);
+      }
+    }
+
+    camera.targetZoom = camera.desiredZoom;
+
+    // Critically damped-ish spring with velocity cap.
+    const delta = camera.targetZoom - camera.zoom;
+    const stiffness = delta < 0 ? 9.5 : 4.2;   // zoom out faster than zoom in
+    const damping = delta < 0 ? 7.0 : 5.5;
+    camera.zoomVel += delta * stiffness * dt;
+    camera.zoomVel *= Math.exp(-damping * dt);
+
+    // Cap zoom speed to avoid visible pops, but allow emergency zoom-out.
+    const maxSpeed = delta < 0 ? 1.35 : 0.42;
+    camera.zoomVel = clamp(camera.zoomVel, -maxSpeed, maxSpeed);
+    camera.zoom += camera.zoomVel * dt;
+
+    // Prevent micro-oscillation around the target.
+    if (Math.abs(delta) < 0.0025 && Math.abs(camera.zoomVel) < 0.006) {
+      camera.zoom = camera.targetZoom;
+      camera.zoomVel = 0;
+    }
 
     camera.x = ship.x;
     camera.y = ship.y;
