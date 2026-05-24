@@ -229,7 +229,7 @@
     x: 0,
     y: 0,
     r: 175,
-    mass: 180000,
+    mass: 120000,
     a: [255, 232, 165],
     b: [255, 125, 44],
     seed: 7.4
@@ -317,9 +317,9 @@
     }
 
     defs[0].angle0 = rr(rng, 0.15, 0.95);
-    defs[0].orbitR = rr(rng, 2200, 2800);
+    defs[0].orbitR = rr(rng, 2400, 3100);
     defs[0].r = clamp(defs[0].r, 86, 120);
-    defs[0].mass = Math.round(defs[0].r * defs[0].r * rr(rng, 260, 340));
+    defs[0].mass = Math.round(defs[0].r * defs[0].r * rr(rng, 320, 420));
     return defs;
   }
 
@@ -430,8 +430,7 @@
   }
 
   function selectSpawnPlanet() {
-    // For now the game must always begin in a clearly readable planet orbit.
-    // Use the guaranteed starter planet generated as p0 / Aster.
+    // Guaranteed starter planet. Never start around the star.
     return bodies.find(b => b.id === "p0") || bodies.find(b => b.name === "Aster") || bodies.find(b => b.type !== "sun") || bodies[1];
   }
 
@@ -439,11 +438,11 @@
     updateBodies();
     const p = selectSpawnPlanet();
 
-    // Tight, planet-dominated circular orbit.
-    // Tight enough that the star cannot visually or physically steal the initial path,
-    // but still comfortably outside the collision radius.
-    const orbitRadius = Math.max(p.r * 2.55, p.r + ship.radius + 120);
-    let spawnAngle = Math.atan2(p.y, p.x) + Math.PI * 0.5;
+    // Safer, wider orbit: close enough to read clearly, far enough not to graze the surface.
+    const orbitRadius = Math.max(p.r * 4.25, p.r + ship.radius + 220);
+
+    // Start on the side away from the star, so the sun's residual pull is least disruptive.
+    let spawnAngle = Math.atan2(p.y - sun.y, p.x - sun.x);
 
     function placeAt(a) {
       const nx = Math.cos(a);
@@ -454,7 +453,11 @@
       ship.x = p.x + nx * orbitRadius;
       ship.y = p.y + ny * orbitRadius;
 
-      const circ = Math.sqrt(p.mass / orbitRadius);
+      // Use the same boosted gravity model used by gravityAt().
+      // Without this, the initial orbit is under-speed and the ship falls into the planet.
+      const effectiveMass = effectiveGravityMassForOrbit(p, orbitRadius);
+      const circ = Math.sqrt(effectiveMass / orbitRadius);
+
       ship.vx = tx * circ;
       ship.vy = ty * circ;
       ship.angle = Math.atan2(ship.vy, ship.vx);
@@ -462,21 +465,22 @@
 
     placeAt(spawnAngle);
 
-    // Rotate if the spawn point is obstructed by any other body.
-    for (let attempt = 0; attempt < 64; attempt++) {
+    // Rotate the spawn point if another body obstructs it or it is too close to the star.
+    for (let attempt = 0; attempt < 72; attempt++) {
       let safe = true;
+
       for (const b of bodies) {
-        const minD = b.r + ship.radius + 80;
+        const minD = b.r + ship.radius + 120;
         if (Math.hypot(ship.x - b.x, ship.y - b.y) < minD) {
           safe = false;
           break;
         }
       }
 
-      const farFromSun = Math.hypot(ship.x - sun.x, ship.y - sun.y) > sun.r + 650;
+      const farFromSun = Math.hypot(ship.x - sun.x, ship.y - sun.y) > sun.r + 850;
       if (safe && farFromSun) break;
 
-      spawnAngle += Math.PI * 0.173;
+      spawnAngle += Math.PI * 0.211;
       placeAt(spawnAngle);
     }
 
@@ -490,11 +494,12 @@
     crashTimer = 0;
     flashTimer = 0;
     particles = [];
+
     camera.x = ship.x;
     camera.y = ship.y;
-    camera.zoom = 0.62;
-    camera.targetZoom = 0.62;
-    camera.desiredZoom = 0.62;
+    camera.zoom = 0.58;
+    camera.targetZoom = 0.58;
+    camera.desiredZoom = 0.58;
     camera.zoomVel = 0;
     camera.zoomHold = 0;
 
@@ -537,6 +542,12 @@
     return { ax, ay };
   }
 
+  function effectiveGravityMassForOrbit(b, orbitalRadius) {
+    const well = b.type === "sun" ? b.r * 12 : b.r * 20;
+    const boost = 1 + 2.4 * (well / (orbitalRadius + well));
+    return b.mass * boost;
+  }
+
   function orbitAssist(dt, x, y, vx, vy, bs = bodies, mode = "actual") {
     // Temporarily disabled: testing raw orbital mechanics without assisted capture.
     let nearest = null;
@@ -567,7 +578,7 @@
     const scores = new Map();
     const closest = new Map();
     const step = 0.085;
-    const steps = 520;
+    const steps = 500;
     let stableBody = null;
 
     let dominantId = null;
@@ -639,7 +650,7 @@
           } else {
             orbitTrackAccum += shortDelta(orbitTrackLastAng, a);
             orbitTrackLastAng = a;
-            if (Math.abs(orbitTrackAccum) > Math.PI * 2 * 1.35 && pts.length > 90) break;
+            if (Math.abs(orbitTrackAccum) > Math.PI * 2 * 1.15 && pts.length > 90) break;
           }
         }
       }
