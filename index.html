@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>DeltaV - Cannon AI Adaptive</title>
+<title>DeltaV - Cannon AI Nodes</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#020610;color:#eef6ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif;touch-action:none}
@@ -19,7 +19,7 @@ canvas{display:block;width:100vw;height:100dvh;background:radial-gradient(circle
 </head>
 <body>
 <canvas id="game"></canvas>
-<div class="hud"><div class="panel"><div class="title">DeltaV - Cannon AI Adaptive</div><div class="small">AI lab: aggressive far intercept, inertial close combat, visible speed.</div></div><div class="panel" id="readout"></div></div>
+<div class="hud"><div class="panel"><div class="title">DeltaV - Cannon AI Nodes</div><div class="small">AI lab: cannon shots plus gravity-node flyby candidates.</div></div><div class="panel" id="readout"></div></div>
 <div class="hint">Lati invisibili: ruota con RCS. Centro basso: burn. Laser automatico con cono stretto.</div>
 <div class="turnZone left" id="leftGlow"></div><div class="turnZone right" id="rightGlow"></div><div class="burnButton" id="burnVisual">BURN</div>
 <div class="speedPill" id="speedPill">speed 0.0</div><div class="actions"><button class="hudBtn" id="resetBtn">Reset</button><button class="hudBtn" id="newBtn">New</button></div>
@@ -263,69 +263,160 @@ function aiAngleLerp(a,b,t){
   return a+sd(a,b)*clamp(t,0,1);
 }
 
+function aiFlybyCandidates(e, toPlayer, dPlayer){
+  const out=[];
+  if(dPlayer<1250)return out;
+
+  // Few planets, few nodes. We use planets as optional gravity/flyby waypoints, not as mandatory pathfinding.
+  const relevant=bodies
+    .filter(b=>b.type!=='sun')
+    .map(b=>{
+      const de=Math.hypot(b.x-e.x,b.y-e.y);
+      const dp=Math.hypot(b.x-ship.x,b.y-ship.y);
+      return {b,de,dp,score:de*.62+dp*.38};
+    })
+    .sort((a,b)=>a.score-b.score)
+    .slice(0,3);
+
+  for(const item of relevant){
+    const b=item.b;
+
+    // Do not use a planet that is basically behind the player at close range.
+    const ebAng=Math.atan2(b.y-e.y,b.x-e.x);
+    const clearance=b.r+220;
+
+    const fromEnemy=Math.atan2(b.y-e.y,b.x-e.x);
+    const towardPlayer=Math.atan2(ship.y-b.y,ship.x-b.x);
+
+    // Tangency-like points. Not exact orbital mechanics, just "try near the well".
+    for(const s of [-1,1]){
+      const wx=b.x+Math.cos(towardPlayer+s*Math.PI/2)*clearance;
+      const wy=b.y+Math.sin(towardPlayer+s*Math.PI/2)*clearance;
+      out.push({
+        angle:Math.atan2(wy-e.y,wx-e.x),
+        node:b,
+        kind:'flyby',
+        waypoint:{x:wx,y:wy},
+        bonus:42
+      });
+    }
+
+    // A slightly inside/outside assisted pass relative to the enemy-planet line.
+    for(const s of [-1,1]){
+      out.push({
+        angle:fromEnemy+s*.34,
+        node:b,
+        kind:'bend',
+        waypoint:{x:b.x+Math.cos(fromEnemy+s*.34)*clearance,y:b.y+Math.sin(fromEnemy+s*.34)*clearance},
+        bonus:24
+      });
+    }
+
+    // Pure direction to node only if far enough to matter.
+    if(item.de>700){
+      out.push({
+        angle:ebAng,
+        node:b,
+        kind:'node_direct',
+        waypoint:{x:b.x,y:b.y},
+        bonus:18
+      });
+    }
+  }
+
+  return out;
+}
+
 function aiPlanCannonShot(e){
-  const horizon=3.35,step=.14;
+  const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
+
+  // Longer horizon only when far enough for gravity node passes to matter.
+  const horizon=dPlayer>1550?4.35:3.35;
+  const step=.14;
   const playerPath=aiSimPlayerPath(horizon,step);
 
   const toPlayer=Math.atan2(ship.y-e.y,ship.x-e.x);
-  const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
   const vAng=Math.atan2(e.vy,e.vx);
   const relAng=Math.atan2((ship.vy-e.vy),(ship.vx-e.vx));
 
   const previousAng = e.currentPlan && Number.isFinite(e.currentPlan.angle) ? e.currentPlan.angle : vAng;
 
-  // Adaptive inertia: permissive far away, restrained in close combat.
   const far = dPlayer>1650;
   const mid = dPlayer>900 && dPlayer<=1650;
   const close = dPlayer<=900;
 
-  const blend = far ? .88 : (mid ? .68 : .52);
-  const anglePenaltyK = far ? 38 : (mid ? 95 : 175);
-  const maxPlanTurn = far ? 1.65 : (mid ? 1.02 : .62);
+  // Adaptive inertia. Far: permissive enough to reach. Close: restrained.
+  const blend = far ? .86 : (mid ? .66 : .52);
+  const anglePenaltyK = far ? 34 : (mid ? 88 : 170);
+  const maxPlanTurn = far ? 1.72 : (mid ? 1.04 : .62);
 
   const candidateAngles=[
-    toPlayer,
-    toPlayer+.24,
-    toPlayer-.24,
-    toPlayer+.50,
-    toPlayer-.50,
-    toPlayer+.82,
-    toPlayer-.82,
-    toPlayer+Math.PI/2,
-    toPlayer-Math.PI/2,
-    vAng,
-    relAng,
-    previousAng,
-    previousAng+.35,
-    previousAng-.35
+    {angle:toPlayer,kind:'direct'},
+    {angle:toPlayer+.24,kind:'direct'},
+    {angle:toPlayer-.24,kind:'direct'},
+    {angle:toPlayer+.50,kind:'direct'},
+    {angle:toPlayer-.50,kind:'direct'},
+    {angle:toPlayer+.82,kind:'wide'},
+    {angle:toPlayer-.82,kind:'wide'},
+    {angle:toPlayer+Math.PI/2,kind:'tangent'},
+    {angle:toPlayer-Math.PI/2,kind:'tangent'},
+    {angle:vAng,kind:'velocity'},
+    {angle:relAng,kind:'relative'},
+    {angle:previousAng,kind:'previous'},
+    {angle:previousAng+.35,kind:'previous'},
+    {angle:previousAng-.35,kind:'previous'}
   ];
 
-  for(let i=-5;i<=5;i++)candidateAngles.push(toPlayer+i*.18);
+  for(let i=-5;i<=5;i++)candidateAngles.push({angle:toPlayer+i*.18,kind:'fan'});
 
-  const powers = far ? [76,104,134,162] : (mid ? [64,92,122,144] : [52,76,104,126]);
+  // Add gravity-node/flyby candidates only when not already in close combat.
+  for(const c of aiFlybyCandidates(e,toPlayer,dPlayer))candidateAngles.push(c);
+
+  const powers = far ? [78,108,138,166] : (mid ? [64,94,122,144] : [52,76,104,126]);
   const burns = far ? [.32,.48,.68] : (mid ? [.26,.42,.60] : [.22,.36,.52]);
 
   let best=null;
 
-  for(const rawAng of candidateAngles){
+  for(const cand of candidateAngles){
+    const rawAng=cand.angle;
     const blendedAng=aiAngleLerp(previousAng,rawAng,blend);
+
     for(const p of powers){
       for(const b of burns){
         const c=aiScoreCandidate(e,blendedAng,p,b,horizon,step,playerPath);
 
         const turnPenalty=Math.abs(sd(previousAng,blendedAng))*anglePenaltyK;
-        const aggressionPenalty=close?((p>104?35:0)+(b>.5?24:0)):(mid?(p>122?18:0):0);
+        const aggressionPenalty=close?((p>104?35:0)+(b>.5?24:0)):(mid?(p>122?16:0):0);
 
-        c.score+=turnPenalty+aggressionPenalty;
+        let nodeBonus=0;
+        if(cand.node && far){
+          // Reward shots that pass near the node but not through it.
+          const n=cand.node;
+          const nodeD=Math.hypot(c.endX-n.x,c.endY-n.y);
+          const waypointD=cand.waypoint?Math.hypot(c.endX-cand.waypoint.x,c.endY-cand.waypoint.y):nodeD;
+
+          // Also sample best path closeness roughly via endpoint and candidate waypoint.
+          nodeBonus+=cand.bonus||0;
+          nodeBonus+=clamp(1-waypointD/1200,0,1)*52;
+
+          if(nodeD<n.r+70)nodeBonus-=160; // too close means collision/visual nonsense
+        }
+
+        // Far shots may use nodes, but avoid "slingshot to nowhere".
+        const escapePenalty=(far&&Math.hypot(c.endX,c.endY)>boundary.soft*.92)?90:0;
+
+        c.score+=turnPenalty+aggressionPenalty+escapePenalty-nodeBonus;
+        c.kind=cand.kind;
+        c.node=cand.node;
         if(!best||c.score<best.score)best=c;
       }
     }
   }
 
   const killzone=aiKillzoneScore(e),shot=aiShotScore(e);
-  let state="cannon_intercept";
-  let coast=far ? clamp(best.bestT*.48,.72,1.35)
-                 : mid ? clamp(best.bestT*.58,.90,1.65)
+  let state=best.node?'node_transfer':'cannon_intercept';
+  let coast=far ? clamp(best.bestT*.50,.78,1.45)
+                 : mid ? clamp(best.bestT*.60,.92,1.70)
                        : clamp(best.bestT*.70,1.10,2.10);
 
   if(killzone>.48&&shot<.64){
@@ -337,7 +428,7 @@ function aiPlanCannonShot(e){
     coast=close?1.55:1.15;
   }else if(best.bestD<enemyWeapon.range*.78 && shot>.28){
     state="attack_pass";
-    coast=close?1.05:.85;
+    coast=close?1.05:.90;
   }
 
   const finalAngle=previousAng+clamp(sd(previousAng,best.ang),-maxPlanTurn,maxPlanTurn);
@@ -354,7 +445,9 @@ function aiPlanCannonShot(e){
     shot,
     killzone,
     score:best.score,
-    rangeBand:far?'far':(mid?'mid':'close')
+    rangeBand:far?'far':(mid?'mid':'close'),
+    kind:best.kind||state,
+    node:best.node||null
   };
 }
 
@@ -382,8 +475,8 @@ function updateEnemies(dt){
       e.currentPlan=plan;
       e.burnTimerAI=plan.burn;
       e.coastTimer=plan.coast;
-      e.planTimer=plan.burn+plan.coast+(plan.rangeBand==='far'?.03:.18);
-      if(plan.state==="cannon_escape"&&e.sideCooldown<=0){e.side*=-1;e.sideCooldown=1.7;}
+      e.planTimer=plan.burn+plan.coast+(plan.rangeBand==='far'?.05:.18);
+      if(plan.state==="cannon_escape"&&e.sideCooldown<=0){e.side*=-1;e.sideCooldown=plan.rangeBand==='far'?1.0:1.7;}
     }
 
     let ax=0,ay=0;
@@ -425,7 +518,7 @@ function updateEnemies(dt){
     const canAim=plan.state!=="cannon_escape"&&(shot>.32||dPlayer<enemyWeapon.range*1.25);
     const desiredAim=canAim?Math.atan2((ship.y+ship.vy*.18)-e.y,(ship.x+ship.vx*.18)-e.x):Math.atan2(e.vy,e.vx);
 
-    const maxTurn=plan.rangeBand==='far'?1.85:(plan.rangeBand==='mid'?1.62:1.42);
+    const maxTurn=plan.rangeBand==='far'?1.82:(plan.rangeBand==='mid'?1.58:1.40);
     e.angle+=clamp(sd(e.angle,desiredAim),-maxTurn*dt,maxTurn*dt);
 
     if(plan.state!=="cannon_escape"&&e.weaponCooldown<=0&&aiCanShoot(e))aiEnemyFire(e);
