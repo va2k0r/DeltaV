@@ -19,7 +19,7 @@ canvas{display:block;width:100vw;height:100dvh;background:radial-gradient(circle
 </head>
 <body>
 <canvas id="game"></canvas>
-<div class="hud"><div class="panel"><div class="title">DeltaV combat prototype</div><div class="small">AI anticipatoria: il nemico prevede il cono del player e completa burn difensivi comparabili ai tuoi.</div></div><div class="panel" id="readout"></div></div>
+<div class="hud"><div class="panel"><div class="title">DeltaV combat prototype</div><div class="small">AI orbitale: il nemico non fugge verso l’esterno, flanka e torna verso il centro con burn comparabili ai tuoi.</div></div><div class="panel" id="readout"></div></div>
 <div class="hint">Lati invisibili: ruota con RCS. Centro basso: burn. Laser automatico con cono stretto; marker rosso se il nemico è fuori schermo.</div>
 <div class="turnZone left" id="leftGlow"></div><div class="turnZone right" id="rightGlow"></div><div class="burnButton" id="burnVisual">BURN</div>
 <div class="actions"><button class="hudBtn" id="resetBtn">Reset</button><button class="hudBtn" id="newBtn">New</button></div>
@@ -242,71 +242,118 @@ function enemyBurn(e,dirAng,power,dur){
   e.burnPower=clamp(power,45,145);
   e.plumeTimer=dur+.12;
 }
+
+function mixAngles(a,b,t){
+  return a + sd(a,b) * clamp(t,0,1);
+}
+function inwardBiasAngle(x,y){
+  return Math.atan2(-y,-x);
+}
+function tangentToCenterAngle(x,y,preferSign=1){
+  const radial=Math.atan2(y,x);
+  return radial + preferSign * Math.PI/2;
+}
+function nonEscapeBurnAngle(e,baseAng,aggression=.5){
+  // Prevent the AI from choosing a burn that points outward from the solar system.
+  // Blend evasive direction with central/tangential direction so it circles and flanks instead of fleeing.
+  const R=Math.hypot(e.x,e.y)+.0001;
+  const outward=Math.atan2(e.y,e.x);
+  const inward=outward+Math.PI;
+  const sideSign = Math.sign(sd(outward, baseAng)) || (Math.random()<.5?-1:1);
+  const tangential=outward + sideSign*Math.PI/2;
+
+  // If already far out, strong inward bias. Otherwise prefer tangential flanking.
+  const far=clamp((R-3600)/2600,0,1);
+  let preferred=mixAngles(tangential,inward,far*.72);
+
+  // Keep some intent from the base evasive angle, but never enough to become pure escape.
+  let blended=mixAngles(preferred,baseAng,clamp(.28+aggression*.18,0,.46));
+
+  // If final burn still has too much outward component, rotate toward tangent/inward.
+  const outDot=Math.cos(blended-outward);
+  if(outDot>.18) blended=mixAngles(blended, preferred, .72);
+
+  return blended;
+}
+function enemyDesiredOrbitAngle(e){
+  // General behaviour when not directly threatened: move around the player/system, not straight away.
+  const R=Math.hypot(e.x,e.y)+.0001;
+  const outward=Math.atan2(e.y,e.x);
+  const playerAng=Math.atan2(ship.y-e.y,ship.x-e.x);
+  const side=Math.sign(sd(outward,playerAng)) || 1;
+  const tang=outward + side*Math.PI/2;
+  const inward=outward + Math.PI;
+  const far=clamp((R-4200)/2300,0,1);
+  return mixAngles(tang,inward,far*.55);
+}
 function updateEnemies(dt){
   for(const e of enemies){
     if(!e.alive)continue;
 
     const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
     const danger=playerWeaponDanger(e);
+    const sysR=Math.hypot(e.x,e.y);
 
     if(e.aiState==null)e.aiState='patrol';
     if(e.aiLock==null)e.aiLock=0;
     if(e.burnCooldown==null)e.burnCooldown=0;
+    if(e.preferredSide==null)e.preferredSide=Math.random()<.5?-1:1;
 
     e.aiLock=Math.max(0,e.aiLock-dt);
     e.burnCooldown=Math.max(0,e.burnCooldown-dt);
 
-    // Non cambiare decisione ogni frame: completa la manovra.
     const canDecide=e.aiLock<=0;
 
     if(canDecide){
-      if(danger>.62){
-        e.aiState='emergency_break';
-        e.aiLock=1.05;
-        e.burnCooldown=1.75;
+      if(sysR>systemBoundary.soft*.78){
+        // Hard rule: never turn the fight into an outward chase.
+        e.aiState='return_core';
+        e.aiLock=1.45;
+        e.burnCooldown=1.15;
+        const burnAng=nonEscapeBurnAngle(e,inwardBiasAngle(e.x,e.y),.9);
+        enemyBurn(e,burnAng,122,.62);
+      } else if(danger>.62){
+        e.aiState='emergency_flank';
+        e.aiLock=1.20;
+        e.burnCooldown=1.85;
 
+        // Evade by cutting across the player's firing line, biased toward the system center.
         const away=Math.atan2(e.y-ship.y,e.x-ship.x);
-        const relVx=e.vx-ship.vx, relVy=e.vy-ship.vy;
-        const closing=(ship.x-e.x)*relVx+(ship.y-e.y)*relVy;
-        const side=(closing>0?1:-1) * (Math.random()<.5?-1:1);
-        const burnAng=away + side*Math.PI*.52;
+        const lateral=away + e.preferredSide*Math.PI*.58;
+        const burnAng=nonEscapeBurnAngle(e,lateral,.75);
+        enemyBurn(e,burnAng,128,.58);
+        e.preferredSide*=-1;
+      } else if(danger>.26 || (dPlayer<weapon.range*1.85 && playerWeaponDangerAt(e.x+e.vx*1.7,e.y+e.vy*1.7,1.7)>.20)){
+        e.aiState='pre_flank';
+        e.aiLock=1.35;
+        e.burnCooldown=2.35;
 
-        enemyBurn(e,burnAng,132,.58);
-      } else if(danger>.28 || (dPlayer<weapon.range*1.75 && playerWeaponDangerAt(e.x+e.vx*1.7,e.y+e.vy*1.7,1.7)>.22)){
-        e.aiState='pre_break';
-        e.aiLock=1.25;
-        e.burnCooldown=2.4;
-
-        // Anticipatory evasive burn: mostly lateral/orbital, not a hard 180 turn.
-        const away=Math.atan2(e.y-ship.y,e.x-ship.x);
-        const side=(Math.random()<.5?-1:1);
-        const burnAng=away + side*Math.PI*.62;
-
-        enemyBurn(e,burnAng,92,.46);
+        // Anticipate the shot: slide to a new orbital lane, not away into deep space.
+        const toPlayer=Math.atan2(ship.y-e.y,ship.x-e.x);
+        const lateral=toPlayer + e.preferredSide*Math.PI*.64;
+        const burnAng=nonEscapeBurnAngle(e,lateral,.45);
+        enemyBurn(e,burnAng,88,.48);
       } else if(dPlayer<1850){
-        e.aiState='aware';
-        e.aiLock=.65;
+        e.aiState='circle_player';
+        e.aiLock=.80;
       } else {
         e.aiState='patrol';
-        e.aiLock=.75;
+        e.aiLock=.95;
       }
     }
 
-    // Turning model: comparable to player, no instantaneous snap.
     let desiredAngle=null;
 
-    if(e.aiState==='emergency_break'){
+    if(e.aiState==='return_core'){
+      desiredAngle=inwardBiasAngle(e.x,e.y);
+    } else if(e.aiState==='emergency_flank' || e.aiState==='pre_flank'){
       desiredAngle=e.burnAngle;
-    } else if(e.aiState==='pre_break'){
-      desiredAngle=e.burnAngle;
-    } else if(e.aiState==='aware'){
-      // Not a pure "point at player"; lead slightly to avoid jousting.
-      const leadX=ship.x+ship.vx*.55;
-      const leadY=ship.y+ship.vy*.55;
-      desiredAngle=Math.atan2(leadY-e.y,leadX-e.x)+Math.sin(time*1.7)*.12;
+    } else if(e.aiState==='circle_player'){
+      // Circle/flank the player instead of jousting straight at them.
+      const toPlayer=Math.atan2(ship.y-e.y,ship.x-e.x);
+      desiredAngle=toPlayer + e.preferredSide*Math.PI*.42;
     } else {
-      const spd=Math.hypot(e.vx,e.vy);
-      if(spd>.1)desiredAngle=Math.atan2(e.vy,e.vx);
+      desiredAngle=enemyDesiredOrbitAngle(e);
     }
 
     if(desiredAngle!=null){
@@ -315,7 +362,6 @@ function updateEnemies(dt){
       e.angle+=clamp(delta,-maxTurn*dt,maxTurn*dt);
     }
 
-    // Burn is committed for its duration.
     if(e.burnTimer>0){
       e.burnTimer-=dt;
       e.vx+=Math.cos(e.burnAngle)*e.burnPower*dt;
@@ -324,17 +370,28 @@ function updateEnemies(dt){
 
     e.plumeTimer=Math.max(0,(e.plumeTimer||0)-dt);
 
-    // Occasional recover burn, only after completing evasive states.
-    if((e.aiState==='patrol'||e.aiState==='aware') && e.burnCooldown<=0 && dPlayer<2200 && danger<.20){
-      const spdAng=Math.atan2(e.vy,e.vx);
-      const adjust=(Math.random()<.5?-1:1)*.32;
-      enemyBurn(e,spdAng+adjust,58,.30);
-      e.burnCooldown=3.4+Math.random()*1.7;
+    // Controlled orbit-shaping impulses: limited, central/tangential, never outward chase.
+    if((e.aiState==='patrol'||e.aiState==='circle_player') && e.burnCooldown<=0 && dPlayer<2400 && danger<.22){
+      const base=enemyDesiredOrbitAngle(e);
+      const burnAng=nonEscapeBurnAngle(e,base,.25);
+      enemyBurn(e,burnAng,58,.30);
+      e.burnCooldown=3.4+Math.random()*1.8;
     }
 
     let g=gravityAt(e.x,e.y);
     e.vx+=g.ax*dt;
     e.vy+=g.ay*dt;
+
+    // Soft anti-escape velocity trim: only removes outward excess, does not create a visible wall.
+    if(sysR>systemBoundary.soft*.72){
+      const ox=e.x/(sysR+.0001), oy=e.y/(sysR+.0001);
+      const outwardV=e.vx*ox+e.vy*oy;
+      if(outwardV>28){
+        e.vx-=ox*outwardV*.018;
+        e.vy-=oy*outwardV*.018;
+      }
+    }
+
     e.x+=e.vx*dt;
     e.y+=e.vy*dt;
 
