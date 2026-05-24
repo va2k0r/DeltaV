@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>DeltaV - Cannon AI Nodes</title>
+<title>DeltaV - Cannon AI Return Flyby</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#020610;color:#eef6ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif;touch-action:none}
@@ -19,7 +19,7 @@ canvas{display:block;width:100vw;height:100dvh;background:radial-gradient(circle
 </head>
 <body>
 <canvas id="game"></canvas>
-<div class="hud"><div class="panel"><div class="title">DeltaV - Cannon AI Nodes</div><div class="small">AI lab: cannon shots plus gravity-node flyby candidates.</div></div><div class="panel" id="readout"></div></div>
+<div class="hud"><div class="panel"><div class="title">DeltaV - Cannon AI Return Flyby</div><div class="small">AI lab: flyby candidates must bend back toward the player.</div></div><div class="panel" id="readout"></div></div>
 <div class="hint">Lati invisibili: ruota con RCS. Centro basso: burn. Laser automatico con cono stretto.</div>
 <div class="turnZone left" id="leftGlow"></div><div class="turnZone right" id="rightGlow"></div><div class="burnButton" id="burnVisual">BURN</div>
 <div class="speedPill" id="speedPill">speed 0.0</div><div class="actions"><button class="hudBtn" id="resetBtn">Reset</button><button class="hudBtn" id="newBtn">New</button></div>
@@ -327,12 +327,43 @@ function aiFlybyCandidates(e, toPlayer, dPlayer){
   return out;
 }
 
+
+function aiScoreReturnPressure(c, e){
+  // A good flyby is not simply close to the player.
+  // It should leave the enemy moving back toward the player after the bend.
+  const toPX=ship.x-c.endX;
+  const toPY=ship.y-c.endY;
+  const toPD=Math.hypot(toPX,toPY)+.0001;
+  const relVX=c.endVX-ship.vx;
+  const relVY=c.endVY-ship.vy;
+
+  const returnSpeed=(relVX*toPX+relVY*toPY)/toPD;
+  const sideways=Math.abs(relVX*(-toPY/toPD)+relVY*(toPX/toPD));
+
+  const awayPenalty=returnSpeed<0 ? Math.min(260, -returnSpeed*1.35) : 0;
+  const returnBonus=returnSpeed>0 ? Math.min(150, returnSpeed*.72) : 0;
+
+  // Very high sideways speed after pass usually means it will just disappear off-screen.
+  const flyawayPenalty=Math.max(0,sideways-210)*.48;
+
+  // Penalize huge distance after the simulated arc unless it is clearly returning.
+  const endDist=Math.hypot(c.endX-ship.x,c.endY-ship.y);
+  const endDistPenalty=endDist>2100 ? (endDist-2100)*.055 : 0;
+
+  return {
+    returnSpeed,
+    sideways,
+    endDist,
+    adjustment: awayPenalty + flyawayPenalty + endDistPenalty - returnBonus
+  };
+}
+
 function aiPlanCannonShot(e){
   const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
 
-  // Longer horizon only when far enough for gravity node passes to matter.
-  const horizon=dPlayer>1550?4.35:3.35;
-  const step=.14;
+  // Longer horizon when far: flyby-return needs time to show up.
+  const horizon=dPlayer>1550?5.4:3.55;
+  const step=.15;
   const playerPath=aiSimPlayerPath(horizon,step);
 
   const toPlayer=Math.atan2(ship.y-e.y,ship.x-e.x);
@@ -345,10 +376,9 @@ function aiPlanCannonShot(e){
   const mid = dPlayer>900 && dPlayer<=1650;
   const close = dPlayer<=900;
 
-  // Adaptive inertia. Far: permissive enough to reach. Close: restrained.
-  const blend = far ? .86 : (mid ? .66 : .52);
-  const anglePenaltyK = far ? 34 : (mid ? 88 : 170);
-  const maxPlanTurn = far ? 1.72 : (mid ? 1.04 : .62);
+  const blend = far ? .88 : (mid ? .66 : .52);
+  const anglePenaltyK = far ? 30 : (mid ? 88 : 170);
+  const maxPlanTurn = far ? 1.78 : (mid ? 1.04 : .62);
 
   const candidateAngles=[
     {angle:toPlayer,kind:'direct'},
@@ -369,13 +399,14 @@ function aiPlanCannonShot(e){
 
   for(let i=-5;i<=5;i++)candidateAngles.push({angle:toPlayer+i*.18,kind:'fan'});
 
-  // Add gravity-node/flyby candidates only when not already in close combat.
-  for(const c of aiFlybyCandidates(e,toPlayer,dPlayer))candidateAngles.push(c);
+  const flybyCandidates=aiFlybyCandidates(e,toPlayer,dPlayer);
+  for(const c of flybyCandidates)candidateAngles.push(c);
 
-  const powers = far ? [78,108,138,166] : (mid ? [64,94,122,144] : [52,76,104,126]);
+  const powers = far ? [76,106,136,164] : (mid ? [64,94,122,144] : [52,76,104,126]);
   const burns = far ? [.32,.48,.68] : (mid ? [.26,.42,.60] : [.22,.36,.52]);
 
   let best=null;
+  let bestNode=null;
 
   for(const cand of candidateAngles){
     const rawAng=cand.angle;
@@ -388,34 +419,54 @@ function aiPlanCannonShot(e){
         const turnPenalty=Math.abs(sd(previousAng,blendedAng))*anglePenaltyK;
         const aggressionPenalty=close?((p>104?35:0)+(b>.5?24:0)):(mid?(p>122?16:0):0);
 
-        let nodeBonus=0;
+        let nodeAdjust=0;
+        let returnInfo=aiScoreReturnPressure(c,e);
+
         if(cand.node && far){
-          // Reward shots that pass near the node but not through it.
           const n=cand.node;
           const nodeD=Math.hypot(c.endX-n.x,c.endY-n.y);
           const waypointD=cand.waypoint?Math.hypot(c.endX-cand.waypoint.x,c.endY-cand.waypoint.y):nodeD;
 
-          // Also sample best path closeness roughly via endpoint and candidate waypoint.
-          nodeBonus+=cand.bonus||0;
-          nodeBonus+=clamp(1-waypointD/1200,0,1)*52;
+          // Reward passing through the neighborhood of the gravity well, but only if it returns pressure.
+          const waypointBonus=clamp(1-waypointD/1500,0,1)*48;
+          const nodeBonus=(cand.bonus||0)+waypointBonus;
 
-          if(nodeD<n.r+70)nodeBonus-=160; // too close means collision/visual nonsense
+          const tooClosePenalty=nodeD<n.r+70 ? 180 : 0;
+
+          // Core of this version: after flyby, velocity must bend back toward player.
+          nodeAdjust += returnInfo.adjustment - nodeBonus + tooClosePenalty;
+
+          // If the node shot just throws the enemy away, make it lose badly.
+          if(returnInfo.returnSpeed < -80) nodeAdjust += 170;
+          if(returnInfo.endDist > 2800 && returnInfo.returnSpeed < 40) nodeAdjust += 120;
+        }else{
+          // Direct shots still get some post-pass sanity check, but less strict.
+          nodeAdjust += returnInfo.adjustment*.35;
         }
 
-        // Far shots may use nodes, but avoid "slingshot to nowhere".
-        const escapePenalty=(far&&Math.hypot(c.endX,c.endY)>boundary.soft*.92)?90:0;
+        const escapePenalty=(far&&Math.hypot(c.endX,c.endY)>boundary.soft*.95)?110:0;
 
-        c.score+=turnPenalty+aggressionPenalty+escapePenalty-nodeBonus;
+        c.score+=turnPenalty+aggressionPenalty+escapePenalty+nodeAdjust;
         c.kind=cand.kind;
         c.node=cand.node;
+        c.returnInfo=returnInfo;
+
         if(!best||c.score<best.score)best=c;
+        if(cand.node && (!bestNode||c.score<bestNode.score))bestNode=c;
       }
     }
   }
 
   const killzone=aiKillzoneScore(e),shot=aiShotScore(e);
-  let state=best.node?'node_transfer':'cannon_intercept';
-  let coast=far ? clamp(best.bestT*.50,.78,1.45)
+
+  // If a node candidate is only slightly worse than direct but has a good return vector,
+  // prefer it because the goal is flyby + return, not immediate overshoot.
+  if(far && bestNode && bestNode.returnInfo && bestNode.returnInfo.returnSpeed>35 && bestNode.score<best.score+95){
+    best=bestNode;
+  }
+
+  let state=best.node?'return_flyby':'cannon_intercept';
+  let coast=far ? clamp(best.bestT*.62,1.05,2.15)
                  : mid ? clamp(best.bestT*.60,.92,1.70)
                        : clamp(best.bestT*.70,1.10,2.10);
 
@@ -426,9 +477,9 @@ function aiPlanCannonShot(e){
     const escapeAng=aiAngleLerp(previousAng,toPlayer+side*Math.PI/2,escapeBlend);
     best=aiScoreCandidate(e,escapeAng,close?112:128,close?.36:.44,2.7,step,playerPath);
     coast=close?1.55:1.15;
-  }else if(best.bestD<enemyWeapon.range*.78 && shot>.28){
+  }else if(best.bestD<enemyWeapon.range*.78 && shot>.28 && (!best.returnInfo || best.returnInfo.returnSpeed>-30)){
     state="attack_pass";
-    coast=close?1.05:.90;
+    coast=close?1.05:.95;
   }
 
   const finalAngle=previousAng+clamp(sd(previousAng,best.ang),-maxPlanTurn,maxPlanTurn);
@@ -447,7 +498,8 @@ function aiPlanCannonShot(e){
     score:best.score,
     rangeBand:far?'far':(mid?'mid':'close'),
     kind:best.kind||state,
-    node:best.node||null
+    node:best.node||null,
+    returnInfo:best.returnInfo||null
   };
 }
 
