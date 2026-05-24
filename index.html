@@ -318,8 +318,8 @@
 
     defs[0].angle0 = rr(rng, 0.15, 0.95);
     defs[0].orbitR = rr(rng, 2400, 3100);
-    defs[0].r = clamp(defs[0].r, 86, 120);
-    defs[0].mass = Math.round(defs[0].r * defs[0].r * rr(rng, 320, 420));
+    defs[0].r = clamp(defs[0].r, 92, 125);
+    defs[0].mass = Math.round(defs[0].r * defs[0].r * rr(rng, 280, 360));
     return defs;
   }
 
@@ -438,11 +438,10 @@
     updateBodies();
     const p = selectSpawnPlanet();
 
-    // Safer, wider orbit: close enough to read clearly, far enough not to graze the surface.
-    const orbitRadius = Math.max(p.r * 4.25, p.r + ship.radius + 220);
-
-    // Start on the side away from the star, so the sun's residual pull is least disruptive.
-    let spawnAngle = Math.atan2(p.y - sun.y, p.x - sun.x);
+    // Start comfortably inside the planet's sphere of influence.
+    // This guarantees a clean, stable planet orbit at the beginning.
+    const orbitRadius = Math.max(p.r * 3.45, p.r + ship.radius + 180);
+    let spawnAngle = Math.atan2(p.y - sun.y, p.x - sun.x) + Math.PI * 0.45;
 
     function placeAt(a) {
       const nx = Math.cos(a);
@@ -453,8 +452,6 @@
       ship.x = p.x + nx * orbitRadius;
       ship.y = p.y + ny * orbitRadius;
 
-      // Use the same boosted gravity model used by gravityAt().
-      // Without this, the initial orbit is under-speed and the ship falls into the planet.
       const effectiveMass = effectiveGravityMassForOrbit(p, orbitRadius);
       const circ = Math.sqrt(effectiveMass / orbitRadius);
 
@@ -465,20 +462,21 @@
 
     placeAt(spawnAngle);
 
-    // Rotate the spawn point if another body obstructs it or it is too close to the star.
     for (let attempt = 0; attempt < 72; attempt++) {
       let safe = true;
 
       for (const b of bodies) {
-        const minD = b.r + ship.radius + 120;
+        const minD = b.r + ship.radius + 100;
         if (Math.hypot(ship.x - b.x, ship.y - b.y) < minD) {
           safe = false;
           break;
         }
       }
 
+      const inPlanetSOI = Math.hypot(ship.x - p.x, ship.y - p.y) < p.r * 8.5;
       const farFromSun = Math.hypot(ship.x - sun.x, ship.y - sun.y) > sun.r + 850;
-      if (safe && farFromSun) break;
+
+      if (safe && inPlanetSOI && farFromSun) break;
 
       spawnAngle += Math.PI * 0.211;
       placeAt(spawnAngle);
@@ -497,9 +495,9 @@
 
     camera.x = ship.x;
     camera.y = ship.y;
-    camera.zoom = 0.58;
-    camera.targetZoom = 0.58;
-    camera.desiredZoom = 0.58;
+    camera.zoom = 0.62;
+    camera.targetZoom = 0.62;
+    camera.desiredZoom = 0.62;
     camera.zoomVel = 0;
     camera.zoomHold = 0;
 
@@ -523,18 +521,47 @@
   }
 
   function gravityAt(x, y, bs = bodies) {
+    // Simple and solid model:
+    // if the ship/trajectory point is inside a planet's sphere of influence,
+    // that planet is the ONLY active gravity source.
+    // This makes local planet orbits stable and removes accidental multi-body crashes.
+    let soiBody = null;
+    let soiScore = -Infinity;
+
+    for (const b of bs) {
+      if (b.type === "sun") continue;
+      const dx = b.x - x;
+      const dy = b.y - y;
+      const d = Math.hypot(dx, dy) + 0.0001;
+      const soi = b.r * 8.5;
+
+      if (d < soi) {
+        const score = (1 - d / soi) * 100 + b.mass / (d * d + 1);
+        if (score > soiScore) {
+          soiScore = score;
+          soiBody = b;
+        }
+      }
+    }
+
+    const activeBodies = soiBody ? [soiBody] : bs;
+
     let ax = 0;
     let ay = 0;
 
-    for (const b of bs) {
+    for (const b of activeBodies) {
       const dx = b.x - x;
       const dy = b.y - y;
       const d2 = dx * dx + dy * dy;
       const d = Math.sqrt(d2) + 0.0001;
       const safe = Math.max(d2, b.r * b.r * 0.82);
-      const well = b.type === "sun" ? b.r * 12 : b.r * 20;
-      const boost = 1 + 2.4 * (well / (d + well));
+
+      // Keep gravity readable, but deterministic. The same effective mass
+      // is used for the starting circular speed.
+      const well = b.type === "sun" ? b.r * 10 : b.r * 16;
+      const boost = 1 + 1.55 * (well / (d + well));
       const g = b.mass * boost / safe;
+
       ax += dx / d * g;
       ay += dy / d * g;
     }
@@ -543,8 +570,8 @@
   }
 
   function effectiveGravityMassForOrbit(b, orbitalRadius) {
-    const well = b.type === "sun" ? b.r * 12 : b.r * 20;
-    const boost = 1 + 2.4 * (well / (orbitalRadius + well));
+    const well = b.type === "sun" ? b.r * 10 : b.r * 16;
+    const boost = 1 + 1.55 * (well / (orbitalRadius + well));
     return b.mass * boost;
   }
 
@@ -578,7 +605,7 @@
     const scores = new Map();
     const closest = new Map();
     const step = 0.085;
-    const steps = 500;
+    const steps = 430;
     let stableBody = null;
 
     let dominantId = null;
@@ -650,7 +677,7 @@
           } else {
             orbitTrackAccum += shortDelta(orbitTrackLastAng, a);
             orbitTrackLastAng = a;
-            if (Math.abs(orbitTrackAccum) > Math.PI * 2 * 1.15 && pts.length > 90) break;
+            if (Math.abs(orbitTrackAccum) > Math.PI * 2 * 1.05 && pts.length > 90) break;
           }
         }
       }
