@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>DeltaV - Cannon AI Inertia</title>
+<title>DeltaV - Cannon AI Adaptive</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#020610;color:#eef6ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif;touch-action:none}
@@ -19,7 +19,7 @@ canvas{display:block;width:100vw;height:100dvh;background:radial-gradient(circle
 </head>
 <body>
 <canvas id="game"></canvas>
-<div class="hud"><div class="panel"><div class="title">DeltaV - Cannon AI Inertia</div><div class="small">AI lab: cannon-shot sampling with barrel inertia, longer coast, less aggression.</div></div><div class="panel" id="readout"></div></div>
+<div class="hud"><div class="panel"><div class="title">DeltaV - Cannon AI Adaptive</div><div class="small">AI lab: aggressive far intercept, inertial close combat, visible speed.</div></div><div class="panel" id="readout"></div></div>
 <div class="hint">Lati invisibili: ruota con RCS. Centro basso: burn. Laser automatico con cono stretto.</div>
 <div class="turnZone left" id="leftGlow"></div><div class="turnZone right" id="rightGlow"></div><div class="burnButton" id="burnVisual">BURN</div>
 <div class="speedPill" id="speedPill">speed 0.0</div><div class="actions"><button class="hudBtn" id="resetBtn">Reset</button><button class="hudBtn" id="newBtn">New</button></div>
@@ -264,52 +264,57 @@ function aiAngleLerp(a,b,t){
 }
 
 function aiPlanCannonShot(e){
-  const horizon=3.2,step=.14;
+  const horizon=3.35,step=.14;
   const playerPath=aiSimPlayerPath(horizon,step);
 
   const toPlayer=Math.atan2(ship.y-e.y,ship.x-e.x);
+  const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
   const vAng=Math.atan2(e.vy,e.vx);
   const relAng=Math.atan2((ship.vy-e.vy),(ship.vx-e.vx));
 
-  // Previous plan gives the "barrel inertia": the enemy cannot instantly choose
-  // a completely different cannon shot every cycle.
   const previousAng = e.currentPlan && Number.isFinite(e.currentPlan.angle) ? e.currentPlan.angle : vAng;
+
+  // Adaptive inertia: permissive far away, restrained in close combat.
+  const far = dPlayer>1650;
+  const mid = dPlayer>900 && dPlayer<=1650;
+  const close = dPlayer<=900;
+
+  const blend = far ? .88 : (mid ? .68 : .52);
+  const anglePenaltyK = far ? 38 : (mid ? 95 : 175);
+  const maxPlanTurn = far ? 1.65 : (mid ? 1.02 : .62);
 
   const candidateAngles=[
     toPlayer,
-    toPlayer+.22,
-    toPlayer-.22,
-    toPlayer+.44,
-    toPlayer-.44,
+    toPlayer+.24,
+    toPlayer-.24,
+    toPlayer+.50,
+    toPlayer-.50,
+    toPlayer+.82,
+    toPlayer-.82,
     toPlayer+Math.PI/2,
     toPlayer-Math.PI/2,
     vAng,
     relAng,
     previousAng,
-    previousAng+.28,
-    previousAng-.28
+    previousAng+.35,
+    previousAng-.35
   ];
 
-  for(let i=-4;i<=4;i++)candidateAngles.push(toPlayer+i*.16);
+  for(let i=-5;i<=5;i++)candidateAngles.push(toPlayer+i*.18);
 
-  // Less aggressive than previous version.
-  const powers=[52,76,104,126];
-  const burns=[.22,.36,.52];
+  const powers = far ? [76,104,134,162] : (mid ? [64,92,122,144] : [52,76,104,126]);
+  const burns = far ? [.32,.48,.68] : (mid ? [.26,.42,.60] : [.22,.36,.52]);
 
   let best=null;
 
   for(const rawAng of candidateAngles){
-    // Barrel inertia: blend candidate toward current/previous shot direction.
-    const blendedAng=aiAngleLerp(previousAng,rawAng,.58);
+    const blendedAng=aiAngleLerp(previousAng,rawAng,blend);
     for(const p of powers){
       for(const b of burns){
         const c=aiScoreCandidate(e,blendedAng,p,b,horizon,step,playerPath);
 
-        // Penalize hard changes in cannon direction.
-        const turnPenalty=Math.abs(sd(previousAng,blendedAng))*170;
-
-        // Mildly prefer not attacking every possible window.
-        const aggressionPenalty=(p>104?35:0)+(b>.5?24:0);
+        const turnPenalty=Math.abs(sd(previousAng,blendedAng))*anglePenaltyK;
+        const aggressionPenalty=close?((p>104?35:0)+(b>.5?24:0)):(mid?(p>122?18:0):0);
 
         c.score+=turnPenalty+aggressionPenalty;
         if(!best||c.score<best.score)best=c;
@@ -319,21 +324,22 @@ function aiPlanCannonShot(e){
 
   const killzone=aiKillzoneScore(e),shot=aiShotScore(e);
   let state="cannon_intercept";
-  let coast=clamp(best.bestT*.65,1.05,2.05);
+  let coast=far ? clamp(best.bestT*.48,.72,1.35)
+                 : mid ? clamp(best.bestT*.58,.90,1.65)
+                       : clamp(best.bestT*.70,1.10,2.10);
 
   if(killzone>.48&&shot<.64){
     state="cannon_escape";
     const side=e.side||1;
-    const escapeAng=aiAngleLerp(previousAng,toPlayer+side*Math.PI/2,.55);
-    best=aiScoreCandidate(e,escapeAng,112,.36,2.7,step,playerPath);
-    coast=1.55;
-  }else if(best.bestD<enemyWeapon.range*.74 && shot>.30){
+    const escapeBlend = close ? .55 : .72;
+    const escapeAng=aiAngleLerp(previousAng,toPlayer+side*Math.PI/2,escapeBlend);
+    best=aiScoreCandidate(e,escapeAng,close?112:128,close?.36:.44,2.7,step,playerPath);
+    coast=close?1.55:1.15;
+  }else if(best.bestD<enemyWeapon.range*.78 && shot>.28){
     state="attack_pass";
-    coast=1.05;
+    coast=close?1.05:.85;
   }
 
-  // Final clamp: do not let the chosen cannon angle swing too hard.
-  const maxPlanTurn=.72;
   const finalAngle=previousAng+clamp(sd(previousAng,best.ang),-maxPlanTurn,maxPlanTurn);
 
   return{
@@ -347,7 +353,8 @@ function aiPlanCannonShot(e){
     target:{x:best.bestPX,y:best.bestPY},
     shot,
     killzone,
-    score:best.score
+    score:best.score,
+    rangeBand:far?'far':(mid?'mid':'close')
   };
 }
 
@@ -375,7 +382,7 @@ function updateEnemies(dt){
       e.currentPlan=plan;
       e.burnTimerAI=plan.burn;
       e.coastTimer=plan.coast;
-      e.planTimer=plan.burn+plan.coast+.18;
+      e.planTimer=plan.burn+plan.coast+(plan.rangeBand==='far'?.03:.18);
       if(plan.state==="cannon_escape"&&e.sideCooldown<=0){e.side*=-1;e.sideCooldown=1.7;}
     }
 
@@ -401,7 +408,7 @@ function updateEnemies(dt){
     const sysR=Math.hypot(e.x,e.y)+.0001;
     if(sysR>boundary.soft*.72){ax+=(-e.x/sysR)*62;ay+=(-e.y/sysR)*62}
 
-    const maxA=plan.state==="cannon_escape"?128:116;
+    const maxA=plan.rangeBand==='far'?(plan.state==='cannon_escape'?150:138):(plan.rangeBand==='mid'?(plan.state==='cannon_escape'?138:126):(plan.state==='cannon_escape'?128:116));
     const mag=Math.hypot(ax,ay);
     if(mag>maxA){ax=ax/mag*maxA;ay=ay/mag*maxA}
 
@@ -418,7 +425,7 @@ function updateEnemies(dt){
     const canAim=plan.state!=="cannon_escape"&&(shot>.32||dPlayer<enemyWeapon.range*1.25);
     const desiredAim=canAim?Math.atan2((ship.y+ship.vy*.18)-e.y,(ship.x+ship.vx*.18)-e.x):Math.atan2(e.vy,e.vx);
 
-    const maxTurn=1.42;
+    const maxTurn=plan.rangeBand==='far'?1.85:(plan.rangeBand==='mid'?1.62:1.42);
     e.angle+=clamp(sd(e.angle,desiredAim),-maxTurn*dt,maxTurn*dt);
 
     if(plan.state!=="cannon_escape"&&e.weaponCooldown<=0&&aiCanShoot(e))aiEnemyFire(e);
