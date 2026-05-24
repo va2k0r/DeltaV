@@ -1,10 +1,9 @@
 <!doctype html>
-<!-- orbital-phase-ai-fixed-title-v1 -->
 <html lang="it">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>DeltaV - Orbital Phase AI</title>
+<title>DeltaV - Cannon AI</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#020610;color:#eef6ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif;touch-action:none}
@@ -20,7 +19,7 @@ canvas{display:block;width:100vw;height:100dvh;background:radial-gradient(circle
 </head>
 <body>
 <canvas id="game"></canvas>
-<div class="hud"><div class="panel"><div class="title">DeltaV - Orbital Phase AI</div><div class="small">AI lab: orbital phase burns, discrete coast, simplified transfer logic.</div></div><div class="panel" id="readout"></div></div>
+<div class="hud"><div class="panel"><div class="title">DeltaV - Cannon AI</div><div class="small">AI lab: cannon-shot intercept sampling, gravity-simulated attack passes.</div></div><div class="panel" id="readout"></div></div>
 <div class="hint">Lati invisibili: ruota con RCS. Centro basso: burn. Laser automatico con cono stretto.</div>
 <div class="turnZone left" id="leftGlow"></div><div class="turnZone right" id="rightGlow"></div><div class="burnButton" id="burnVisual">BURN</div>
 <div class="actions"><button class="hudBtn" id="resetBtn">Reset</button><button class="hudBtn" id="newBtn">New</button></div>
@@ -146,37 +145,8 @@ function enemyAttackOpportunity(e){
   return angleScore*.74+rangeScore*.26;
 }
 function enemyCanShootPlayer(e){let dx=ship.x-e.x,dy=ship.y-e.y,d=Math.hypot(dx,dy);if(d>enemyWeapon.range||d<1)return false;let fx=Math.cos(e.angle),fy=Math.sin(e.angle),a=Math.acos(clamp((dx/d)*fx+(dy/d)*fy,-1,1));return a<=enemyWeapon.cone}
-function aiNorm(x,y){
-  const l=Math.hypot(x,y)+.0001;
-  return{x:x/l,y:y/l};
-}
 
-function aiPlayerFacingDir(){
-  return{x:Math.cos(ship.angle),y:Math.sin(ship.angle)};
-}
-
-function aiPlayerOrbitBody(){
-  let best=null,bestScore=-Infinity;
-  for(const b of bodies){
-    if(b.type==='sun')continue;
-    const d=Math.hypot(ship.x-b.x,ship.y-b.y)+.0001;
-    const score=b.mass/(d*d);
-    if(score>bestScore){bestScore=score;best=b}
-  }
-  return best||bodies.find(b=>b.type!=='sun')||bodies[0];
-}
-
-function aiPolarAround(b,x,y){
-  const dx=x-b.x,dy=y-b.y;
-  const r=Math.hypot(dx,dy)+.0001;
-  const radial={x:dx/r,y:dy/r};
-  const tangent={x:-radial.y,y:radial.x};
-  return{dx,dy,r,angle:Math.atan2(dy,dx),radial,tangent};
-}
-
-function aiSignedPhase(a,b){
-  return sd(a,b);
-}
+function aiNorm(x,y){const l=Math.hypot(x,y)+.0001;return{x:x/l,y:y/l}}
 
 function aiShotScore(e){
   const dx=ship.x-e.x,dy=ship.y-e.y,d=Math.hypot(dx,dy);
@@ -186,15 +156,17 @@ function aiShotScore(e){
   return clamp(1-a/(enemyWeapon.cone*2.1),0,1)*.72+clamp(1-d/(enemyWeapon.range*1.25),0,1)*.28;
 }
 
-function aiKillzoneScore(e){
-  const dx=e.x-ship.x,dy=e.y-ship.y,d=Math.hypot(dx,dy)+.0001;
+function aiKillzoneScoreAt(ex,ey,px,py,pAngle){
+  const dx=ex-px,dy=ey-py,d=Math.hypot(dx,dy)+.0001;
   if(d>weapon.range*1.55)return 0;
-  const f=aiPlayerFacingDir();
-  const a=Math.acos(clamp((dx/d)*f.x+(dy/d)*f.y,-1,1));
+  const fx=Math.cos(pAngle),fy=Math.sin(pAngle);
+  const a=Math.acos(clamp((dx/d)*fx+(dy/d)*fy,-1,1));
   const cone=weapon.cone*3.05;
   if(a>cone)return 0;
   return clamp(1-a/cone,0,1)*.80+clamp(1-d/(weapon.range*1.55),0,1)*.20;
 }
+
+function aiKillzoneScore(e){return aiKillzoneScoreAt(e.x,e.y,ship.x,ship.y,ship.angle)}
 
 function aiCanShoot(e){
   const dx=ship.x-e.x,dy=ship.y-e.y,d=Math.hypot(dx,dy);
@@ -207,20 +179,10 @@ function aiCanShoot(e){
 function aiEnemyFire(e){
   e.weaponCooldown=enemyWeapon.cooldown;
   e.lastAttack=0;
-  enemyBeams.push({
-    x1:e.x+Math.cos(e.angle)*20,
-    y1:e.y+Math.sin(e.angle)*20,
-    x2:ship.x,
-    y2:ship.y,
-    life:.12,
-    maxLife:.12
-  });
+  enemyBeams.push({x1:e.x+Math.cos(e.angle)*20,y1:e.y+Math.sin(e.angle)*20,x2:ship.x,y2:ship.y,life:.12,maxLife:.12});
   ship.damageFlash=.22;
   ship.hp=Math.max(0,ship.hp-enemyWeapon.damage);
-  if(ship.hp<=0){
-    spawnParticle(ship.x,ship.y,90,'255,130,70');
-    reset();
-  }
+  if(ship.hp<=0){spawnParticle(ship.x,ship.y,90,'255,130,70');reset()}
 }
 
 function aiPlanetAvoidanceVector(e){
@@ -230,12 +192,12 @@ function aiPlanetAvoidanceVector(e){
     const fx=e.x+e.vx*.85,fy=e.y+e.vy*.85;
     const dx=e.x-b.x,dy=e.y-b.y,d=Math.hypot(dx,dy)+.0001;
     const fdx=fx-b.x,fdy=fy-b.y,fd=Math.hypot(fdx,fdy)+.0001;
-    const danger=b.r+e.radius+115;
+    const danger=b.r+e.radius+120;
     const risk=clamp(1-(Math.min(d,fd)-b.r)/Math.max(1,danger-b.r),0,1);
     if(risk<=0)continue;
     const nx=dx/d,ny=dy/d;
     const inward=-(e.vx*nx+e.vy*ny);
-    const side=Math.sign(e.vx*ny-e.vy*nx)||e.orbitSide||1;
+    const side=Math.sign(e.vx*ny-e.vy*nx)||e.side||1;
     const tx=-ny*side,ty=nx*side;
     const push=65*risk+clamp(inward,0,180)*.40*risk;
     ax+=(tx*.74+nx*.26)*push;
@@ -245,122 +207,122 @@ function aiPlanetAvoidanceVector(e){
   return{ax,ay,risk:riskMax};
 }
 
-function aiPlanOrbitalBurn(e){
-  const body=aiPlayerOrbitBody();
-  const pp=aiPolarAround(body,ship.x,ship.y);
-  const ep=aiPolarAround(body,e.x,e.y);
+function aiSimPlayerPath(horizon,step){
+  let x=ship.x,y=ship.y,vx=ship.vx,vy=ship.vy;
+  const pts=[];
+  for(let t=0;t<=horizon+.0001;t+=step){
+    pts.push({t,x,y,vx,vy,angle:ship.angle+ship.angularVelocity*t});
+    const g=gravityAt(x,y);
+    vx+=g.ax*step;vy+=g.ay*step;
+    x+=vx*step;y+=vy*step;
+  }
+  return pts;
+}
 
-  const phase=aiSignedPhase(ep.angle,pp.angle);
-  const absPhase=Math.abs(phase);
-  const rErr=pp.r-ep.r;
-  const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
-  const shot=aiShotScore(e);
-  const killzone=aiKillzoneScore(e);
+function aiScoreCandidate(e,ang,power,burnDur,horizon,step,playerPath){
+  let x=e.x,y=e.y,vx=e.vx,vy=e.vy;
+  const dir={x:Math.cos(ang),y:Math.sin(ang)};
+  let bestD=Infinity,bestT=0,bestPX=ship.x,bestPY=ship.y;
+  let killPenalty=0,bodyPenalty=0,rangeBonus=0,approachBonus=0;
 
-  const er={x:ep.radial.x,y:ep.radial.y};
-  const et={x:ep.tangent.x*(e.orbitSide||1),y:ep.tangent.y*(e.orbitSide||1)};
+  for(let i=0;i<playerPath.length;i++){
+    const t=i*step;
+    if(t<burnDur){vx+=dir.x*power*step;vy+=dir.y*power*step}
 
-  let state="phase";
-  let dir={x:0,y:0};
-  let power=92;
-  let burn=.50;
-  let coast=1.15;
+    const g=gravityAt(x,y);
+    vx+=g.ax*step;vy+=g.ay*step;
+    x+=vx*step;y+=vy*step;
 
-  if(killzone>.42 && shot<.65){
-    state="killzone_escape";
-    dir={x:et.x*.90+er.x*.12,y:et.y*.90+er.y*.12};
-    power=126;
-    burn=.48;
-    coast=1.35;
-  }else if(dPlayer<enemyWeapon.range*1.15 && shot>.52){
-    state="attack_pass";
-    dir={x:et.x*.75-er.x*.10,y:et.y*.75-er.y*.10};
-    power=48;
-    burn=.26;
-    coast=.90;
-  }else if(absPhase>.34){
-    state="phase_approach";
-    const wantsCatch = phase>0 ? 1 : -1;
-    dir={
-      x:et.x*wantsCatch + er.x*clamp(rErr/900,-.32,.32),
-      y:et.y*wantsCatch + er.y*clamp(rErr/900,-.32,.32)
-    };
-    power=112;
-    burn=.56;
-    coast=1.55;
-  }else if(Math.abs(rErr)>220){
-    state="match_radius";
-    const radialSign=Math.sign(rErr);
-    dir={
-      x:er.x*radialSign*.70+et.x*.30,
-      y:er.y*radialSign*.70+et.y*.30
-    };
-    power=88;
-    burn=.48;
-    coast=1.25;
-  }else if(dPlayer>1050){
-    state="intercept_pass";
-    const toP=aiNorm(ship.x-e.x,ship.y-e.y);
-    dir={x:et.x*.62+toP.x*.38,y:et.y*.62+toP.y*.38};
-    power=104;
-    burn=.44;
-    coast=1.10;
-  }else{
-    state="combat_orbit";
-    const ideal=760;
-    const radialSign=Math.sign(dPlayer-ideal);
-    dir={x:et.x*.88+er.x*radialSign*.18,y:et.y*.88+er.y*radialSign*.18};
-    power=58;
-    burn=.28;
-    coast=1.20;
+    const pp=playerPath[Math.min(i,playerPath.length-1)];
+    const d=Math.hypot(x-pp.x,y-pp.y);
+
+    if(d<bestD){bestD=d;bestT=t;bestPX=pp.x;bestPY=pp.y}
+    if(d<enemyWeapon.range*1.18)rangeBonus+=6;
+
+    const kz=aiKillzoneScoreAt(x,y,pp.x,pp.y,pp.angle);
+    killPenalty+=kz*kz*120;
+
+    for(const b of bodies){
+      if(b.type==='sun')continue;
+      const bd=Math.hypot(x-b.x,y-b.y);
+      if(bd<b.r+e.radius+30)bodyPenalty+=160;
+    }
+
+    if(Math.hypot(x,y)>boundary.hard)bodyPenalty+=240;
   }
 
-  const n=aiNorm(dir.x,dir.y);
-  return{
-    body,state,dir:n,power,burn,coast,phase,rErr,dPlayer,shot,killzone,
-    target:{x:e.x+n.x*520,y:e.y+n.y*520}
-  };
+  const finalDX=bestPX-x,finalDY=bestPY-y;
+  const relClosing=(vx*finalDX+vy*finalDY)/(Math.hypot(finalDX,finalDY)+.0001);
+  approachBonus=clamp(relClosing,0,220)*.35;
+
+  const score=bestD+killPenalty+bodyPenalty-rangeBonus-approachBonus;
+  return{score,bestD,bestT,bestPX,bestPY,ang,power,burnDur,endX:x,endY:y,endVX:vx,endVY:vy};
+}
+
+function aiPlanCannonShot(e){
+  const horizon=3.4,step=.14;
+  const playerPath=aiSimPlayerPath(horizon,step);
+  const toPlayer=Math.atan2(ship.y-e.y,ship.x-e.x);
+  const vAng=Math.atan2(e.vy,e.vx);
+  const relAng=Math.atan2((ship.vy-e.vy),(ship.vx-e.vx));
+  const baseAngles=[toPlayer,toPlayer+.28,toPlayer-.28,toPlayer+.55,toPlayer-.55,toPlayer+Math.PI/2,toPlayer-Math.PI/2,vAng,relAng];
+  for(let i=-5;i<=5;i++)baseAngles.push(toPlayer+i*.18);
+
+  const powers=[64,92,122,150],burns=[.26,.42,.62];
+  let best=null;
+  for(const a of baseAngles)for(const p of powers)for(const b of burns){
+    const c=aiScoreCandidate(e,a,p,b,horizon,step,playerPath);
+    if(!best||c.score<best.score)best=c;
+  }
+
+  const killzone=aiKillzoneScore(e),shot=aiShotScore(e);
+  let state="cannon_intercept",coast=clamp(best.bestT*.55,.75,1.65);
+
+  if(killzone>.44&&shot<.62){
+    state="cannon_escape";
+    const escapeAng=toPlayer+(e.side||1)*Math.PI/2;
+    best=aiScoreCandidate(e,escapeAng,138,.44,2.6,step,playerPath);
+    coast=1.25;
+  }else if(best.bestD<enemyWeapon.range*.82){
+    state="attack_pass";
+    coast=.85;
+  }
+
+  return{state,angle:best.ang,power:best.power,burn:best.burnDur,coast,bestD:best.bestD,bestT:best.bestT,target:{x:best.bestPX,y:best.bestPY},shot,killzone,score:best.score};
 }
 
 function updateEnemies(dt){
   aiDebugData=[];
-
   for(const e of enemies){
     if(!e.alive)continue;
-
-    if(e.orbitSide==null)e.orbitSide=Math.random()<.5?-1:1;
+    if(e.side==null)e.side=Math.random()<.5?-1:1;
     if(e.planTimer==null)e.planTimer=.1;
     if(e.burnTimerAI==null)e.burnTimerAI=0;
     if(e.coastTimer==null)e.coastTimer=0;
     if(e.weaponCooldown==null)e.weaponCooldown=1.0;
     if(e.lastAttack==null)e.lastAttack=0;
-    if(e.currentPlan==null)e.currentPlan=aiPlanOrbitalBurn(e);
+    if(e.currentPlan==null)e.currentPlan=aiPlanCannonShot(e);
 
     e.weaponCooldown=Math.max(0,e.weaponCooldown-dt);
     e.lastAttack+=dt;
     e.planTimer-=dt;
-
     let plan=e.currentPlan;
 
-    if(e.burnTimerAI<=0 && e.coastTimer<=0 && e.planTimer<=0){
-      plan=aiPlanOrbitalBurn(e);
+    if(e.burnTimerAI<=0&&e.coastTimer<=0&&e.planTimer<=0){
+      plan=aiPlanCannonShot(e);
       e.currentPlan=plan;
       e.burnTimerAI=plan.burn;
       e.coastTimer=plan.coast;
       e.planTimer=plan.burn+plan.coast+.05;
-
-      if(plan.state==="killzone_escape" && plan.shot<.65){
-        e.orbitSide*=-1;
-      }
+      if(plan.state==="cannon_escape")e.side*=-1;
     }
 
     let ax=0,ay=0;
-
     if(e.burnTimerAI>0){
       e.burnTimerAI-=dt;
-      ax+=plan.dir.x*plan.power;
-      ay+=plan.dir.y*plan.power;
-      e.burnAngle=Math.atan2(plan.dir.y,plan.dir.x);
+      ax+=Math.cos(plan.angle)*plan.power;
+      ay+=Math.sin(plan.angle)*plan.power;
+      e.burnAngle=plan.angle;
       e.burnTimer=.10;
       e.plumeTimer=.16;
       e.aiState=plan.state+"_burn";
@@ -372,58 +334,35 @@ function updateEnemies(dt){
     }
 
     const avoid=aiPlanetAvoidanceVector(e);
-    ax+=avoid.ax;
-    ay+=avoid.ay;
+    ax+=avoid.ax;ay+=avoid.ay;
 
     const sysR=Math.hypot(e.x,e.y)+.0001;
-    if(sysR>boundary.soft*.72){
-      ax+=(-e.x/sysR)*62;
-      ay+=(-e.y/sysR)*62;
-    }
+    if(sysR>boundary.soft*.72){ax+=(-e.x/sysR)*62;ay+=(-e.y/sysR)*62}
 
-    const maxA=plan.state==="killzone_escape"?142:118;
+    const maxA=plan.state==="cannon_escape"?150:136;
     const mag=Math.hypot(ax,ay);
-    if(mag>maxA){
-      ax=ax/mag*maxA;
-      ay=ay/mag*maxA;
-    }
+    if(mag>maxA){ax=ax/mag*maxA;ay=ay/mag*maxA}
 
-    e.vx+=ax*dt;
-    e.vy+=ay*dt;
-
+    e.vx+=ax*dt;e.vy+=ay*dt;
     const g=gravityAt(e.x,e.y);
-    e.vx+=g.ax*dt;
-    e.vy+=g.ay*dt;
-
-    e.x+=e.vx*dt;
-    e.y+=e.vy*dt;
+    e.vx+=g.ax*dt;e.vy+=g.ay*dt;
+    e.x+=e.vx*dt;e.y+=e.vy*dt;
 
     e.hitFlash=Math.max(0,e.hitFlash-dt);
     e.hpVisible=Math.max(0,e.hpVisible-dt);
 
     const shot=aiShotScore(e);
     const dPlayer=Math.hypot(ship.x-e.x,ship.y-e.y);
-    const canAim=(plan.state==="attack_pass"||shot>.34||dPlayer<enemyWeapon.range*1.2) && plan.state!=="killzone_escape";
-    const desiredAim=canAim
-      ? Math.atan2((ship.y+ship.vy*.18)-e.y,(ship.x+ship.vx*.18)-e.x)
-      : Math.atan2(e.vy,e.vx);
+    const canAim=plan.state!=="cannon_escape"&&(shot>.32||dPlayer<enemyWeapon.range*1.25);
+    const desiredAim=canAim?Math.atan2((ship.y+ship.vy*.18)-e.y,(ship.x+ship.vx*.18)-e.x):Math.atan2(e.vy,e.vx);
 
-    const maxTurn=1.78;
+    const maxTurn=1.84;
     e.angle+=clamp(sd(e.angle,desiredAim),-maxTurn*dt,maxTurn*dt);
 
-    if(plan.state!=="killzone_escape" && e.weaponCooldown<=0 && aiCanShoot(e))aiEnemyFire(e);
+    if(plan.state!=="cannon_escape"&&e.weaponCooldown<=0&&aiCanShoot(e))aiEnemyFire(e);
 
-    aiDebugData.push({
-      enemy:e,
-      target:plan.target,
-      ax,ay,
-      threat:plan.killzone,
-      shot,
-      killzone:plan.killzone,
-      state:e.aiState,
-      phase:plan.phase,
-      rErr:plan.rErr
-    });
+    const target=plan.target||{x:e.x+Math.cos(plan.angle)*520,y:e.y+Math.sin(plan.angle)*520};
+    aiDebugData.push({enemy:e,target,ax,ay,threat:plan.killzone,shot,killzone:plan.killzone,state:e.aiState,bestD:plan.bestD,score:plan.score});
   }
 }
 function updateCombat(dt){weaponCooldown=Math.max(0,weaponCooldown-dt);for(let i=beams.length-1;i>=0;i--){beams[i].life-=dt;if(beams[i].life<=0)beams.splice(i,1)}for(let i=enemyBeams.length-1;i>=0;i--){enemyBeams[i].life-=dt;if(enemyBeams[i].life<=0)enemyBeams.splice(i,1)}let tar=findWeaponTarget();if(tar)tar.hpVisible=Math.max(tar.hpVisible,.35);if(tar&&weaponCooldown<=0){weaponCooldown=weapon.cooldown;tar.hp-=weapon.damage;tar.hitFlash=.16;tar.hpVisible=2.5;beams.push({x1:ship.x+Math.cos(ship.angle)*22,y1:ship.y+Math.sin(ship.angle)*22,x2:tar.x,y2:tar.y,life:.115,maxLife:.115});if(tar.hp<=0){tar.alive=false;spawnParticle(tar.x,tar.y,80,'255,130,70')}}}
