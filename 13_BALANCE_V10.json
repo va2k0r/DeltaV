@@ -1,0 +1,77 @@
+{
+  "version": "v10",
+  "starting_dv": 10,
+  "tritium_yield_per_work": 2,
+  "shipyard_work_turns": 4,
+  "ship_production_dv_cost": 0,
+  "mandatory_launch_required": true,
+  "fire_cost": 0,
+  "missile_min_travel_turns": 2,
+  "ship_min_local_travel_turns": 1,
+  "evade_base_cost": 2,
+  "evade_cost_formula": "2 + active_missile_solutions_targeting_ship",
+  "evade_cancels_all_targeting_missiles": true,
+  "contested_upkeep": 2,
+  "turn_order": [
+    "contested_upkeep",
+    "missile_impact_and_evade",
+    "ship_arrivals_and_intercept",
+    "actions",
+    "economy_tritium_income",
+    "economy_shipyard_progress_completion",
+    "mandatory_launch"
+  ],
+  "map": {
+    "protected": [
+      "Earth",
+      "Moon"
+    ],
+    "tritium": [
+      "Jupiter",
+      "Saturn",
+      "Uranus",
+      "Neptune"
+    ],
+    "shipyard": [
+      "Mercury",
+      "Mars",
+      "Titan",
+      "Pluto/Charon"
+    ],
+    "barren": [
+      "Venus",
+      "Deimos",
+      "Callisto",
+      "Iapetus",
+      "Oberon",
+      "Triton",
+      "Nix",
+      "Hydra"
+    ]
+  },
+  "gravity_well_suggested": {
+    "Mercury": 1,
+    "Venus": 1,
+    "Mars": 1,
+    "Deimos": 0,
+    "Jupiter": 3,
+    "Callisto": 0,
+    "Saturn": 3,
+    "Titan": 1,
+    "Iapetus": 0,
+    "Uranus": 2,
+    "Oberon": 0,
+    "Neptune": 2,
+    "Triton": 1,
+    "Pluto/Charon": 2,
+    "Nix": 0,
+    "Hydra": 0
+  },
+  "map_constraints": {
+    "active_nodes_target": "18 baseline, 20 rich, 24 scenario upper limit",
+    "use_only_planets_and_moons": true,
+    "activate_all_moons": false,
+    "max_shipyards_per_planetary_system": 1,
+    "gas_ice_giants_are_tritium": true
+  }
+}

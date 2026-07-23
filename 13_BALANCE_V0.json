@@ -1,0 +1,91 @@
+{
+  "version": "balance_v0_candidate",
+  "status": "simulation-derived baseline, not final shipped balance",
+  "time": {
+    "turnMeaning": "1 abstract operational day",
+    "simulationHorizonForBalance": "30-60 turns",
+    "outerPlanetPeriodsAreGameplayAccelerated": true
+  },
+  "orbitalPeriodsTurns": {
+    "Mercury": 16,
+    "Venus": 24,
+    "Earth": 32,
+    "Moon": 6,
+    "Mars": 42,
+    "Jupiter": 56,
+    "Europa": 5,
+    "Ganymede": 7,
+    "Callisto": 9,
+    "Saturn": 70,
+    "Enceladus": 6,
+    "Titan": 10,
+    "Uranus": 86,
+    "Neptune": 96,
+    "Triton": 8
+  },
+  "nodes": {
+    "protectedTransit": ["Earth", "Moon"],
+    "shipyard": ["Mars", "Ganymede", "Callisto", "Titan", "Triton"],
+    "tritium": ["Mercury", "Venus", "Jupiter", "Europa", "Saturn", "Enceladus", "Uranus", "Neptune"]
+  },
+  "tritiumYieldPerTurn": {
+    "Mercury": 4,
+    "Venus": 6,
+    "Jupiter": 7,
+    "Europa": 4,
+    "Saturn": 7,
+    "Enceladus": 4,
+    "Uranus": 6,
+    "Neptune": 7
+  },
+  "startingStateCandidate": {
+    "initialDVReservePerFaction": 42,
+    "factionA": {"shipyard": "Mars", "tritium": "Venus", "ships": ["Mars", "Venus"]},
+    "factionB": {"shipyard": "Ganymede", "tritium": "Jupiter", "ships": ["Ganymede", "Jupiter"]},
+    "factionC": {"shipyard": "Titan", "tritium": "Saturn", "ships": ["Titan", "Saturn"]},
+    "neutralOrUnowned": ["Mercury", "Earth", "Moon", "Europa", "Callisto", "Enceladus", "Uranus", "Neptune", "Triton"]
+  },
+  "transferCostFormula": {
+    "type": "compressed distance formula",
+    "costBase": 2,
+    "costFactor": 0.68,
+    "distanceExponent": 0.92,
+    "longHaulDiscount": 0.9,
+    "maxTransferCost": 45,
+    "notes": "Cost is node-to-node and turn-deterministic. Ship orbital phase never affects cost. Protected nodes have no discount or special routing bonus."
+  },
+  "transferDurationFormula": {
+    "type": "ceil(dV / durationStep)",
+    "durationStep": 8,
+    "minTurns": 1,
+    "maxTurns": 5
+  },
+  "contested": {
+    "costPerFactionPerTurn": 4,
+    "costPaidBeforeOtherActions": true,
+    "leaveCost": "contested cost + selected transfer cost",
+    "evadeAllowed": false,
+    "externalFireAllowed": false,
+    "escalation": "off in v0; enable only if playtests show contested lasts too long"
+  },
+  "missiles": {
+    "fireCostDV": 0,
+    "defaultCountdownTurns": 3,
+    "multipleMissilesCanTargetSameShip": true,
+    "evadeCancelsAllIncomingMissilesAgainstThatShip": true
+  },
+  "evade": {
+    "costDV": 8,
+    "requiresNotContested": true,
+    "effect": "cancels all missiles currently targeting that ship"
+  },
+  "shipProduction": {
+    "shipCostDV": 30,
+    "buildTurns": 4,
+    "shipCapPerFactionForPrototype": 5
+  },
+  "intercept": {
+    "status": "candidate feature, not core balance v0",
+    "costDV": "TBD after core loop testing"
+  }
+}

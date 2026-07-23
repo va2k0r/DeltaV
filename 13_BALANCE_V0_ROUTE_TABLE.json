@@ -1,0 +1,113 @@
+{
+  "medianDV": 14.0,
+  "meanDV": 15.8,
+  "minDV": 2,
+  "maxDV": 35,
+  "routes": [
+    {
+      "route": "Earth -> Moon",
+      "avgDV": 2,
+      "minDV": 2,
+      "maxDV": 2,
+      "medianT": 1
+    },
+    {
+      "route": "Earth -> Mars",
+      "avgDV": 6.3,
+      "minDV": 4,
+      "maxDV": 10,
+      "medianT": 1
+    },
+    {
+      "route": "Venus -> Mercury",
+      "avgDV": 5.7,
+      "minDV": 3,
+      "maxDV": 8,
+      "medianT": 1
+    },
+    {
+      "route": "Mars -> Venus",
+      "avgDV": 8.7,
+      "minDV": 5,
+      "maxDV": 11,
+      "medianT": 2
+    },
+    {
+      "route": "Mars -> Jupiter",
+      "avgDV": 8.9,
+      "minDV": 6,
+      "maxDV": 14,
+      "medianT": 1
+    },
+    {
+      "route": "Mercury -> Jupiter",
+      "avgDV": 11.9,
+      "minDV": 10,
+      "maxDV": 14,
+      "medianT": 2
+    },
+    {
+      "route": "Jupiter -> Europa",
+      "avgDV": 3,
+      "minDV": 3,
+      "maxDV": 3,
+      "medianT": 1
+    },
+    {
+      "route": "Jupiter -> Ganymede",
+      "avgDV": 3,
+      "minDV": 3,
+      "maxDV": 3,
+      "medianT": 1
+    },
+    {
+      "route": "Jupiter -> Saturn",
+      "avgDV": 14.2,
+      "minDV": 10,
+      "maxDV": 18,
+      "medianT": 2
+    },
+    {
+      "route": "Ganymede -> Saturn",
+      "avgDV": 14.3,
+      "minDV": 10,
+      "maxDV": 19,
+      "medianT": 2
+    },
+    {
+      "route": "Mars -> Titan",
+      "avgDV": 15.8,
+      "minDV": 10,
+      "maxDV": 20,
+      "medianT": 2
+    },
+    {
+      "route": "Saturn -> Titan",
+      "avgDV": 3,
+      "minDV": 3,
+      "maxDV": 3,
+      "medianT": 1
+    },
+    {
+      "route": "Saturn -> Neptune",
+      "avgDV": 32.0,
+      "minDV": 28,
+      "maxDV": 34,
+      "medianT": 4
+    },
+    {
+      "route": "Titan -> Triton",
+      "avgDV": 32.0,
+      "minDV": 27,
+      "maxDV": 35,
+      "medianT": 4
+    },
+    {
+      "route": "Neptune -> Triton",
+      "avgDV": 3,
+      "minDV": 3,
+      "maxDV": 3,
+      "medianT": 1
+    }
+  ]
+}
