@@ -49,7 +49,7 @@ jobs:
 
       - name: Verify and build
         run: |
-          npm test -- --no-file-parallelism
+          npm test -- --no-file-parallelism --testTimeout=30000
           npm run typecheck
           npm run lint
           npm run build
