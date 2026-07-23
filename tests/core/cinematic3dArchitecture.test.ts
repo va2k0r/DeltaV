@@ -255,6 +255,8 @@ describe("Cinematic 3D architecture boundary", () => {
 
     expect(uiSource).toContain("new DeltaVMusicEngine()");
     expect(uiSource).toContain("musicButton");
+    expect(uiSource).toContain("let isMusicEnabled = true;");
+    expect(uiSource).toContain('musicButton.textContent = "Music On"');
     expect(uiSource).toContain('"Music Off"');
     expect(uiSource).toContain('"Music Pending"');
     expect(uiSource).toContain("musicButton.addEventListener");
@@ -348,6 +350,10 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain('header.className = "debug-drawer is-hidden"');
     expect(uiSource).toContain("function toggleDebugDrawer()");
     expect(uiSource).toContain('debugToggleButton.addEventListener("click", toggleDebugDrawer)');
+    expect(uiSource).toContain('new URLSearchParams(window.location.search).get("debug") === "1"');
+    expect(uiSource).toContain(
+      "if (isDebugUiEnabled) {\n    canvasFrame.append(debugToggleButton, header);\n  }"
+    );
     expect(uiSource).not.toContain("isGameMenuDebugDisabled");
     expect(uiSource).not.toContain("debugToggleButton.hidden = true");
     expect(uiSource).not.toContain('event.key.toLowerCase() === "d"');
@@ -1874,7 +1880,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(coreSource).toContain("isHumanControlledFaction(state, defaultPlayerFactionId)");
   });
 
-  it("starts the default runtime in two-faction AI-vs-AI with timer zero", () => {
+  it("starts the default runtime in the main menu while retaining debug AI controls", () => {
     const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
     const startupStart = uiSource.indexOf("  startMusicOnGameStart();");
     const startupEnd = uiSource.indexOf("  function tacticalViewport(): ViewportSize {");
@@ -1882,8 +1888,8 @@ describe("Cinematic 3D architecture boundary", () => {
 
     expect(startupStart).toBeGreaterThanOrEqual(0);
     expect(startupEnd).toBeGreaterThan(startupStart);
-    expect(startupBlock).toContain('startDebugAiAutorunMode("2p");');
-    expect(startupBlock).not.toContain("startGameMenuDemo();");
+    expect(startupBlock).toContain("startGameMenuDemo();");
+    expect(startupBlock).not.toContain('startDebugAiAutorunMode("2p");');
     expect(uiSource).toContain('planningTimerMode = "zero";');
     expect(uiSource).toContain("hasConsumedZeroTimerInitialCountdown = true;");
   });

@@ -638,6 +638,7 @@ const turnTransitionWatchdogMaxMs = turnResolutionPresentationMaxMs;
 
 export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   root.innerHTML = "";
+  const isDebugUiEnabled = new URLSearchParams(window.location.search).get("debug") === "1";
 
   const shell = document.createElement("section");
   shell.className = "app-shell";
@@ -670,9 +671,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   controls.className = "map-controls debug-controls";
 
   const musicEngine = new DeltaVMusicEngine();
-  // Keep local development and visual-debug sessions silent by default. Production builds retain
-  // the intended soundtrack; developers can still enable it explicitly from OPTIONS.
-  let isMusicEnabled = !["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+  let isMusicEnabled = true;
   const sfxEngine = new DeltaVSfxEngine();
 
   const nextTurnButton = document.createElement("button");
@@ -691,8 +690,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   const musicButton = document.createElement("button");
   musicButton.type = "button";
   musicButton.className = "music-button";
-  musicButton.textContent = "Music Off";
-  musicButton.setAttribute("aria-pressed", "false");
+  musicButton.textContent = "Music On";
+  musicButton.setAttribute("aria-pressed", "true");
   let musicAutoplayUnlockHandler: ((event: Event) => void) | null = null;
 
   const sfxButton = document.createElement("button");
@@ -912,12 +911,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     tacticalCanvas,
     replayIndicator,
     postMatchDismissLayer,
-    postMatchReport,
-    debugToggleButton,
-    header,
-    commandConsole,
-    gameMenu
+    postMatchReport
   );
+  if (isDebugUiEnabled) {
+    canvasFrame.append(debugToggleButton, header);
+  }
+  canvasFrame.append(commandConsole, gameMenu);
   shell.append(canvasFrame);
   root.append(shell);
   updateMusicButton();
@@ -1096,7 +1095,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   restartPlanningTimerForCurrentTurn();
 
   startMusicOnGameStart();
-  startDebugAiAutorunMode("2p");
+  startGameMenuDemo();
 
   function tacticalViewport(): ViewportSize {
     return {
