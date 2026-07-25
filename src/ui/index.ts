@@ -33,6 +33,7 @@ import {
   type FactionIdentity,
   type GameModeId,
   type GameState,
+  type PendingFireOrder,
   type ResolutionCue,
   type ResolutionEvent,
   type SolarSystemSnapshot,
@@ -61,6 +62,7 @@ import {
   type CinematicPerformanceMode,
   type CinematicPerformanceStats,
   type CinematicSelection,
+  type CinematicTrajectoryReflectionMode,
   type ShipModelVariant,
   type CinematicTutorialAttentionPulse,
   type CinematicTransferDeltaHint,
@@ -68,6 +70,7 @@ import {
 } from "../renderers/cinematic3d";
 import { renderTacticalMap2d } from "../renderers/tactical2d";
 import { getBeatSynchronizedCycle } from "../shared/presentationBeat";
+import type { AiTurnWorkerRequest, AiTurnWorkerResponse } from "./aiTurnWorker";
 import {
   createCameraState,
   fitBoundsToViewport,
@@ -86,6 +89,14 @@ import {
 } from "./domControls";
 import { factionColorPalette } from "./factionColors";
 import { createFactionDvForIdentities, createRandomFactionIdentities } from "./factionIdentities";
+import {
+  displayBrightnessStep,
+  formatDisplayBrightnessLabel,
+  maximumDisplayBrightness,
+  minimumDisplayBrightness,
+  normalizeDisplayBrightness,
+  parseStoredDisplayBrightness
+} from "./displayBrightness";
 import { resolveInitialNodeId } from "./initialSetupAliases";
 import { shiftSolarSystemOrbitPhase } from "./gameMenuOrbitContinuity";
 import {
@@ -125,7 +136,6 @@ import {
 } from "./postMatchReport";
 import {
   createAutomaticProceduralMapForSeed,
-  createProceduralBatchMapCycle,
   createInitialStateForPreset,
   getPresetCacheKey,
   getProceduralDebugForPreset,
@@ -154,7 +164,9 @@ import { isCinematicGameplayInteractionLocked } from "./input/interactionLock";
 import {
   createTutorialRuntimeDiagnosticDump,
   createTutorialRuntimeState,
+  findTutorialQueuedFireOrder,
   getTutorialMandatoryLaunchResumePhase,
+  recoverTutorialQueuedFireLessonAfterCancellation,
   shouldInterruptTutorialForMandatoryLaunch,
   shouldRestoreTutorialAutoAdvanceLock,
   type TutorialPhase,
@@ -231,12 +243,8 @@ type StartStateAuditOptions = Readonly<{
   controllerOverrides?: Partial<Record<FactionId, StartStateControllerType>>;
 }>;
 
-const cinematicPerformanceModeStorageKey = "deltavPerformanceMode";
-const cinematicPerformanceModes: readonly CinematicPerformanceMode[] = [
-  "full",
-  "reduced",
-  "minimal"
-];
+const cinematicTrajectoryReflectionModeStorageKey = "deltavTrajectoryReflectionMode";
+const displayBrightnessStorageKey = "deltav.displayBrightness.v1";
 const fpsCounterSampleWindowMs = 300;
 const fpsCounterSmoothing = 0.35;
 
@@ -576,13 +584,18 @@ const planningTimerExecuteCountdownMs = 10_000;
 const planningTimerLongExecuteCountdownMs = 20_000;
 const planningTimerWarningMs = 10_000;
 const zeroTimerAutoRestartDelayMs = 450;
+const trailerModePlanningTimerLabel = "9:99";
+// Zero removes planning downtime; it must not turn the match into an unreadable fast-forward.
+// Keep a fixed presentation slot so turn interpolation and transient effects can complete smoothly.
+const zeroTimerMinimumTurnPresentationMs = 2_000;
 const postMatchAutoReturnDelayMs = 10_000;
 const gameMenuDemoTurnDelayMs = 2_000;
 const gameMenuDemoRestartDelayMs = 360;
-const gameMenuCrtFlickerMinDelayMs = 2_800;
-const gameMenuCrtFlickerMaxDelayMs = 7_000;
+const gameMenuCrtFlickerMinDelayMs = 1_200;
+const gameMenuCrtFlickerMaxDelayMs = 3_400;
 const gameMenuCrtFlickerMinDurationMs = 140;
 const gameMenuCrtFlickerMaxDurationMs = 300;
+const aiAutorunCommandTranscriptDomEntryLimit = 72;
 const commandTypewriterMsPerCharacter = 6;
 const commandTypewriterMinDurationMs = 80;
 const commandTypewriterMaxDurationMs = 520;
@@ -638,7 +651,7 @@ const turnTransitionWatchdogMaxMs = turnResolutionPresentationMaxMs;
 
 export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   root.innerHTML = "";
-  const isDebugUiEnabled = new URLSearchParams(window.location.search).get("debug") === "1";
+  const isDebugUiEnabled = new URLSearchParams(window.location.search).get("debug") !== "0";
 
   const shell = document.createElement("section");
   shell.className = "app-shell";
@@ -671,7 +684,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   controls.className = "map-controls debug-controls";
 
   const musicEngine = new DeltaVMusicEngine();
-  let isMusicEnabled = true;
+  let isMusicEnabled = false;
   const sfxEngine = new DeltaVSfxEngine();
 
   const nextTurnButton = document.createElement("button");
@@ -690,8 +703,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   const musicButton = document.createElement("button");
   musicButton.type = "button";
   musicButton.className = "music-button";
-  musicButton.textContent = "Music On";
-  musicButton.setAttribute("aria-pressed", "true");
+  musicButton.textContent = "Music Off";
+  musicButton.setAttribute("aria-pressed", "false");
   let musicAutoplayUnlockHandler: ((event: Event) => void) | null = null;
 
   const sfxButton = document.createElement("button");
@@ -752,6 +765,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   const twoPlayerModeButton = createDebugModeButton("2 PLAYERS");
   const threePlayerModeButton = createDebugModeButton("3 PLAYERS");
   const gameMenuModeButton = createDebugModeButton("GAME MENU");
+  const trailerModeButton = createDebugModeButton("TRAILER MODE");
   const aiVsAiModeButton = createDebugModeButton("AIvsAI");
   const aiVsAiVsAiModeButton = createDebugModeButton("AIvsAIvsAI");
   const fireVsAiModeButton = createDebugModeButton("FIREvsAI");
@@ -761,10 +775,14 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   const planningTimerButton = createDebugModeButton("TIMER AUTO");
   const beatSyncButton = createDebugModeButton("BEAT ON");
   const performanceDiagnosticsButton = createDebugModeButton("PERF OFF");
+  const burnPreviewEffectsButton = createDebugModeButton("BURN FX OFF");
+  const firePreviewEffectsButton = createDebugModeButton("FIRE FX ON");
   const solarHazeButton = createDebugModeButton("SOLAR HAZE OFF");
+  const solarOcclusionButton = createDebugModeButton("OCCLUSION ON");
+  const atmosphericScatteringButton = createDebugModeButton("ATMOSPHERE ON");
   const compactSunBloomButton = createDebugModeButton("SUN PASS ON");
   const uiBloomButton = createDebugModeButton("UI BLOOM ON");
-  const reducedBloomResolutionButton = createDebugModeButton("BLOOM HIGH 40%");
+  const lowBloomProfileButton = createDebugModeButton("BLOOM LOW");
   const heatDistortionButton = createDebugModeButton("HEAT DISTORT ON");
   const aiLevelSelect = document.createElement("select");
   aiLevelSelect.ariaLabel = "AI level";
@@ -773,7 +791,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   aiLevelSelect.append(createOption("1", "AI LEVEL 1 · SIMPLE"));
   aiLevelSelect.append(createOption("2", "AI LEVEL 2 · RESERVED"));
   aiLevelSelect.append(createOption("3", "AI LEVEL 3 · CURRENT"));
-  aiLevelSelect.value = "3";
+  aiLevelSelect.value = "0";
   const tutorialOverlayTextButton = createDebugModeButton("TUTORIAL TEXT OFF");
   const tutorialOverlayBlinkButton = createDebugModeButton("CONTEXT BLINK OFF");
   const recordButton = createDebugModeButton("RECORD");
@@ -815,6 +833,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     twoPlayerModeButton,
     threePlayerModeButton,
     gameMenuModeButton,
+    trailerModeButton,
     aiVsAiModeButton,
     aiVsAiVsAiModeButton,
     fireVsAiModeButton,
@@ -824,10 +843,14 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     planningTimerButton,
     beatSyncButton,
     performanceDiagnosticsButton,
+    burnPreviewEffectsButton,
+    firePreviewEffectsButton,
     solarHazeButton,
+    solarOcclusionButton,
+    atmosphericScatteringButton,
     compactSunBloomButton,
     uiBloomButton,
-    reducedBloomResolutionButton,
+    lowBloomProfileButton,
     heatDistortionButton,
     aiLevelSelect,
     tutorialOverlayTextButton,
@@ -851,6 +874,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   const debugPanel = document.createElement("pre");
   debugPanel.className = "debug-panel";
+  const debugPanelDynamic = document.createElement("span");
+  const debugPanelProcedural = document.createElement("span");
+  debugPanel.append(debugPanelDynamic, debugPanelProcedural);
+  let debugPanelProceduralSource: ProceduralMapDebug | null = null;
+  let debugPanelProceduralMode: GameModeId | null = null;
+  let debugPanelProceduralIsCompact = false;
 
   const debugRecordingIndicator = document.createElement("div");
   debugRecordingIndicator.className = "debug-recording-indicator is-hidden";
@@ -942,6 +971,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let dragStart: Vec2 | null = null;
   let selectedTargetKey: string | null = null;
   let isTurnTransitionActive = false;
+  let aiTurnWorker: Worker | null = null;
+  let aiTurnWorkerRequestId = 0;
+  let hasReportedAiTurnWorkerFallback = false;
+  let aiWorkerPostMatchEvaluation:
+    | Extract<AiTurnWorkerResponse, { kind: "advance-turn" }>["postMatchEvaluation"]
+    | null = null;
   let isCommandConsoleResolving = false;
   let turnPresentationDeadlineAt: number | null = null;
   let isCommandConsoleTypingLiveBlock = false;
@@ -988,6 +1023,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let tutorialCameraAssistAnchor: CinematicCameraState | null = null;
   let commandInputHintsMode: CommandInputHintsMode = "off";
   let isGameMenuDemoActive = false;
+  let isTrailerModeActive = false;
   let gameMenuScreen: GameMenuScreen = "main";
   let gameMenuNewGameOpponentCount: 1 | 2 = 1;
   let gameMenuNewGameTimerSeconds: 10 | 90 = 90;
@@ -1002,16 +1038,25 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let planningTimerDurationOverrideMs: number | null = null;
   let beatSyncMode: "on" | "off" = "on";
   let performanceDiagnosticsMode: "on" | "off" = "off";
+  let burnPreviewEffectsMode: "on" | "off" = "off";
+  let firePreviewEffectsMode: "on" | "off" = "on";
   let solarHazeMode: "on" | "off" = "off";
+  let solarOcclusionMode: "on" | "off" = "on";
+  let atmosphericScatteringMode: "on" | "off" = "on";
   let compactSunBloomMode: "on" | "off" = "on";
   let uiBloomMode: "on" | "off" = "on";
-  let reducedBloomResolutionMode: "on" | "off" = "off";
+  let lowBloomProfileMode: "on" | "off" = "on";
   let heatDistortionMode: "on" | "off" = "on";
+  let trajectoryReflectionMode = getStoredTrajectoryReflectionMode();
+  let displayBrightness = parseStoredDisplayBrightness(
+    window.localStorage.getItem(displayBrightnessStorageKey)
+  );
+  applyDisplayBrightness(displayBrightness);
   let cachedWarningSnapshot: CommandWarningSnapshot | null = null;
   let browserPerformanceCounters = createBrowserPerformanceCounterRecord();
   let browserPerformanceCounterSampleStartedAt = performance.now();
   let lastPerformanceCounterRates = createPerformanceCounterRateRecord();
-  let debugAiLevel: AiPlanningLevel = 3;
+  let debugAiLevel: AiPlanningLevel = 0;
   let debugAiStrategyProfiles: Partial<Record<FactionId, AiStrategyProfile>> = {};
   let tutorialEnemySimpleAiEnabled = false;
   let fallbackBeatSyncStartedAtMs = performance.now();
@@ -1038,7 +1083,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   const commandLogTimeReviewDurations = {
     replayTurnMs: 860
   };
-  const tutorialFirstEnemyKillReplayCueFocusBeforeRewindMs = 320;
+  const commandLogReplayFocusBeforePlaybackMs = 340;
   const commandScrollbackLineSelector =
     ".command-console__line--linked-event[data-entry-id], .command-console__line--linked-event[data-row-key]";
   const commandLogScrubLongPressMs = 115;
@@ -1056,7 +1101,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let previousLiveDynamicCommandRows: readonly CommandConsoleRow[] = [];
   const contentByPresetKey = new Map<string, SolarSystemData>();
   const proceduralGenerationBySeed = new Map<string, ProceduralMapGeneration>();
-  const proceduralBatchMapCycle = createProceduralBatchMapCycle();
+  const aiAutorunIssuedProceduralSeeds = new Set<string>();
   let debugRecordingTimer: number | null = null;
   const debugRecorder = new DeltaVDebugRecorder({
     getCanvas: getActiveRecordingCanvas,
@@ -1445,6 +1490,29 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     if (!isHidden) {
       updateDebugFps();
     }
+  }
+
+  function activateTrailerMode(): void {
+    if (isTrailerModeActive) {
+      return;
+    }
+
+    isTrailerModeActive = true;
+    header.classList.add("is-hidden");
+    debugToggleButton.setAttribute("aria-expanded", "false");
+    header.remove();
+    debugToggleButton.remove();
+
+    const returnToMainMenuWhenReady = (): void => {
+      if (isTurnTransitionActive || isCommandConsoleResolving) {
+        window.setTimeout(returnToMainMenuWhenReady, 40);
+        return;
+      }
+
+      startGameMenuDemo();
+    };
+
+    returnToMainMenuWhenReady();
   }
 
   function startGameMenuDemo(): void {
@@ -1851,12 +1919,17 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     const timerAction = createGameMenuAction(
       getGameMenuNewGameTimerLabel(),
       (action) => {
+        if (isTrailerModeActive) {
+          return;
+        }
+
         gameMenuNewGameTimerSeconds = gameMenuNewGameTimerSeconds === 90 ? 10 : 90;
         typeGameMenuAction(action, getGameMenuNewGameTimerLabel());
       },
       { tone: "regular" },
       typingTargets
     );
+    timerAction.disabled = isTrailerModeActive;
 
     actions.append(
       factionsAction,
@@ -1899,10 +1972,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         const nextBloomMode =
           currentBloomMode === "high" ? "low" : currentBloomMode === "low" ? "off" : "high";
         uiBloomMode = nextBloomMode === "off" ? "off" : "on";
-        reducedBloomResolutionMode = nextBloomMode === "low" ? "on" : "off";
+        lowBloomProfileMode = nextBloomMode === "low" ? "on" : "off";
         cinematicRenderer?.setBloomEnabled(uiBloomMode === "on");
         cinematicRenderer?.setUiBloomEnabled(uiBloomMode === "on");
-        cinematicRenderer?.setReducedBloomResolutionEnabled(reducedBloomResolutionMode === "on");
+        cinematicRenderer?.setLowBloomProfileEnabled(lowBloomProfileMode === "on");
         updateCommandConsoleModeControls();
         redraw();
         action.classList.toggle("game-menu__action--regular", nextBloomMode !== "off");
@@ -1912,23 +1985,84 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       { tone: uiBloomMode === "on" ? "regular" : "dim" },
       typingTargets
     );
-    const performanceAction = createGameMenuAction(
-      getGameMenuPerformanceLabel(),
+    const reflectionsAction = createGameMenuAction(
+      getGameMenuReflectionsLabel(),
       (action) => {
-        const currentMode = getCinematicPerformanceMode();
-        const currentIndex = cinematicPerformanceModes.indexOf(currentMode);
-        const nextMode =
-          cinematicPerformanceModes[(currentIndex + 1) % cinematicPerformanceModes.length] ??
-          "auto";
-        window.localStorage.setItem(cinematicPerformanceModeStorageKey, nextMode);
-        redraw();
-        typeGameMenuAction(action, getGameMenuPerformanceLabel());
+        trajectoryReflectionMode =
+          trajectoryReflectionMode === "on"
+            ? "hover"
+            : trajectoryReflectionMode === "hover"
+              ? "off"
+              : "on";
+        window.localStorage.setItem(
+          cinematicTrajectoryReflectionModeStorageKey,
+          trajectoryReflectionMode
+        );
+        cinematicRenderer?.setTrajectoryReflectionMode(trajectoryReflectionMode);
+        action.classList.toggle("game-menu__action--bright", trajectoryReflectionMode === "on");
+        action.classList.toggle("game-menu__action--regular", trajectoryReflectionMode === "hover");
+        action.classList.toggle("game-menu__action--dim", trajectoryReflectionMode === "off");
+        typeGameMenuAction(action, getGameMenuReflectionsLabel());
       },
-      { tone: getCinematicPerformanceMode() === "full" ? "bright" : "regular" },
+      {
+        tone:
+          trajectoryReflectionMode === "on"
+            ? "bright"
+            : trajectoryReflectionMode === "hover"
+              ? "regular"
+              : "dim"
+      },
       typingTargets
     );
+    reflectionsAction.classList.add("game-menu__action--nowrap");
+    const brightnessControl = createGameMenuBrightnessControl(typingTargets);
 
-    actions.append(musicAction, sfxAction, bloomAction, performanceAction);
+    actions.append(musicAction, sfxAction, bloomAction, reflectionsAction, brightnessControl);
+  }
+
+  function createGameMenuBrightnessControl(
+    typingTargets: GameMenuTypingTarget[]
+  ): HTMLLabelElement {
+    const control = document.createElement("label");
+    control.className = "game-menu__brightness-control";
+
+    const readout = document.createElement("span");
+    readout.className = "game-menu__brightness-readout";
+    readout.setAttribute("aria-hidden", "true");
+    typingTargets.push({
+      element: readout,
+      text: formatDisplayBrightnessLabel(displayBrightness)
+    });
+
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.className = "game-menu__brightness-slider";
+    slider.min = String(minimumDisplayBrightness);
+    slider.max = String(maximumDisplayBrightness);
+    slider.step = String(displayBrightnessStep);
+    slider.value = String(displayBrightness);
+    slider.ariaLabel = "Display brightness";
+    slider.setAttribute("aria-valuetext", formatDisplayBrightnessLabel(displayBrightness));
+    slider.addEventListener("pointerenter", () => {
+      sfxEngine.play("ui.hoverCommand");
+    });
+    slider.addEventListener("input", () => {
+      displayBrightness = normalizeDisplayBrightness(slider.valueAsNumber);
+      applyDisplayBrightness(displayBrightness);
+      window.localStorage.setItem(displayBrightnessStorageKey, String(displayBrightness));
+      slider.setAttribute("aria-valuetext", formatDisplayBrightnessLabel(displayBrightness));
+      setGameMenuGlyphText(readout, formatDisplayBrightnessLabel(displayBrightness));
+    });
+    slider.addEventListener("change", () => {
+      sfxEngine.play("ui.select");
+    });
+
+    control.append(readout, slider);
+    return control;
+  }
+
+  function applyDisplayBrightness(value: number): void {
+    canvasFrame.style.setProperty("--display-brightness", String(value));
   }
 
   function toggleGameMenuMusic(action: HTMLButtonElement): void {
@@ -2123,13 +2257,15 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         return;
       }
 
-      planningTimerMode = "auto";
-      planningTimerDurationOverrideMs = timerDurationMs;
+      planningTimerMode = isTrailerModeActive ? "zero" : "auto";
+      planningTimerDurationOverrideMs = isTrailerModeActive ? null : timerDurationMs;
       hasConsumedZeroTimerInitialCountdown = true;
       clearZeroTimerAutoRestart();
 
       if (selectedMapPreset.procedural === true) {
-        resetNewGameWithAutomaticProceduralMap(mode);
+        resetNewGameWithAutomaticProceduralMap(mode, isTrailerModeActive);
+      } else if (isTrailerModeActive) {
+        resetDebugAiMode(mode);
       } else {
         resetDebugGameMode(mode);
       }
@@ -2138,15 +2274,20 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     waitForCurrentTurn();
   }
 
-  function resetNewGameWithAutomaticProceduralMap(mode: MultiFactionGameModeId): void {
+  function resetNewGameWithAutomaticProceduralMap(
+    mode: MultiFactionGameModeId,
+    allAiControlled = false
+  ): void {
     const requestedSeed = createProceduralMapSeed();
     const automaticMap = createAutomaticProceduralMapForSeed(selectedMapPreset, requestedSeed);
 
-    installAutomaticProceduralMap(mode, automaticMap, false, "new-game");
+    installAutomaticProceduralMap(mode, automaticMap, allAiControlled, "new-game");
   }
 
-  function resetAiBatchWithAutomaticProceduralMap(mode: MultiFactionGameModeId): void {
-    const automaticMap = proceduralBatchMapCycle.createNext(selectedMapPreset);
+  async function resetAiBatchWithAutomaticProceduralMap(
+    mode: MultiFactionGameModeId
+  ): Promise<void> {
+    const automaticMap = await createNextAiAutorunProceduralMap(selectedMapPreset);
 
     installAutomaticProceduralMap(mode, automaticMap, true, "ai-vs-ai-batch-start");
   }
@@ -2201,6 +2342,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function getGameMenuNewGameTimerLabel(): string {
+    if (isTrailerModeActive) {
+      return `TIMER ${trailerModePlanningTimerLabel}`;
+    }
+
     return `TIMER ${gameMenuNewGameTimerSeconds}`;
   }
 
@@ -2227,23 +2372,15 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return "off";
     }
 
-    return reducedBloomResolutionMode === "on" ? "low" : "high";
+    return lowBloomProfileMode === "on" ? "low" : "high";
   }
 
-  function getGameMenuPerformanceLabel(): string {
-    const mode = getCinematicPerformanceMode();
-
-    if (mode === "full") {
-      return "PERFORMANCE QUALITY";
-    }
-    if (mode === "reduced") {
-      return "PERFORMANCE BALANCED";
-    }
-    if (mode === "minimal") {
-      return "PERFORMANCE COMPATIBILITY";
+  function getGameMenuReflectionsLabel(): string {
+    if (trajectoryReflectionMode === "hover") {
+      return "REFLECTIONS HOVER";
     }
 
-    return "PERFORMANCE AUTO";
+    return trajectoryReflectionMode === "on" ? "REFLECTIONS ON" : "REFLECTIONS OFF";
   }
 
   function getGameMenuMusicLabel(): string {
@@ -2323,12 +2460,19 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     beatSyncButton.textContent = beatSyncMode === "on" ? "BEAT ON" : "BEAT OFF";
     performanceDiagnosticsButton.textContent =
       performanceDiagnosticsMode === "on" ? "PERF ON" : "PERF OFF";
+    burnPreviewEffectsButton.textContent =
+      burnPreviewEffectsMode === "on" ? "BURN FX ON" : "BURN FX OFF";
+    firePreviewEffectsButton.textContent =
+      firePreviewEffectsMode === "on" ? "FIRE FX ON" : "FIRE FX OFF";
     solarHazeButton.textContent = solarHazeMode === "on" ? "SOLAR HAZE ON" : "SOLAR HAZE OFF";
+    solarOcclusionButton.textContent =
+      solarOcclusionMode === "on" ? "OCCLUSION ON" : "OCCLUSION OFF";
+    atmosphericScatteringButton.textContent =
+      atmosphericScatteringMode === "on" ? "ATMOSPHERE ON" : "ATMOSPHERE OFF";
     compactSunBloomButton.textContent =
       compactSunBloomMode === "on" ? "SUN PASS ON" : "SUN PASS OFF";
     uiBloomButton.textContent = uiBloomMode === "on" ? "BLOOM ON" : "BLOOM OFF";
-    reducedBloomResolutionButton.textContent =
-      reducedBloomResolutionMode === "on" ? "BLOOM LOW 20%" : "BLOOM HIGH 40%";
+    lowBloomProfileButton.textContent = lowBloomProfileMode === "on" ? "BLOOM LOW" : "BLOOM HIGH";
     heatDistortionButton.textContent =
       heatDistortionMode === "on" ? "HEAT DISTORT ON" : "HEAT DISTORT OFF";
     tutorialOverlayTextButton.textContent =
@@ -2343,10 +2487,14 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     planningTimerButton.classList.toggle("is-active", planningTimerMode !== "auto");
     beatSyncButton.classList.toggle("is-active", beatSyncMode === "on");
     performanceDiagnosticsButton.classList.toggle("is-active", performanceDiagnosticsMode === "on");
+    burnPreviewEffectsButton.classList.toggle("is-active", burnPreviewEffectsMode === "on");
+    firePreviewEffectsButton.classList.toggle("is-active", firePreviewEffectsMode === "on");
     solarHazeButton.classList.toggle("is-active", solarHazeMode === "on");
+    solarOcclusionButton.classList.toggle("is-active", solarOcclusionMode === "on");
+    atmosphericScatteringButton.classList.toggle("is-active", atmosphericScatteringMode === "on");
     compactSunBloomButton.classList.toggle("is-active", compactSunBloomMode === "on");
     uiBloomButton.classList.toggle("is-active", uiBloomMode === "on");
-    reducedBloomResolutionButton.classList.toggle("is-active", reducedBloomResolutionMode === "on");
+    lowBloomProfileButton.classList.toggle("is-active", lowBloomProfileMode === "on");
     heatDistortionButton.classList.toggle("is-active", heatDistortionMode === "on");
     planningTimerButton.setAttribute(
       "aria-pressed",
@@ -2357,15 +2505,31 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       "aria-pressed",
       performanceDiagnosticsMode === "on" ? "true" : "false"
     );
+    burnPreviewEffectsButton.setAttribute(
+      "aria-pressed",
+      burnPreviewEffectsMode === "on" ? "true" : "false"
+    );
+    firePreviewEffectsButton.setAttribute(
+      "aria-pressed",
+      firePreviewEffectsMode === "on" ? "true" : "false"
+    );
     solarHazeButton.setAttribute("aria-pressed", solarHazeMode === "on" ? "true" : "false");
+    solarOcclusionButton.setAttribute(
+      "aria-pressed",
+      solarOcclusionMode === "on" ? "true" : "false"
+    );
+    atmosphericScatteringButton.setAttribute(
+      "aria-pressed",
+      atmosphericScatteringMode === "on" ? "true" : "false"
+    );
     compactSunBloomButton.setAttribute(
       "aria-pressed",
       compactSunBloomMode === "on" ? "true" : "false"
     );
     uiBloomButton.setAttribute("aria-pressed", uiBloomMode === "on" ? "true" : "false");
-    reducedBloomResolutionButton.setAttribute(
+    lowBloomProfileButton.setAttribute(
       "aria-pressed",
-      reducedBloomResolutionMode === "on" ? "true" : "false"
+      lowBloomProfileMode === "on" ? "true" : "false"
     );
     heatDistortionButton.setAttribute(
       "aria-pressed",
@@ -3189,7 +3353,21 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   function updateDebugPanel(): void {
     const debugState = dumpTurnState(content, state);
-    const proceduralDebugText = formatProceduralMapDebug(currentProceduralDebug, state.gameMode);
+    const useCompactProceduralDebug = isZeroTimerAiAutorunMode();
+    if (
+      debugPanelProceduralSource !== currentProceduralDebug ||
+      debugPanelProceduralMode !== state.gameMode ||
+      debugPanelProceduralIsCompact !== useCompactProceduralDebug
+    ) {
+      const proceduralDebugText = useCompactProceduralDebug
+        ? formatAiAutorunProceduralDebugSummary(currentProceduralDebug, state.gameMode)
+        : formatProceduralMapDebug(currentProceduralDebug, state.gameMode);
+      debugPanelProcedural.textContent =
+        proceduralDebugText === "" ? "" : `\n\n${proceduralDebugText}`;
+      debugPanelProceduralSource = currentProceduralDebug;
+      debugPanelProceduralMode = state.gameMode;
+      debugPanelProceduralIsCompact = useCompactProceduralDebug;
+    }
     const activeFactionSummary = getActiveFactions(state)
       .map((faction) => `${faction.displayName} ${debugState.factionDv[faction.id] ?? 0}`)
       .join(" / ");
@@ -3207,12 +3385,14 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     const debugMessages =
       debugPanelMessages.length === 0 ? [] : ["", "Debug", ...debugPanelMessages];
     const performanceMessages = isPerformanceDiagnosticsEnabled()
-      ? formatCinematicPerformanceDebugLines(
-          cinematicRenderer?.getPerformanceStats() ?? lastCinematicPerformanceStats,
-          lastPerformanceCounterRates
-        )
+      ? [
+          ...formatCinematicPerformanceDebugLines(
+            cinematicRenderer?.getPerformanceStats() ?? lastCinematicPerformanceStats,
+            lastPerformanceCounterRates
+          )
+        ]
       : [];
-    debugPanel.textContent = [
+    debugPanelDynamic.textContent = [
       ...recordingStatus,
       `Turn ${debugState.turn}`,
       `Mode ${debugState.gameMode} | ΔV ${activeFactionSummary}`,
@@ -3230,8 +3410,28 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       `AI ${formatDebugRecord(debugState.lastAIActionPerShip)}`,
       ...(performanceMessages.length === 0 ? [] : ["", "Perf", ...performanceMessages]),
       ...recordingMessages,
-      ...debugMessages,
-      ...(proceduralDebugText === "" ? [] : ["", proceduralDebugText])
+      ...debugMessages
+    ].join("\n");
+  }
+
+  function formatAiAutorunProceduralDebugSummary(
+    debug: ProceduralMapDebug | null,
+    mode: GameModeId
+  ): string {
+    if (debug === null) {
+      return "";
+    }
+
+    const fairnessAudit = debug.fairnessAuditByMode[mode] ?? debug.fairnessAudit;
+    return [
+      "Procedural Map Debug · compact autorun",
+      `Seed ${debug.seed}`,
+      `Tritium ${debug.selectedTritiumNodes.join(", ")}`,
+      `Shipyards ${debug.selectedShipyardNodes.join(", ")}`,
+      `Scores final ${debug.finalScore} | fairness ${debug.fairnessScore} | expansion ${debug.expansionScore} | conflict ${debug.conflictScore}`,
+      `Hard gate ${debug.hardGatePassed ? "PASS" : "FAIL"} | fallback ${fairnessAudit.fallbackStaticLayoutUsed}`,
+      `Candidates ${debug.acceptedCandidateCount}/${debug.evaluatedCandidateCount} accepted`,
+      `Worst asymmetry ${fairnessAudit.worstAsymmetryReason}`
     ].join("\n");
   }
 
@@ -3308,6 +3508,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     const rows = getLiveCommandRows(false);
 
     try {
+      if (isZeroTimerAiAutorunMode()) {
+        renderLiveCommandRowsInstant(rows);
+        return;
+      }
+
       await appendLiveCommandBlockSequential(rows, { typewriter: true });
       hasRenderedLiveCommandRows = true;
       previousLiveDynamicCommandRows = getDynamicCommandRows(rows);
@@ -3381,7 +3586,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
     if (
       tutorialState.phase === "shipyardFireQueued" ||
-      tutorialState.phase === "shipyardContestedFireQueued" ||
+      tutorialState.phase === "shipyardContestedFireQueued"
+    ) {
+      return getTutorialQueuedFireOrder() !== undefined;
+    }
+
+    if (
       tutorialState.phase === "shipyardCounterContestBurnQueued" ||
       tutorialState.phase === "shipyardContestedBurnQueued"
     ) {
@@ -3819,10 +4029,30 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     const entries = resolutionEvents.map(createResolutionTimelineEntry);
     commandTimelineEntries.push(...entries);
 
-    await appendCommandTimelineEntriesSequential(getVisibleCommandTimelineEntries(entries), {
-      typewriter: true
-    });
+    const transcriptPromise = appendCommandTimelineEntriesSequential(
+      getVisibleCommandTimelineEntries(entries),
+      {
+        typewriter: !isZeroTimerAiAutorunMode()
+      }
+    );
+    await transcriptPromise;
+    pruneAiAutorunCommandTranscriptDom();
     scrollCommandTranscriptToEnd();
+  }
+
+  function pruneAiAutorunCommandTranscriptDom(): void {
+    if (!isZeroTimerAiAutorunMode()) {
+      return;
+    }
+
+    const transcriptEntries = [...commandTranscript.children].filter(
+      (child) => child !== commandLiveRows
+    );
+    const excessEntryCount = transcriptEntries.length - aiAutorunCommandTranscriptDomEntryLimit;
+
+    for (let index = 0; index < excessEntryCount; index += 1) {
+      transcriptEntries[index]?.remove();
+    }
   }
 
   function playResolutionEventsSfx(events: readonly ResolutionEvent[]): void {
@@ -4562,6 +4792,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function getPlanningTurnTimerSuffix(now = performance.now()): string {
+    if (isTrailerAiMatchActive()) {
+      return ` - ${trailerModePlanningTimerLabel}`;
+    }
+
     if (planningTimerState.phase !== "planning") {
       return "";
     }
@@ -4569,7 +4803,20 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     return ` - ${formatPlanningCountdown(getPlanningTimerRemainingMs(now))}`;
   }
 
+  function isTrailerAiMatchActive(): boolean {
+    return (
+      isTrailerModeActive &&
+      !isGameMenuDemoActive &&
+      tutorialState === null &&
+      getActiveFactions(state).every((faction) => faction.controlType === "ai")
+    );
+  }
+
   function getPlanningTurnLineClass(now = performance.now()): string {
+    if (isTrailerAiMatchActive()) {
+      return "command-console__line--turn";
+    }
+
     const remainingMs = getPlanningTimerRemainingMs(now);
     const isWarning =
       planningTimerState.phase === "planning" && remainingMs <= planningTimerWarningMs;
@@ -6648,6 +6895,17 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   function computeCommandWarningSnapshot(gameState: GameState): CommandWarningSnapshot {
     const projectedDv = getProjectedCommandDv();
+    if (isZeroTimerAiAutorunMode()) {
+      return {
+        sourceContent: content,
+        sourceState: gameState,
+        sourceSnapshot: snapshot,
+        projectedDv,
+        warnings: [],
+        nodeWarningLevels: new Map()
+      };
+    }
+
     const warnings = getCommandWarnings(projectedDv);
 
     return {
@@ -7419,7 +7677,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
-    const outcome = detectPostMatchOutcome(content, state, snapshot);
+    const workerEvaluation = isZeroTimerAiAutorunMode() ? aiWorkerPostMatchEvaluation : null;
+    const outcome =
+      workerEvaluation === null
+        ? detectPostMatchOutcome(content, state, snapshot)
+        : workerEvaluation.outcome;
 
     if (isGameMenuDemoActive) {
       if (outcome !== null) {
@@ -7428,31 +7690,33 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
-    lastVictoryAudit = createVictoryAudit(content, state, snapshot, outcome);
+    let victoryAudit =
+      workerEvaluation?.victoryAudit ?? createVictoryAudit(content, state, snapshot, outcome);
+    lastVictoryAudit = victoryAudit;
 
     if (outcome === null) {
-      logVictoryDelayAudit();
+      logVictoryDelayAudit(null, workerEvaluation?.victoryDelayAudit);
       return;
     }
 
-    const victoryContradictions = createVictoryAuditContradictions(
-      content,
-      state,
-      snapshot,
-      outcome,
-      lastVictoryAudit
-    );
+    const victoryContradictions =
+      workerEvaluation?.victoryContradictions ??
+      createVictoryAuditContradictions(content, state, snapshot, outcome, victoryAudit);
 
     if (victoryContradictions.length > 0) {
-      lastVictoryAudit = {
-        ...lastVictoryAudit,
+      victoryAudit = {
+        ...victoryAudit,
         contradictions: victoryContradictions
       };
+      lastVictoryAudit = victoryAudit;
       console.info("VICTORY_AUDIT_CONTRADICTION", victoryContradictions);
-      logVictoryDelayAudit({
-        reason: "victory-audit-contradiction",
-        contradictions: victoryContradictions
-      });
+      logVictoryDelayAudit(
+        {
+          reason: "victory-audit-contradiction",
+          contradictions: victoryContradictions
+        },
+        workerEvaluation?.victoryDelayAudit
+      );
       return;
     }
 
@@ -7462,14 +7726,14 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       replayTape,
       snapshot,
       outcome,
-      lastVictoryAudit
+      victoryAudit
     );
-    console.info("VICTORY_AUDIT", lastVictoryAudit);
+    console.info("VICTORY_AUDIT", victoryAudit);
     console.info("MAP_OUTCOME_AUDIT", lastMapOutcomeAudit);
     console.info("VICTORY_CONFIRMED", {
       winner: outcome.winner,
-      reason: lastVictoryAudit.reason,
-      survivingTritiumPath: lastVictoryAudit.factionStates[outcome.winner]?.countedTritium ?? [],
+      reason: victoryAudit.reason,
+      survivingTritiumPath: victoryAudit.factionStates[outcome.winner]?.countedTritium ?? [],
       missilesRemainInFlight: snapshot.activeMissiles.length > 0,
       irrelevantMissiles: snapshot.activeMissiles
         .filter((missile) => missile.targetFactionId !== outcome.winner)
@@ -7554,9 +7818,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function shouldAutoRestartZeroTimerMatch(): boolean {
+    return tutorialState === null && isZeroTimerAiAutorunMode();
+  }
+
+  function isZeroTimerAiAutorunMode(): boolean {
     return (
       planningTimerMode === "zero" &&
-      tutorialState === null &&
       getActiveFactions(state).every((faction) => faction.controlType === "ai")
     );
   }
@@ -7601,7 +7868,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
     try {
       if (restartPreset.procedural === true) {
-        const batchMap = proceduralBatchMapCycle.createNext(restartPreset);
+        const batchMap = await createNextAiAutorunProceduralMap(restartPreset);
         const nextContent = batchMap.generation.content;
         const nextState = withControllerOverrides(
           createInitialStateForGameModeAndMap(
@@ -7641,7 +7908,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           controllers: controllerOverrides
         });
         hasConsumedZeroTimerInitialCountdown = true;
-        resetRuntimeAfterGameReset({ preserveCamera: true });
+        resetRuntimeAfterGameReset({ preserveCamera: true, preserveCinematicScene: true });
         return;
       }
 
@@ -7674,7 +7941,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         controllers: controllerOverrides
       });
       hasConsumedZeroTimerInitialCountdown = true;
-      resetRuntimeAfterGameReset({ preserveCamera: true });
+      resetRuntimeAfterGameReset({ preserveCamera: true, preserveCinematicScene: true });
     } catch (error) {
       status.textContent =
         error instanceof Error ? error.message : "Zero timer autorun restart failed.";
@@ -7683,8 +7950,14 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
   }
 
-  function logVictoryDelayAudit(extra: Readonly<Record<string, unknown>> | null = null): void {
-    const audit = createVictoryDelayAudit(content, state, snapshot);
+  function logVictoryDelayAudit(
+    extra: Readonly<Record<string, unknown>> | null = null,
+    precomputedAudit?: Readonly<Record<string, unknown>> | null
+  ): void {
+    const audit =
+      precomputedAudit === undefined
+        ? createVictoryDelayAudit(content, state, snapshot)
+        : precomputedAudit;
 
     if (audit === null && extra === null) {
       return;
@@ -7818,7 +8091,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     if (
       (isReplayMode && commandLogTimeReviewState === null) ||
       isTurnTransitionActive ||
-      isCommandConsoleResolving
+      isCommandConsoleResolving ||
+      isCommandLogTimeReviewAnimating
     ) {
       return;
     }
@@ -7942,7 +8216,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     return commandLogTimeReviewState;
   }
 
-  function animateCommandLogTimeReviewToPosition(
+  async function animateCommandLogTimeReviewToPosition(
     targetPosition: number,
     targetEventId: string | null,
     focusTargetKeys: readonly string[] = [],
@@ -7955,16 +8229,31 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     cancelCommandLogTimeReviewAnimation();
+    reviewState.focusTargetKeys = focusTargetKeys;
+    reviewState.staticFocusTargetSignature = null;
+    if (focusTargetKeys.length === 0) {
+      cinematicRenderer?.freezeTimelineReviewCamera();
+    } else {
+      syncLogReviewStaticFocusTargetKeys(focusTargetKeys);
+      isCommandLogTimeReviewAnimating = true;
+      await waitForCommandLogReplayFocusBeforePlayback();
+      isCommandLogTimeReviewAnimating = false;
+      if (commandLogTimeReviewState !== reviewState) {
+        return;
+      }
+    }
+
     const clampedTarget = clampCommandLogReviewPosition(targetPosition);
     const startPosition = reviewState.currentPosition;
 
     if (clampedTarget > startPosition + 0.001) {
-      return playCommandLogReviewForwardToPosition(
+      await playCommandLogReviewForwardToPosition(
         clampedTarget,
         targetEventId,
         focusTargetKeys,
         activeCommandRowKey
       );
+      return;
     }
 
     const distance = Math.abs(clampedTarget - startPosition);
@@ -7980,7 +8269,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     setCommandScrollbackPlayingEvent(targetEventId);
     reviewState.eventId = targetEventId;
     reviewState.activeCommandRowKey = activeCommandRowKey;
-    reviewState.focusTargetKeys = focusTargetKeys;
     reviewState.transitionIndex = Math.min(
       Math.floor(clampedTarget),
       Math.max(0, replayTape.transitions.length - 1)
@@ -8147,7 +8435,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
-    const focusedTargetKey = cinematicRenderer.focusFirstAvailableTargetWithoutTracking(targetKeys);
+    const focusedTargetKey = cinematicRenderer.focusFirstAvailableTargetWithoutZoom(targetKeys);
 
     if (focusedTargetKey !== null) {
       reviewState.staticFocusTargetSignature = signature;
@@ -8186,7 +8474,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       transition.to,
       position - transitionIndex,
       {
-        followTrackedFocus: false,
+        followTrackedFocus: (commandLogTimeReviewState?.focusTargetKeys.length ?? 0) > 0,
         includePresentationEffects: false
       }
     );
@@ -8501,7 +8789,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return [warningNodeTargetKey];
     }
 
-    const targetKeys = getCommandScrollbackLineFocusTargetKeys(line);
+    const targetKeys = preferCommandLogOrbitFocusTargetKeys(
+      getCommandScrollbackLineFocusTargetKeys(line)
+    );
 
     if (targetKeys.length === 0 || currentView !== "cinematic3d") {
       return targetKeys;
@@ -8516,6 +8806,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     return targetKeys;
+  }
+
+  function preferCommandLogOrbitFocusTargetKeys(targetKeys: readonly string[]): readonly string[] {
+    const orbitTargetKeys = targetKeys.filter((targetKey) => targetKey.startsWith("node:"));
+    return orbitTargetKeys.length > 0 ? orbitTargetKeys : targetKeys;
   }
 
   function getCommandWarningNodeTargetKey(line: HTMLElement | null): string | null {
@@ -8780,13 +9075,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function getCinematicPerformanceMode(): CinematicPerformanceMode {
-    const storedMode = window.localStorage.getItem(cinematicPerformanceModeStorageKey);
+    return "full";
+  }
 
-    // AUTO used frame cadence as a proxy for render cost. Safari's WebGL presenter can settle at
-    // 30 Hz while the renderer itself is comfortably below 16.7 ms, causing AUTO to lower detail
-    // and resolution without improving presentation. Preserve explicit compatibility choices,
-    // but migrate AUTO and new installs to the full-quality path.
-    return storedMode === "reduced" || storedMode === "minimal" ? storedMode : "full";
+  function getStoredTrajectoryReflectionMode(): CinematicTrajectoryReflectionMode {
+    const storedMode = window.localStorage.getItem(cinematicTrajectoryReflectionModeStorageKey);
+    return storedMode === "on" || storedMode === "off" ? storedMode : "hover";
   }
 
   function getCinematicRendererPerformanceMode(): CinematicPerformanceMode {
@@ -9041,11 +9335,20 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           return;
         }
 
+        const queuedTutorialOrder = getTutorialQueuedFireOrder();
+        const cancelledTutorialOrder =
+          queuedTutorialOrder?.originNodeId === originNodeId ? queuedTutorialOrder : undefined;
         state = applyCommand(state, {
           type: "CANCEL_PENDING_FIRE_ORDER",
           originNodeId
         });
         snapshot = createSolarSystemSnapshot(content, state);
+        if (
+          cancelledTutorialOrder !== undefined &&
+          !state.pendingFireOrders.some((order) => order.id === cancelledTutorialOrder.id)
+        ) {
+          handleTutorialFireOrderCancelled(cancelledTutorialOrder);
+        }
         sfxEngine.play("queue.remove");
         redraw();
       },
@@ -9056,12 +9359,17 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       }
     });
     cinematicRenderer.setShipModelVariant(selectedShipModelVariant);
+    cinematicRenderer.setBurnPreviewEffectsEnabled(burnPreviewEffectsMode === "on");
+    cinematicRenderer.setFirePreviewEffectsEnabled(firePreviewEffectsMode === "on");
     cinematicRenderer.setSolarHazeEnabled(solarHazeMode === "on");
+    cinematicRenderer.setSolarOcclusionEnabled(solarOcclusionMode === "on");
+    cinematicRenderer.setAtmosphericScatteringEnabled(atmosphericScatteringMode === "on");
     cinematicRenderer.setCompactSunBloomEnabled(compactSunBloomMode === "on");
     cinematicRenderer.setBloomEnabled(uiBloomMode === "on");
     cinematicRenderer.setUiBloomEnabled(uiBloomMode === "on");
-    cinematicRenderer.setReducedBloomResolutionEnabled(reducedBloomResolutionMode === "on");
+    cinematicRenderer.setLowBloomProfileEnabled(lowBloomProfileMode === "on");
     cinematicRenderer.setHeatDistortionEnabled(heatDistortionMode === "on");
+    cinematicRenderer.setTrajectoryReflectionMode(trajectoryReflectionMode);
     cinematicRenderer.setCameraInputEnabled(!isGameMenuDemoActive);
     cinematicRenderer.setBillboardsVisible(!isGameMenuDemoActive);
     resizeActiveView();
@@ -9897,6 +10205,45 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
   }
 
+  function getTutorialQueuedFireOrder(): PendingFireOrder | undefined {
+    const tutorial = tutorialState;
+
+    if (tutorial === null) {
+      return undefined;
+    }
+
+    return findTutorialQueuedFireOrder(
+      tutorial,
+      getTutorialShipyardContestedTargetNodeId(tutorial),
+      state.pendingFireOrders
+    );
+  }
+
+  function handleTutorialFireOrderCancelled(cancelledOrder: PendingFireOrder): void {
+    const tutorial = tutorialState;
+
+    if (tutorial === null) {
+      return;
+    }
+
+    const lesson = recoverTutorialQueuedFireLessonAfterCancellation(
+      tutorial,
+      getTutorialShipyardContestedTargetNodeId(tutorial),
+      cancelledOrder,
+      performance.now()
+    );
+
+    if (lesson === null) {
+      return;
+    }
+
+    noteTutorialPlayerActivity();
+    hasConfirmedPlayerOrderAfterSelection = false;
+
+    updateInteractionLocks();
+    updateCommandConsole();
+  }
+
   function appendTutorialShipyardFireWorkChoiceRows(): void {
     appendTutorialTimelineRows(
       createTutorialShipyardFireWorkChoiceRows(getCommandFactionClass("player")),
@@ -10715,6 +11062,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       isReplayMode || isMandatoryLaunchLocked || isTurnTransitionActive;
     gameMenuModeButton.disabled =
       isGameMenuDemoActive || isReplayMode || isMandatoryLaunchLocked || isTurnTransitionActive;
+    trailerModeButton.disabled =
+      isTrailerModeActive || isReplayMode || isMandatoryLaunchLocked || isTurnTransitionActive;
     aiVsAiModeButton.disabled = isReplayMode || isMandatoryLaunchLocked || isTurnTransitionActive;
     aiVsAiVsAiModeButton.disabled =
       isReplayMode || isMandatoryLaunchLocked || isTurnTransitionActive;
@@ -10756,7 +11105,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     const shouldRecoverTutorialSupportProductionAdvance =
       isTutorialSupportProductionAdvancePrompt() && !isManualExecutePromptDisabled();
     const shouldContinueTutorialShipyardFireQueued =
-      tutorialState?.phase === "shipyardFireQueued" && !isManualExecutePromptDisabled();
+      tutorialState?.phase === "shipyardFireQueued" &&
+      getTutorialQueuedFireOrder() !== undefined &&
+      !isManualExecutePromptDisabled();
     const shouldContinueTutorialShipyardEnemyEvadeLesson =
       tutorialState?.phase === "shipyardEnemyEvadeLesson" && !isManualExecutePromptDisabled();
     if (shouldContinueTutorialShipyardEnemyEvadeLesson) {
@@ -10768,7 +11119,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       tutorialState.autoAdvanceActive !== true &&
       !isManualExecutePromptDisabled();
     const shouldAutoAdvanceTutorialShipyardContestedFire =
-      tutorialState?.phase === "shipyardContestedFireQueued" && !isManualExecutePromptDisabled();
+      tutorialState?.phase === "shipyardContestedFireQueued" &&
+      getTutorialQueuedFireOrder() !== undefined &&
+      !isManualExecutePromptDisabled();
     const shouldAutoAdvanceTutorialShipyardCounterContest =
       tutorialState?.phase === "shipyardCounterContestBurnQueued" &&
       tutorialState.shipyardCounterContestAutoAdvanceConsumed !== true &&
@@ -11134,6 +11487,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     startGameMenuDemo();
   });
 
+  trailerModeButton.addEventListener("click", activateTrailerMode);
+
   aiVsAiModeButton.addEventListener("click", () => {
     startDebugAiAutorunMode("2p");
   });
@@ -11187,10 +11542,42 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     updateDebugPanel();
   });
 
+  burnPreviewEffectsButton.addEventListener("click", () => {
+    burnPreviewEffectsMode = burnPreviewEffectsMode === "on" ? "off" : "on";
+    cinematicRenderer?.setBurnPreviewEffectsEnabled(burnPreviewEffectsMode === "on");
+    appendDebugPanelMessage(`BURN PREVIEW FX ${burnPreviewEffectsMode.toUpperCase()}`);
+    updateCommandConsoleModeControls();
+    redraw();
+  });
+
+  firePreviewEffectsButton.addEventListener("click", () => {
+    firePreviewEffectsMode = firePreviewEffectsMode === "on" ? "off" : "on";
+    cinematicRenderer?.setFirePreviewEffectsEnabled(firePreviewEffectsMode === "on");
+    appendDebugPanelMessage(`FIRE PREVIEW FX ${firePreviewEffectsMode.toUpperCase()}`);
+    updateCommandConsoleModeControls();
+    redraw();
+  });
+
   solarHazeButton.addEventListener("click", () => {
     solarHazeMode = solarHazeMode === "on" ? "off" : "on";
     cinematicRenderer?.setSolarHazeEnabled(solarHazeMode === "on");
     appendDebugPanelMessage(`SOLAR HAZE ${solarHazeMode.toUpperCase()}`);
+    updateCommandConsoleModeControls();
+    redraw();
+  });
+
+  solarOcclusionButton.addEventListener("click", () => {
+    solarOcclusionMode = solarOcclusionMode === "on" ? "off" : "on";
+    cinematicRenderer?.setSolarOcclusionEnabled(solarOcclusionMode === "on");
+    appendDebugPanelMessage(`SOLAR OCCLUSION ${solarOcclusionMode.toUpperCase()}`);
+    updateCommandConsoleModeControls();
+    redraw();
+  });
+
+  atmosphericScatteringButton.addEventListener("click", () => {
+    atmosphericScatteringMode = atmosphericScatteringMode === "on" ? "off" : "on";
+    cinematicRenderer?.setAtmosphericScatteringEnabled(atmosphericScatteringMode === "on");
+    appendDebugPanelMessage(`ATMOSPHERIC SCATTERING ${atmosphericScatteringMode.toUpperCase()}`);
     updateCommandConsoleModeControls();
     redraw();
   });
@@ -11212,12 +11599,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     redraw();
   });
 
-  reducedBloomResolutionButton.addEventListener("click", () => {
-    reducedBloomResolutionMode = reducedBloomResolutionMode === "on" ? "off" : "on";
-    cinematicRenderer?.setReducedBloomResolutionEnabled(reducedBloomResolutionMode === "on");
-    appendDebugPanelMessage(
-      `BLOOM RESOLUTION ${reducedBloomResolutionMode === "on" ? "LOW 20%" : "HIGH 40%"}`
-    );
+  lowBloomProfileButton.addEventListener("click", () => {
+    lowBloomProfileMode = lowBloomProfileMode === "on" ? "off" : "on";
+    cinematicRenderer?.setLowBloomProfileEnabled(lowBloomProfileMode === "on");
+    appendDebugPanelMessage(`BLOOM PROFILE ${lowBloomProfileMode === "on" ? "LOW" : "HIGH"}`);
     updateCommandConsoleModeControls();
     redraw();
   });
@@ -11651,10 +12036,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       const commandRowKey = getCommandScrollbackLineReviewKey(line);
       const focusTargetKeys = focusCommandScrollbackLineTarget(line);
 
-      if (focusTargetKeys.length > 0) {
-        await waitForTutorialFirstEnemyKillReplayCueFocusBeforeRewind();
-      }
-
       await rewindCommandLogToEvent(targetId, focusTargetKeys, commandRowKey);
       if (commandLogTimeReviewState !== null) {
         freezeTutorialFirstEnemyKillReplayFollowupHints();
@@ -11665,9 +12046,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
   }
 
-  function waitForTutorialFirstEnemyKillReplayCueFocusBeforeRewind(): Promise<void> {
+  function waitForCommandLogReplayFocusBeforePlayback(): Promise<void> {
     return new Promise((resolve) => {
-      window.setTimeout(resolve, tutorialFirstEnemyKillReplayCueFocusBeforeRewindMs);
+      window.setTimeout(resolve, commandLogReplayFocusBeforePlaybackMs);
     });
   }
 
@@ -12023,9 +12404,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
-    const startWhenCurrentTurnSettles = (): void => {
+    const startWhenCurrentTurnSettles = async (): Promise<void> => {
       if (isTurnTransitionActive || isCommandConsoleResolving) {
-        window.setTimeout(startWhenCurrentTurnSettles, 40);
+        window.setTimeout(() => {
+          void startWhenCurrentTurnSettles();
+        }, 40);
         return;
       }
 
@@ -12039,13 +12422,13 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       clearZeroTimerAutoRestart();
 
       if (selectedMapPreset.procedural === true) {
-        resetAiBatchWithAutomaticProceduralMap(mode);
+        await resetAiBatchWithAutomaticProceduralMap(mode);
       } else {
         resetDebugAiMode(mode);
       }
     };
 
-    startWhenCurrentTurnSettles();
+    void startWhenCurrentTurnSettles();
   }
 
   function resetDebugFireVsAiMode(): void {
@@ -12773,6 +13156,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     populateFocusSelect(focusSelect, content);
     if (options.preserveCinematicScene !== true) {
       disposeCinematicRenderer();
+    } else {
+      cinematicRenderer?.clearPresentationEffects();
     }
     resizeActiveView();
 
@@ -14977,7 +15362,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   function appendTutorialShipyardContestedRuleRows(): void {
     appendTutorialTimelineRows(
-      createTutorialShipyardContestedRuleRows(),
+      createTutorialShipyardContestedRuleRows(getCommandFactionClass("player")),
       "tutorial:shipyard-contested-rule"
     );
   }
@@ -16690,6 +17075,186 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     });
   }
 
+  function terminateAiTurnWorker(): void {
+    aiTurnWorker?.terminate();
+    aiTurnWorker = null;
+  }
+
+  function getAiTurnWorker(): Worker {
+    if (aiTurnWorker === null) {
+      aiTurnWorker = new Worker(new URL("./aiTurnWorker.ts", import.meta.url), {
+        type: "module"
+      });
+    }
+
+    return aiTurnWorker;
+  }
+
+  function advanceAiTurnOffMainThread(
+    automaticMandatoryLaunchFactionIds: readonly FactionId[] | undefined,
+    planningOptions: AiPlanningOptions
+  ): Promise<Extract<AiTurnWorkerResponse, { kind: "advance-turn" }>> {
+    const worker = getAiTurnWorker();
+    const id = ++aiTurnWorkerRequestId;
+    const request: AiTurnWorkerRequest = {
+      kind: "advance-turn",
+      id,
+      state,
+      content,
+      automaticMandatoryLaunchFactionIds,
+      planningOptions
+    };
+
+    return new Promise((resolve, reject) => {
+      const handleMessage = (event: MessageEvent<AiTurnWorkerResponse>): void => {
+        if (event.data.id !== id) {
+          return;
+        }
+
+        cleanup();
+        if ("error" in event.data) {
+          reject(new Error(event.data.error));
+          return;
+        }
+
+        if (event.data.kind !== "advance-turn") {
+          reject(new Error(`Unexpected AI worker response "${event.data.kind}"`));
+          return;
+        }
+
+        resolve(event.data);
+      };
+      const handleError = (event: ErrorEvent): void => {
+        cleanup();
+        reject(new Error(event.message || "AI turn worker failed"));
+      };
+      const cleanup = (): void => {
+        worker.removeEventListener("message", handleMessage);
+        worker.removeEventListener("error", handleError);
+      };
+
+      worker.addEventListener("message", handleMessage);
+      worker.addEventListener("error", handleError);
+      worker.postMessage(request);
+    });
+  }
+
+  function issueAiAutorunProceduralSeed(): string {
+    let seed = normalizeProceduralSeedForUi(createProceduralMapSeed());
+
+    while (aiAutorunIssuedProceduralSeeds.has(seed)) {
+      seed = `${seed}-batch-${aiAutorunIssuedProceduralSeeds.size.toString(36)}`;
+    }
+
+    aiAutorunIssuedProceduralSeeds.add(seed);
+    return seed;
+  }
+
+  function generateAiAutorunMapOffMainThread(
+    preset: MapPreset
+  ): Promise<ProceduralBatchMapGeneration> {
+    const worker = getAiTurnWorker();
+    const id = ++aiTurnWorkerRequestId;
+    const requestedSeed = issueAiAutorunProceduralSeed();
+    const retrySeeds = Array.from({ length: 3 }, () => issueAiAutorunProceduralSeed());
+    const request: AiTurnWorkerRequest = {
+      kind: "generate-map",
+      id,
+      preset,
+      requestedSeed,
+      retrySeeds
+    };
+
+    return new Promise((resolve, reject) => {
+      const handleMessage = (event: MessageEvent<AiTurnWorkerResponse>): void => {
+        if (event.data.id !== id) {
+          return;
+        }
+
+        cleanup();
+        if ("error" in event.data) {
+          reject(new Error(event.data.error));
+          return;
+        }
+
+        if (event.data.kind !== "generate-map") {
+          reject(new Error(`Unexpected AI worker response "${event.data.kind}"`));
+          return;
+        }
+
+        resolve(event.data.automaticMap);
+      };
+      const handleError = (event: ErrorEvent): void => {
+        cleanup();
+        reject(new Error(event.message || "AI map worker failed"));
+      };
+      const cleanup = (): void => {
+        worker.removeEventListener("message", handleMessage);
+        worker.removeEventListener("error", handleError);
+      };
+
+      worker.addEventListener("message", handleMessage);
+      worker.addEventListener("error", handleError);
+      worker.postMessage(request);
+    });
+  }
+
+  async function createNextAiAutorunProceduralMap(
+    preset: MapPreset
+  ): Promise<ProceduralBatchMapGeneration> {
+    try {
+      return await generateAiAutorunMapOffMainThread(preset);
+    } catch (error) {
+      terminateAiTurnWorker();
+      if (!hasReportedAiTurnWorkerFallback) {
+        hasReportedAiTurnWorkerFallback = true;
+        appendDebugPanelMessage(
+          `AI WORKER fallback: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+      return createAutomaticProceduralMapForSeed(preset, issueAiAutorunProceduralSeed());
+    }
+  }
+
+  async function resolveSimulationTurn(
+    automaticMandatoryLaunchFactionIds: readonly FactionId[] | undefined,
+    planningOptions: AiPlanningOptions
+  ): Promise<GameState> {
+    if (!isZeroTimerAiAutorunMode() || typeof Worker === "undefined") {
+      aiWorkerPostMatchEvaluation = null;
+      return advanceSimulationTurn(
+        state,
+        content,
+        automaticMandatoryLaunchFactionIds,
+        planningOptions
+      );
+    }
+
+    try {
+      const response = await advanceAiTurnOffMainThread(
+        automaticMandatoryLaunchFactionIds,
+        planningOptions
+      );
+      aiWorkerPostMatchEvaluation = response.postMatchEvaluation;
+      return response.state;
+    } catch (error) {
+      terminateAiTurnWorker();
+      aiWorkerPostMatchEvaluation = null;
+      if (!hasReportedAiTurnWorkerFallback) {
+        hasReportedAiTurnWorkerFallback = true;
+        appendDebugPanelMessage(
+          `AI WORKER fallback: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+      return advanceSimulationTurn(
+        state,
+        content,
+        automaticMandatoryLaunchFactionIds,
+        planningOptions
+      );
+    }
+  }
+
   async function advanceTurn(
     transcriptStartIndex?: number,
     options: Readonly<{
@@ -16711,14 +17276,13 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
+    const turnPresentationStartedAt = performance.now();
     prepareTutorialOpponentMandatoryLaunches();
     const previousSnapshot = snapshot;
     const automaticMandatoryLaunchFactionIds = getAutomaticMandatoryLaunchFactionIdsForResolution(
       options.ignoreMandatoryLaunchLock === true
     );
-    state = advanceSimulationTurn(
-      state,
-      content,
+    state = await resolveSimulationTurn(
       automaticMandatoryLaunchFactionIds,
       getEffectiveAiPlanningOptions()
     );
@@ -16771,6 +17335,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       redraw();
       await consoleReadyPromise;
       handleTutorialAfterTurn(previousSnapshot, snapshot);
+      await waitForZeroTimerPresentationCadence(turnPresentationStartedAt);
       maybeShowPostMatchReport();
       finishPlanningTimerResolution();
       sfxEngine.play("turn.ready");
@@ -16793,11 +17358,24 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       await consoleReadyPromise;
       handleTutorialAfterTurn(previousSnapshot, snapshot);
       syncMandatoryLaunchFocus();
+      await waitForZeroTimerPresentationCadence(turnPresentationStartedAt);
       maybeShowPostMatchReport();
       finishPlanningTimerResolution();
       sfxEngine.play("turn.ready");
       updateStatus();
       scheduleGameMenuDemoTurn();
+    }
+  }
+
+  async function waitForZeroTimerPresentationCadence(startedAt: number): Promise<void> {
+    if (!isZeroTimerAiAutorunMode()) {
+      return;
+    }
+
+    const remainingMs = zeroTimerMinimumTurnPresentationMs - (performance.now() - startedAt);
+
+    if (remainingMs > 0) {
+      await waitForCommandConsoleMs(remainingMs);
     }
   }
 
@@ -17043,6 +17621,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     cancelMusicAutoplayUnlock();
     cancelSfxAutoplayUnlock();
     stopDebugRecordingTimer();
+    terminateAiTurnWorker();
     musicEngine.dispose();
     sfxEngine.dispose();
   });

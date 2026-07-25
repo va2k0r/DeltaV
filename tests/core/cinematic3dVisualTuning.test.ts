@@ -350,9 +350,45 @@ describe("Cinematic 3D visual tuning", () => {
       defaultCinematic3dVisualTuning.missileImpactBodyFlashRadius * 0.25
     );
     expect(defaultCinematic3dVisualTuning.burnPreviewThicknessMultiplier).toBeGreaterThan(1);
+    expect(defaultCinematic3dVisualTuning.burnPreviewEffectOpacity).toBeGreaterThan(0.8);
+    expect(defaultCinematic3dVisualTuning.burnPreviewEffectParticleCount).toBeGreaterThan(24);
+    expect(defaultCinematic3dVisualTuning.burnPreviewEffectParticleSizePixels).toBeGreaterThan(5);
+    expect(defaultCinematic3dVisualTuning.burnPreviewEffectApertureSizePixels).toBeGreaterThan(30);
+    expect(defaultCinematic3dVisualTuning.burnPreviewEffectFlowSpeed).toBeGreaterThan(0);
     expect(defaultCinematic3dVisualTuning.fireMarkerColor).toBeGreaterThan(0);
     expect(defaultCinematic3dVisualTuning.fireTargetDimOpacity).toBeLessThan(0.5);
     expect(defaultCinematic3dVisualTuning.firePreviewOpacity).toBeGreaterThan(0.5);
+    expect(defaultCinematic3dVisualTuning.firePreviewEffectOpacity).toBeGreaterThan(0.8);
+    expect(defaultCinematic3dVisualTuning.firePreviewEffectParticleCount).toBeGreaterThan(30);
+    expect(defaultCinematic3dVisualTuning.firePreviewEffectParticleSizePixels).toBeGreaterThan(
+      defaultCinematic3dVisualTuning.burnPreviewEffectParticleSizePixels
+    );
+    expect(defaultCinematic3dVisualTuning.firePreviewEffectReticleSizePixels).toBeGreaterThan(44);
+    expect(defaultCinematic3dVisualTuning.firePreviewEffectReticleSizePixels).toBeLessThan(50);
+    expect(defaultCinematic3dVisualTuning.firePreviewEffectFlowSpeed).toBeGreaterThan(
+      defaultCinematic3dVisualTuning.burnPreviewEffectFlowSpeed
+    );
+    expect(defaultCinematic3dVisualTuning.confirmedOrderEffectOpacityMultiplier).toBeGreaterThan(
+      0.4
+    );
+    expect(defaultCinematic3dVisualTuning.confirmedOrderEffectOpacityMultiplier).toBeLessThan(0.7);
+    expect(defaultCinematic3dVisualTuning.confirmedOrderEffectParticleMultiplier).toBeLessThan(0.7);
+    expect(defaultCinematic3dVisualTuning.confirmedOrderEffectSizeMultiplier).toBeLessThan(1);
+    expect(defaultCinematic3dVisualTuning.fireConfirmedSolutionRevealDurationSeconds).toBeLessThan(
+      1
+    );
+    expect(defaultCinematic3dVisualTuning.fireConfirmedSolutionFadeDurationSeconds).toBeGreaterThan(
+      0.1
+    );
+    expect(defaultCinematic3dVisualTuning.fireConfirmedSolutionFadeDurationSeconds).toBeLessThan(
+      0.3
+    );
+    expect(defaultCinematic3dVisualTuning.fireConfirmedSolutionAimAcquireProgress).toBeGreaterThan(
+      0.5
+    );
+    expect(defaultCinematic3dVisualTuning.fireConfirmedSolutionAimAcquireProgress).toBeLessThan(
+      0.7
+    );
     expect(defaultCinematic3dVisualTuning.pendingFireOpacity).toBeGreaterThan(0.5);
     expect(defaultCinematic3dVisualTuning.extremeZoomUiFadeStartDetail).toBeGreaterThan(0.6);
     expect(defaultCinematic3dVisualTuning.extremeZoomUiFadeStartDetail).toBeLessThan(
@@ -411,6 +447,22 @@ describe("Cinematic 3D visual tuning", () => {
     expect(defaultCinematic3dVisualTuning.solarOcclusionEnabled).toBe(true);
     expect(defaultCinematic3dVisualTuning.solarOcclusionOpacity).toBeGreaterThan(0.9);
     expect(defaultCinematic3dVisualTuning.solarOcclusionOpacity).toBeLessThanOrEqual(1);
+    expect(defaultCinematic3dVisualTuning.solarOcclusionCoronaIntensity).toBeGreaterThan(0);
+    expect(defaultCinematic3dVisualTuning.solarOcclusionExposureCompression).toBeGreaterThan(0);
+    expect(defaultCinematic3dVisualTuning.solarOcclusionExposureCompression).toBeLessThan(0.3);
+    expect(defaultCinematic3dVisualTuning.solarOcclusionReemergenceIntensity).toBeLessThan(0.4);
+    expect(defaultCinematic3dVisualTuning.solarOcclusionReemergenceDurationSeconds).toBeLessThan(1);
+    expect(defaultCinematic3dVisualTuning.solarOcclusionReemergenceArmCoverage).toBeGreaterThan(
+      defaultCinematic3dVisualTuning.solarOcclusionReemergenceReleaseCoverage
+    );
+    expect(defaultCinematic3dVisualTuning.solarOcclusionReemergenceReleaseCoverage).toBeGreaterThan(
+      0.6
+    );
+    expect(defaultCinematic3dVisualTuning.atmosphericScatteringIntensity).toBeGreaterThan(0.5);
+    expect(defaultCinematic3dVisualTuning.atmosphericScatteringScale).toBeGreaterThan(1);
+    expect(defaultCinematic3dVisualTuning.atmosphericScatteringScale).toBeLessThan(1.08);
+    expect(defaultCinematic3dVisualTuning.atmosphericScatteringFalloff).toBeGreaterThan(2);
+    expect(defaultCinematic3dVisualTuning.atmosphericScatteringTerminatorBoost).toBeGreaterThan(0);
     expect(defaultCinematic3dVisualTuning.turnAnimationDurationMs).toBeGreaterThan(0);
     expect(defaultCinematic3dVisualTuning.turnAnimationEase).toBe("smootherstep");
     expect(defaultCinematic3dVisualTuning.shipyardGridCollapseDetailStart).toBeGreaterThan(

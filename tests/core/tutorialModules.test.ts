@@ -14,6 +14,7 @@ import {
   createTutorialPostVictoryActionRows,
   createTutorialPostVictoryAutomaticBehaviorRows,
   createTutorialSelectShipLiveRows,
+  createTutorialShipyardContestedRuleRows,
   createTutorialShipyardProductionRows,
   createTutorialSpacerRow,
   createTutorialZoomFocusLiveRows,
@@ -29,7 +30,11 @@ import {
 import {
   createTutorialRuntimeDiagnosticDump,
   createTutorialRuntimeState,
+  findTutorialQueuedFireOrder,
+  getTutorialQueuedFireLesson,
   getTutorialMandatoryLaunchResumePhase,
+  isOrderForTutorialQueuedFireLesson,
+  recoverTutorialQueuedFireLessonAfterCancellation,
   shouldInterruptTutorialForMandatoryLaunch,
   shouldRestoreTutorialAutoAdvanceLock
 } from "../../src/ui/tutorial/runtimeState";
@@ -120,7 +125,7 @@ describe("tutorial row modules", () => {
   it("builds stable live hint rows through the public barrel", () => {
     expect(createTutorialSelectShipLiveRows("hint-class", "tutorial:test-select")).toEqual([
       {
-        parts: [{ text: "Left click to select a ship." }],
+        parts: [{ text: "Left click on the orbit to select a ship." }],
         className: "hint-class",
         key: "tutorial:test-select"
       },
@@ -357,6 +362,29 @@ describe("tutorial row modules", () => {
     ]);
   });
 
+  it("explains how to disengage from a contested shipyard orbit", () => {
+    const rows = createTutorialShipyardContestedRuleRows("player-highlight");
+
+    expect(rows.at(-1)).toEqual({
+      parts: [
+        { text: "To disengage, " },
+        { text: "BURN", className: "player-highlight" },
+        { text: " to any other orbit." }
+      ],
+      className: tutorialLineClassName
+    });
+
+    const expandedRows = expandTutorialSentenceRows(rows, "tutorial:test-contested");
+    const disengageRowIndex = expandedRows.findIndex((row) => {
+      return (
+        row.parts.map((part) => part.text).join("") === "To disengage, BURN to any other orbit."
+      );
+    });
+
+    expect(expandedRows[disengageRowIndex - 1]?.className).toBe(tutorialSpacerClassName);
+    expect(expandedRows[disengageRowIndex + 1]?.className).toBe(tutorialSpacerClassName);
+  });
+
   it("shows camera hint rows for two condition entries and then suppresses them", () => {
     const state = createTutorialRuntimeState({
       startedAt: 100,
@@ -476,6 +504,96 @@ describe("tutorial row modules", () => {
 });
 
 describe("tutorial runtime modules", () => {
+  it("re-arms every FIRE lesson when its queued solution is cancelled", () => {
+    const state = createTutorialRuntimeState({
+      startedAt: 100,
+      shipyardLessonNodeId: "shipyard_a"
+    });
+    state.shipyardEnemyDestinationNodeId = "enemy_destination";
+    state.phase = "shipyardFireQueued";
+
+    const firstLesson = getTutorialQueuedFireLesson(state, null);
+    const firstOrder = {
+      factionId: "player",
+      targetFactionId: "opponent",
+      originNodeId: "shipyard_a",
+      targetNodeId: "enemy_destination"
+    };
+
+    expect(firstLesson).toMatchObject({
+      queuedPhase: "shipyardFireQueued",
+      promptPhase: "shipyardFirePrompt"
+    });
+    expect(
+      firstLesson === null ? false : isOrderForTutorialQueuedFireLesson(firstOrder, firstLesson)
+    ).toBe(true);
+    expect(findTutorialQueuedFireOrder(state, null, [firstOrder])).toBe(firstOrder);
+    state.inputLocked = true;
+    state.autoAdvanceActive = true;
+    state.shipyardEnemyFireImpactTurn = 8;
+    state.shipyardEnemyEvadeObserved = true;
+    expect(recoverTutorialQueuedFireLessonAfterCancellation(state, null, firstOrder, 250)).toEqual(
+      firstLesson
+    );
+    expect(state.phase).toBe("shipyardFirePrompt");
+    expect(state.inputLocked).toBe(false);
+    expect(state.autoAdvanceActive).toBe(false);
+    expect(state.shipyardEnemyFireImpactTurn).toBeNull();
+    expect(state.shipyardEnemyEvadeObserved).toBe(false);
+    expect(state.shipyardFirePromptStartedAt).toBe(250);
+
+    state.phase = "shipyardContestedFireQueued";
+    state.shipyardSupportFireNodeId = "support_node";
+    const contestedLesson = getTutorialQueuedFireLesson(state, "contested_node");
+    const contestedOrder = {
+      factionId: "player",
+      targetFactionId: "opponent",
+      originNodeId: "support_node",
+      targetNodeId: "contested_node"
+    };
+
+    expect(contestedLesson).toMatchObject({
+      queuedPhase: "shipyardContestedFireQueued",
+      promptPhase: "shipyardContestedFirePrompt"
+    });
+    expect(
+      contestedLesson === null
+        ? false
+        : isOrderForTutorialQueuedFireLesson(contestedOrder, contestedLesson)
+    ).toBe(true);
+    expect(findTutorialQueuedFireOrder(state, "contested_node", [contestedOrder])).toBe(
+      contestedOrder
+    );
+    expect(
+      recoverTutorialQueuedFireLessonAfterCancellation(state, "contested_node", contestedOrder, 500)
+    ).toEqual(contestedLesson);
+    expect(state.phase).toBe("shipyardContestedFirePrompt");
+    expect(state.shipyardSupportFirePromptStartedAt).toBe(500);
+  });
+
+  it("does not treat a missing or unrelated FIRE order as an executable tutorial solution", () => {
+    const state = createTutorialRuntimeState({
+      startedAt: 100,
+      shipyardLessonNodeId: "shipyard_a"
+    });
+    state.phase = "shipyardContestedFireQueued";
+    state.shipyardSupportFireNodeId = "support_node";
+
+    expect(findTutorialQueuedFireOrder(state, "contested_node", [])).toBeUndefined();
+    const unrelatedOrder = {
+      factionId: "player",
+      targetFactionId: "opponent",
+      originNodeId: "support_node",
+      targetNodeId: "different_node"
+    };
+
+    expect(findTutorialQueuedFireOrder(state, "contested_node", [unrelatedOrder])).toBeUndefined();
+    expect(
+      recoverTutorialQueuedFireLessonAfterCancellation(state, "contested_node", unrelatedOrder, 250)
+    ).toBeNull();
+    expect(state.phase).toBe("shipyardContestedFireQueued");
+  });
+
   it("pauses a turn skip for a launch created by another shipyard", () => {
     expect(
       shouldInterruptTutorialForMandatoryLaunch({

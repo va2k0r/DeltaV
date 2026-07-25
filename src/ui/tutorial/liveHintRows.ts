@@ -16,7 +16,7 @@ export function createTutorialSelectShipLiveRows(
 ): readonly TutorialCommandTimelineRow[] {
   return [
     {
-      parts: [{ text: "Left click to select a ship." }],
+      parts: [{ text: "Left click on the orbit to select a ship." }],
       className,
       key
     },

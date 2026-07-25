@@ -67,7 +67,7 @@ export function formatCinematicPerformanceDebugLines(
   const orderedSections = Object.entries(stats.sections)
     .filter(([key]) => key !== "frame")
     .sort((first, second) => second[1].averageMs - first[1].averageMs)
-    .slice(0, 6)
+    .slice(0, 12)
     .map(([key, value]) => {
       return `${key} ${value.averageMs.toFixed(2)}ms avg / ${value.lastMs.toFixed(2)}ms last`;
     });

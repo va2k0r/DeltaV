@@ -129,11 +129,13 @@ select {
 }
 
 .canvas-frame {
+  --display-brightness: 1;
   position: relative;
   display: grid;
   min-height: 0;
   height: 100vh;
   overflow: hidden;
+  filter: brightness(var(--display-brightness));
   padding: 0;
 }
 
@@ -185,6 +187,73 @@ select {
 
 .cinematic-label-layer.is-hidden {
   visibility: hidden;
+}
+
+.cinematic-ship-destruction-retinal-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: hidden;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.cinematic-ship-destruction-retinal-afterimage {
+  --retinal-angle: 0deg;
+  --retinal-scale: 1;
+  --retinal-halo-opacity: 0;
+  position: absolute;
+  width: clamp(240px, 34vmin, 620px);
+  aspect-ratio: 1.28;
+  background:
+    radial-gradient(
+      ellipse 68% 53% at 45% 51%,
+      rgba(157, 224, 255, 0.18) 0%,
+      rgba(157, 224, 255, 0.16) 25%,
+      rgba(119, 176, 255, 0.07) 57%,
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 52% 68% at 61% 47%,
+      rgba(133, 183, 255, 0.075) 0%,
+      rgba(143, 114, 255, 0.04) 48%,
+      transparent 90%
+    );
+  filter: blur(clamp(24px, 3.2vmin, 48px)) saturate(1.12);
+  opacity: 0;
+  transform: translate(-50%, -50%) rotate(var(--retinal-angle)) scale(var(--retinal-scale));
+  transform-origin: center;
+  will-change: opacity, transform;
+}
+
+.cinematic-ship-destruction-retinal-afterimage::before,
+.cinematic-ship-destruction-retinal-afterimage::after {
+  position: absolute;
+  content: "";
+}
+
+.cinematic-ship-destruction-retinal-afterimage::before {
+  inset: 8% -4% 12% 5%;
+  background:
+    radial-gradient(
+      ellipse 68% 49% at 42% 54%,
+      rgba(168, 222, 255, 0.095) 0%,
+      rgba(117, 189, 255, 0.05) 52%,
+      transparent 100%
+    ),
+    radial-gradient(ellipse 51% 68% at 67% 43%, rgba(170, 144, 255, 0.035) 0%, transparent 100%);
+  filter: blur(clamp(22px, 3vmin, 46px));
+  opacity: var(--retinal-halo-opacity);
+  transform: rotate(17deg);
+}
+
+.cinematic-ship-destruction-retinal-afterimage::after {
+  inset: 17% 12% 20% 9%;
+  background:
+    radial-gradient(ellipse 54% 58% at 28% 40%, rgba(145, 213, 255, 0.07) 0%, transparent 100%),
+    radial-gradient(ellipse 61% 49% at 72% 62%, rgba(137, 172, 255, 0.055) 0%, transparent 100%);
+  filter: blur(clamp(18px, 2.4vmin, 38px));
+  transform: rotate(-11deg);
 }
 
 .cinematic-impact-whiteout {
@@ -1054,6 +1123,10 @@ select {
     text-shadow 120ms ease;
 }
 
+.game-menu__action--nowrap {
+  white-space: nowrap;
+}
+
 .game-menu__action--bright {
   color: var(--game-menu-tone-bright);
 }
@@ -1070,6 +1143,83 @@ select {
   color: var(--game-menu-tone-dim);
 }
 
+.game-menu__brightness-control {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 2.72em;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.08em;
+  color: var(--game-menu-tone-regular);
+  padding: 0 var(--command-console-line-right-gutter) 0 0;
+  pointer-events: auto;
+}
+
+.game-menu__brightness-readout {
+  display: block;
+  min-height: 1.36em;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.game-menu__brightness-slider {
+  width: 100%;
+  height: 1.12em;
+  margin: 0;
+  appearance: none;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  cursor: ew-resize;
+}
+
+.game-menu__brightness-slider::-webkit-slider-runnable-track {
+  height: 0.34em;
+  border-top: 1px dashed currentColor;
+  border-bottom: 1px dashed rgba(121, 130, 99, 0.62);
+  background: rgba(5, 8, 12, 0.34);
+}
+
+.game-menu__brightness-slider::-webkit-slider-thumb {
+  width: 0.5em;
+  height: 1.05em;
+  margin-top: -0.42em;
+  appearance: none;
+  border: 1px solid currentColor;
+  border-radius: 0;
+  background: #d9dfb8;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.78),
+    0 0 7px rgba(190, 211, 145, 0.24);
+}
+
+.game-menu__brightness-slider::-moz-range-track {
+  height: 0.34em;
+  border-top: 1px dashed currentColor;
+  border-bottom: 1px dashed rgba(121, 130, 99, 0.62);
+  border-radius: 0;
+  background: rgba(5, 8, 12, 0.34);
+}
+
+.game-menu__brightness-slider::-moz-range-thumb {
+  width: 0.5em;
+  height: 1.05em;
+  border: 1px solid currentColor;
+  border-radius: 0;
+  background: #d9dfb8;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.78),
+    0 0 7px rgba(190, 211, 145, 0.24);
+}
+
+.game-menu__brightness-slider:hover,
+.game-menu__brightness-slider:focus-visible {
+  color: rgba(241, 248, 255, 0.96);
+}
+
 .game-menu__submenu-actions[data-screen="new-game"] {
   --game-menu-tone-bright: #dce4be;
   --game-menu-tone-regular: #c2cea3;
@@ -1082,6 +1232,7 @@ select {
   --game-menu-tone-regular: #bec89c;
   --game-menu-tone-soft: #a0aa80;
   --game-menu-tone-dim: #798263;
+  top: calc(100% - 4px - 2.72em);
 }
 
 .game-menu__submenu-actions[data-screen="quit"] {
@@ -1089,6 +1240,7 @@ select {
   --game-menu-tone-regular: #c1bf98;
   --game-menu-tone-soft: #a5a37f;
   --game-menu-tone-dim: #7f7d62;
+  top: calc(100% - 4px - 1.36em);
 }
 
 .game-menu__action:hover,

@@ -24,7 +24,25 @@ import {
   type Cinematic3dVisualTuning
 } from "./visualTuning";
 import { constrainChaseDistanceByWheelTarget, resolveWheelZoomStep } from "./cameraZoom";
-import { computeApparentBodyBloomSourceGain, computeCinematicBloomStrength } from "./solarBloom";
+import {
+  computeApparentBodyBloomSourceGain,
+  computeCinematicBloomRadius,
+  computeCinematicBloomScreenSpaceSourceEnergyScale,
+  computeCinematicBloomScreenSpaceSourceScale,
+  computeCinematicBloomStrength
+} from "./solarBloom";
+import { shouldRefreshCinematicBloomCache } from "./bloomCache";
+import {
+  advanceSolarOcclusionTransientState,
+  computeSolarDiscOcclusionCoverage,
+  computeSolarOcclusionDistanceVisibility,
+  createInitialSolarOcclusionTransientState,
+  type SolarOcclusionTransientState
+} from "./solarOcclusionFlare";
+import {
+  getAtmosphericScatteringProfile,
+  type AtmosphericScatteringProfile
+} from "./atmosphericScattering";
 import {
   alignMissileFlightProgressToImpactPresentation,
   createOrbitalTransitionSnapshot,
@@ -65,6 +83,7 @@ import {
   writeShipDriveWakeTubeGeometry,
   type ShipModelVariant
 } from "./shipModels";
+import { computeFusionIgnitionPresentationTiming } from "./fusionIgnition";
 import {
   cinematicDecorativePointLightSourceUserDataKey,
   cinematicDecorativePointLightTargetLayerUserDataKey,
@@ -94,6 +113,18 @@ import {
   type BurnTrajectoryDashAnimationState,
   type DisplayNodeRenderData
 } from "./trajectoryPreview";
+import {
+  animateConfirmedTrajectoryEffect,
+  animateTrajectoryPreviewEffect,
+  computeConfirmedFireArcPhase,
+  computeConfirmedSolutionRevealProgress,
+  createBurnPreviewEffect,
+  createFirePreviewEffect
+} from "./trajectoryPreviewEffects";
+import {
+  getShipDestructionBloomProfile,
+  getShipDestructionRetinalAfterimageFrame
+} from "./shipDestructionRetinalAfterimage";
 
 export type { ShipModelVariant } from "./shipModels";
 
@@ -128,6 +159,8 @@ export type CinematicInputGesture =
   | "wheel"
   | "wheel-zoom-out"
   | "keyboard-camera";
+
+export type CinematicTrajectoryReflectionMode = "on" | "hover" | "off";
 
 export type CinematicTutorialAttentionPulse = CinematicVisualPulse &
   Readonly<{
@@ -178,6 +211,7 @@ type BodyObject = Readonly<{
   group: THREE.Group;
   mesh: THREE.Mesh;
   cloudMesh: THREE.Mesh | null;
+  atmosphereMesh: THREE.Mesh | null;
   picker: THREE.Mesh;
   industrialLights: THREE.Group;
   shadowCone: THREE.Mesh;
@@ -189,6 +223,15 @@ type EclipseShadowPresentation = Readonly<{
   diskRadius: number;
   edgeFeather: number;
   strength: number;
+}>;
+
+type SolarOcclusionFlarePresentation = Readonly<{
+  sunCenter: Vec2;
+  sunRadius: number;
+  occluderCenter: Vec2;
+  occluderRadius: number;
+  coverage: number;
+  distanceVisibility: number;
 }>;
 
 type ShadowVolumePresentation = Readonly<{
@@ -316,6 +359,13 @@ type TrajectoryLabelPlacement = Readonly<{
   x: number;
   y: number;
   bounds: ScreenRect;
+}>;
+
+type TrajectoryLabelObject = Readonly<{
+  element: HTMLDivElement;
+  worldAnchor: THREE.Vector3;
+  screenOffset: Vec2;
+  size: TrajectoryLabelSize;
 }>;
 
 type TrajectoryLabelOffsetMemory = Readonly<{
@@ -568,6 +618,8 @@ type RenderableBurnPlan = (CinematicBurnPlan | PendingBurnOrder | ActiveBurnTran
 
 type RenderableFirePlan = CinematicFirePlan | PendingFireOrder | ActiveMissile;
 
+type FireTrajectoryTargetMode = "tracked-ship" | "orbit-center";
+
 type FireTrajectoryVisualWeight = Readonly<{
   opacityMultiplier: number;
   thicknessMultiplier: number;
@@ -578,6 +630,13 @@ type FireTrajectoryVisualWeight = Readonly<{
 }>;
 
 type BurnTrajectoryDetailMode = "full" | "simple";
+
+type TrajectoryPlaneReflectionOptions = Readonly<{
+  accentSpeed: number;
+  enabled: boolean;
+  elapsed: number;
+  showAnimatedAccent: boolean;
+}>;
 
 type InvalidActionBillboard = Readonly<{
   targetKey: string;
@@ -683,10 +742,16 @@ type MissileImpactPresentation = Readonly<{
   nodeId: string;
   factionId: FactionId;
   source: "missile-impact" | "contested-upkeep";
+  createsScreenRetinalAfterimage: boolean;
   startedAt: number;
   seed: number;
   anchorTurn?: number;
   planeSign?: -1 | 1;
+}>;
+
+type ShipDestructionRetinalAfterimage = Readonly<{
+  element: HTMLDivElement;
+  startedAt: number;
 }>;
 
 type MissileBodyFlashLight = Readonly<{
@@ -749,12 +814,26 @@ type CinematicPerformanceSectionKey =
   | "burnPresentation"
   | "transitMarkers"
   | "firePresentation"
+  | "firePending"
+  | "fireActive"
+  | "fireTargets"
+  | "fireTransient"
   | "readability"
   | "presentationOnly"
+  | "trajectoryAnimation"
+  | "bodyAnimation"
+  | "shipAnimation"
+  | "effectAnimation"
+  | "constructionAnimation"
+  | "tritiumAnimation"
+  | "workAnimation"
+  | "missileAnimation"
+  | "lightPools"
   | "solarDust"
   | "sceneRender"
   | "baseRender"
   | "worldBloom"
+  | "sunBloom"
   | "uiBloom"
   | "heatDistortion"
   | "labels";
@@ -813,6 +892,7 @@ export type CinematicPerformanceStats = Readonly<{
 
 type ActiveBurnVisualTiming = Readonly<{
   launchProgress: number;
+  ignitionRampDuration: number;
   arrivalProgress: number;
   arrivalAngle: number;
 }>;
@@ -945,11 +1025,9 @@ const smoothWheelZoomMaxNormalizedDelta = 150;
 const smoothWheelZoomResponseExponent = 0.86;
 const smoothWheelZoomSmallDeltaBoost = 2.05;
 const smoothWheelZoomSnapEpsilon = 0.025;
-const keyboardFastZoomDistanceRatePerSecond = 1.65;
-const keyboardSlowZoomDistanceRatePerSecond = 0.56;
-const keyboardFastOrbitCounterClockwiseRadiansPerSecond = 1.28;
-const keyboardSlowOrbitCounterClockwiseRadiansPerSecond = 0.42;
-const keyboardDronePanPixelsPerSecond = 82;
+const keyboardCinematicZoomDistanceRatePerSecond = 0.56;
+const keyboardCinematicOrbitRadiansPerSecond = 0.12;
+const keyboardCinematicPanPixelsPerSecond = 42;
 const trajectoryLabelCameraSettleMs = 150;
 // Drawing-buffer reallocations are substantially more expensive than ordinary presentation work.
 // Keep them outside the short settling tail of a camera gesture so an adaptive-mode change cannot
@@ -964,8 +1042,13 @@ const activeBurnMandatoryLaunchBlinkWindow = 0.22;
 const missileLaunchTransitionMinDurationMs = 2200;
 const missileLaunchDriftScreenPixels = 36;
 const activeMissileTrajectoryLeadScreenPixels = 12;
-const fireImpactTargetDotZoomOutScreenDiameterPixels = 5.8;
-const fireImpactTargetDotZoomInScreenDiameterPixels = 9.2;
+const futureFireImpactTickCenterRadius = 0.62;
+const futureFireImpactTickHalfLength = 0.24;
+const futureFireImpactTickOuterRadius =
+  futureFireImpactTickCenterRadius + futureFireImpactTickHalfLength;
+const futureFireImpactTickMinimumOuterRadiusPixels = 4.8;
+const futureFireImpactTickThicknessPixels = 1.35;
+const futureFireImpactLabelGapPixels = 5;
 const missileLaunchDriftEndProgress = 0.37;
 const missileLaunchIgnitionStartProgress = 0.31;
 const missileLaunchIgnitionPeakProgress = 0.38;
@@ -1022,10 +1105,11 @@ const rendererPixelRatioEpsilon = 0.01;
 // A half-resolution source buffer keeps the blurred silhouette temporally stable while the
 // camera moves. At 0.38, small distant planets visibly step between bloom texels.
 const cinematicBloomRenderScale = 0.4;
-const reducedCinematicBloomRenderScale = 0.2;
-const cinematicBloomOverlayGain = 1.15;
-const cinematicBloomCacheUpdateIntervalMs = 1000 / 30;
-const cinematicBloomCacheMaximumDeferralMs = cinematicBloomCacheUpdateIntervalMs * 2;
+const lowCinematicBloomStrengthScale = 0.28;
+const highCinematicBloomStrengthScale = 0.9;
+const cinematicBloomOverlayGain = 0.78;
+const highCinematicBloomCacheUpdateIntervalMs = 1000 / 30;
+const lowCinematicBloomCacheUpdateIntervalMs = 1000 / 15;
 const cinematicGeometryWarmupBatchSize = 4;
 const cinematicDecorativePointLightPoolSize = 4;
 const cinematicWorldRenderLayer = 0;
@@ -1043,6 +1127,10 @@ const cinematicPlanetBloomFalloffExponent = 1.25;
 // Keep close disks above the HDR extraction threshold. The cap is still far below the
 // zoomed-out source gain, so a focused planet cannot turn into a full-screen glare.
 const cinematicPlanetBloomMinimumSourceGain = 1.15;
+// A shadow is not visible in vacuum. Receiver-body eclipse shading remains active, but drawing
+// the empty volume itself creates large geometric wedges during fast turn/mandatory-launch
+// transitions and makes them look like exhaust or light emitted by the departing ship.
+const physicalShadowConeMeshesEnabled = false;
 const rendererLargeViewportPixels = 1_600_000;
 const rendererHugeViewportPixels = 3_300_000;
 const tutorialAttentionNodeColorNeutralMix = 0.34;
@@ -1140,6 +1228,7 @@ const tacticalPresentationTransitionReducedUpdateSeconds = 1 / 30;
 const tacticalPresentationTransitionMinimalUpdateSeconds = 1 / 24;
 const tacticalPresentationMinimumFrameGap = 2;
 const missileTransientPresentationUpdateSeconds = 1 / 30;
+const missileImpactPresentationUpdateSeconds = 1 / 60;
 const tacticalReadabilityFullUpdateSeconds = 1 / 30;
 const tacticalReadabilityReducedUpdateSeconds = 1 / 24;
 const tacticalReadabilityMinimalUpdateSeconds = 1 / 18;
@@ -1155,12 +1244,26 @@ const performanceSectionKeys = [
   "burnPresentation",
   "transitMarkers",
   "firePresentation",
+  "firePending",
+  "fireActive",
+  "fireTargets",
+  "fireTransient",
   "readability",
   "presentationOnly",
+  "trajectoryAnimation",
+  "bodyAnimation",
+  "shipAnimation",
+  "effectAnimation",
+  "constructionAnimation",
+  "tritiumAnimation",
+  "workAnimation",
+  "missileAnimation",
+  "lightPools",
   "solarDust",
   "sceneRender",
   "baseRender",
   "worldBloom",
+  "sunBloom",
   "uiBloom",
   "heatDistortion",
   "labels"
@@ -1263,12 +1366,10 @@ const presentationBeatGridSubdivisions = 4;
 const presentationBeatMaxNudgeRatio = 0.12;
 const presentationBeatMaxStartDelayMs = 220;
 const missileExplosionBeatWindowSeconds = 0.018;
-const activeBurnVisualLaunchWindow = 0.08;
 const activeBurnVisualArrivalWindow = 0.1;
 const activeBurnVisualMinimumTravelWindow = 0.58;
-const activeBurnIgnitionRampDuration = 0.12;
 const activeBurnArrivalTurnDuration = 0.14;
-const activeBurnWakeIgnitionFloor = 0.12;
+const activeBurnWakeIgnitionFloor = 0.015;
 const activeBurnDriveWakeFocusedDetailStart = 0.42;
 const activeBurnDriveWakeFocusedDetailEnd = 0.92;
 const arrivalChaseMinimumShipDetailProgress = 0.38;
@@ -1382,7 +1483,6 @@ const missileOffTargetOverviewMarkerScreenPixels = 4.8;
 const missileSolutionBrokenTrajectoryWithdrawalDurationSeconds = 0.56;
 const missileSolutionBrokenPresentationDurationSeconds =
   missileSolutionBrokenTrajectoryWithdrawalDurationSeconds;
-const missileCancellationBlinkSpeedMultiplier = 4.8;
 const missileOverviewBlinkFloor = 0.64;
 const turnOrderWithdrawalStartProgress = 0.035;
 const turnOrderWithdrawalEndProgress = 0.62;
@@ -1469,6 +1569,9 @@ const orbitingShipMinimumWorldSizeZoomOut = 0.6;
 const orbitingShipMinimumWorldSizeZoomIn = 2.72;
 const orbitingShipMinimumWorldSizeModelDetailStart = 0.18;
 const activeBurnMarkerMinimumWorldSize = 0.9;
+const shipStrategicMarkerOcclusionFadeStart = 0.48;
+const shipStrategicMarkerOcclusionFadeEnd = 0.94;
+const shipStrategicMarkerCoarseCullDetailThreshold = 0.72;
 const shipRadiatorPoseValues = [0, 0.5, 1] as const;
 const shipRadiatorAnimationInitialPoseIndex = 2;
 const shipEngineRotorRadiansPerSecond = 0.32;
@@ -1476,6 +1579,16 @@ const shipMetalSunGlintDetailFadeStart = 0.34;
 const shipMetalSunGlintDetailFadeEnd = 0.86;
 const activeBurnTrajectoryCoreScreenPixels = 3.4;
 const burnTrajectoryDashFlowSpeed = 10;
+const trajectoryPlaneReflectionVerticalScale = 0.46;
+const trajectoryPlaneReflectionMinimumDepth = 3;
+const trajectoryPlaneReflectionMaximumDepth = 18;
+const trajectoryPlaneReflectionDistanceDepthRatio = 0.024;
+const trajectoryPlaneReflectionCoreDepthMultiplier = 4;
+const trajectoryPlaneReflectionOpacityMultiplier = 0.28;
+const trajectoryPlaneReflectionWidthMultiplier = 2.15;
+const trajectoryPlaneReflectionGlintWidth = 0.052;
+const trajectoryPlaneReflectionScreenOffsetX = 0.0025;
+const trajectoryPlaneReflectionScreenOffsetY = -0.011;
 
 type ShipRadiatorPoseIndex = 0 | 1 | 2;
 type ShipRadiatorStepDirection = -1 | 1;
@@ -1817,6 +1930,11 @@ export class CinematicSolarSystemRenderer {
     stencilBuffer: false,
     type: THREE.HalfFloatType
   });
+  private readonly cinematicCompactSunBloomCacheTarget = new THREE.WebGLRenderTarget(1, 1, {
+    depthBuffer: false,
+    stencilBuffer: false,
+    type: THREE.HalfFloatType
+  });
   private readonly cinematicUiBloomCacheTarget = new THREE.WebGLRenderTarget(1, 1, {
     depthBuffer: false,
     stencilBuffer: false,
@@ -1826,9 +1944,18 @@ export class CinematicSolarSystemRenderer {
   private readonly cinematicBloomCacheCopy = new FullScreenQuad(
     this.cinematicBloomCacheCopyMaterial
   );
+  private readonly cinematicBloomScreenSpacePointPresentation = new Map<
+    THREE.PointsMaterial,
+    Readonly<{ opacity: number; size: number }>
+  >();
   private readonly cinematicHeatDistortionMaterial = createCinematicHeatDistortionMaterial();
   private readonly cinematicHeatDistortionQuad = new FullScreenQuad(
     this.cinematicHeatDistortionMaterial
+  );
+  private readonly cinematicSolarOcclusionFlareMaterial =
+    createCinematicSolarOcclusionFlareMaterial();
+  private readonly cinematicSolarOcclusionFlareQuad = new FullScreenQuad(
+    this.cinematicSolarOcclusionFlareMaterial
   );
   private readonly cinematicSunHeatDistortionTexture = createHeatDistortionFramebufferTexture();
   private readonly cinematicExhaustHeatDistortionTexture = createHeatDistortionFramebufferTexture();
@@ -1852,6 +1979,9 @@ export class CinematicSolarSystemRenderer {
     [];
   private readonly cinematicUiDecorativePointLightCandidates: CinematicDecorativePointLightCandidate[] =
     [];
+  private readonly cinematicBaseRenderScene = new THREE.Scene();
+  private readonly cinematicDecorativePointLightSources: THREE.PointLight[] = [];
+  private cinematicDecorativePointLightRegistryDirty = true;
   private viewportStarfield: THREE.Points | null = null;
   private readonly starLayers: StarfieldPointLayer[] = [];
   private readonly starAfterglowLayers: StarfieldAfterglowLayer[] = [];
@@ -1928,17 +2058,26 @@ export class CinematicSolarSystemRenderer {
   private readonly onInvalidAction: ((reason: string) => void) | undefined;
   private readonly burnTransferFieldGroup = new THREE.Group();
   private readonly burnPreviewGroup = new THREE.Group();
+  private readonly burnPreviewEffectGroup = new THREE.Group();
+  private readonly confirmedBurnEffectGroup = new THREE.Group();
   private readonly pendingBurnGroup = new THREE.Group();
   private readonly activeBurnGroup = new THREE.Group();
   private readonly activeBurnMarkerCache = new Map<string, THREE.Group>();
   private readonly burnTrajectoryPresentationCache = new Map<string, THREE.Group>();
   private readonly burnTrajectoryPresentationKeysInUse = new Set<string>();
   private readonly activeBurnResolvedTrajectories = new Map<string, ResolvedBurnTrajectory>();
+  private readonly activeMissileResolvedTrajectories = new Map<string, ResolvedFireTrajectory>();
   private readonly firePreviewGroup = new THREE.Group();
+  private readonly firePreviewEffectGroup = new THREE.Group();
+  private readonly confirmedFireEffectGroup = new THREE.Group();
+  private readonly confirmedFireSolutionStartedAt = new Map<string, number>();
   private readonly pendingFireGroup = new THREE.Group();
   private readonly activeMissileGroup = new THREE.Group();
   private readonly missileTransientGroup = new THREE.Group();
   private readonly activeMissileMarkerCache = new Map<string, THREE.Group>();
+  private readonly missileTransientTrajectoryCache = new Map<string, THREE.Group>();
+  private readonly missileTransientMarkerCache = new Map<string, THREE.Group>();
+  private readonly missileTransientCacheKeysInUse = new Set<string>();
   private readonly fireTrajectoryPresentationCache = new Map<string, THREE.Group>();
   private readonly fireTrajectoryPresentationKeysInUse = new Set<string>();
   private readonly resolvedFireTrajectoryPathCache = new Map<string, CachedFireTrajectoryPath>();
@@ -1954,8 +2093,6 @@ export class CinematicSolarSystemRenderer {
     THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
   >();
   private readonly orbitTimingDotKeysInUse = new Set<string>();
-  private readonly futureFireTargetMarkerCache = new Map<string, THREE.Group>();
-  private readonly futureFireTargetMarkerKeysInUse = new Set<string>();
   private readonly futureGhostCache = new Map<string, THREE.Object3D>();
   private readonly futureGhostKeysInUse = new Set<string>();
   private readonly tritiumWorkStreamsGroup = new THREE.Group();
@@ -1963,13 +2100,19 @@ export class CinematicSolarSystemRenderer {
   private readonly contestedThrusterJetsGroup = new THREE.Group();
   private readonly missileImpactGroup = new THREE.Group();
   private readonly missileWreckageGroup = new THREE.Group();
-  private readonly trajectoryLabels: HTMLDivElement[] = [];
+  private readonly trajectoryLabels: TrajectoryLabelObject[] = [];
   private readonly trajectoryLabelPool: HTMLDivElement[] = [];
   private readonly trajectoryLabelBounds: ScreenRect[] = [];
+  private readonly futureFireImpactLabelAvoidBounds: ScreenRect[] = [];
   private readonly trajectoryLabelOffsetMemory = new Map<string, TrajectoryLabelOffsetMemory>();
   private readonly selectedNodeMarkerElement = document.createElement("div");
   private readonly fireMarkerElement = document.createElement("div");
   private readonly invalidActionBillboardElement = document.createElement("div");
+  private readonly shipDestructionRetinalAfterimageLayerElement = document.createElement("div");
+  private readonly shipDestructionRetinalAfterimages = new Map<
+    string,
+    ShipDestructionRetinalAfterimage
+  >();
   private readonly missileImpactWhiteoutElement = document.createElement("div");
   private readonly activeBurnPickables = new Set<THREE.Object3D>();
   private readonly activeBurnTargetPositions = new Map<string, THREE.Vector3>();
@@ -2003,7 +2146,9 @@ export class CinematicSolarSystemRenderer {
   private readonly missileSolutionBrokenPresentations: MissileSolutionBrokenPresentation[] = [];
   private readonly missileVoidBurstPresentations: MissileVoidBurstPresentation[] = [];
   private readonly missileWreckagePresentations = new Map<string, MissileImpactPresentation>();
+  private readonly missileWreckageObjects = new Map<string, THREE.Group>();
   private readonly registeredTransitionImpactKeys = new Set<string>();
+  private missileImpactPresentationLastUpdatedAt = Number.NEGATIVE_INFINITY;
   private animationFrame = 0;
   private turnTransition: TurnTransition | null = null;
   private focusPanTransition: FocusPanTransition | null = null;
@@ -2060,8 +2205,7 @@ export class CinematicSolarSystemRenderer {
     panLeft: false,
     panRight: false,
     panUp: false,
-    panDown: false,
-    slowZoomOrbit: false
+    panDown: false
   };
   private keyboardCameraLastUpdatedAt = performance.now();
   private smoothWheelZoomTargetDistance: number | null = null;
@@ -2126,10 +2270,16 @@ export class CinematicSolarSystemRenderer {
   private currentRendererPixelRatio = 0;
   private cinematicUiBloomCacheValid = false;
   private cinematicUiBloomCacheSignature = "";
+  private cinematicUiBloomCacheCameraSignature = "";
   private cinematicUiBloomCacheLastUpdatedAt = Number.NEGATIVE_INFINITY;
   private cinematicWorldBloomCacheValid = false;
   private cinematicWorldBloomCacheSignature = "";
+  private cinematicWorldBloomCacheCameraSignature = "";
   private cinematicWorldBloomCacheLastUpdatedAt = Number.NEGATIVE_INFINITY;
+  private cinematicCompactSunBloomCacheValid = false;
+  private cinematicCompactSunBloomCacheSignature = "";
+  private cinematicCompactSunBloomCacheCameraSignature = "";
+  private cinematicCompactSunBloomCacheLastUpdatedAt = Number.NEGATIVE_INFINITY;
   private hasAnimatedUiBloomSource = false;
   private snapshotBodiesById = new Map<string, BodySnapshot>();
   private snapshotNodesByBodyId = new Map<string, NodeSnapshot>();
@@ -2147,6 +2297,7 @@ export class CinematicSolarSystemRenderer {
     string,
     DisplayNodeRenderData | null
   >();
+  private readonly tacticalDisplaySnapshotCache = new Map<string, SolarSystemSnapshot>();
   private tacticalDisplayCacheSnapshot: SolarSystemSnapshot | null = null;
   private tacticalDisplayCacheSignature = "";
   private readonly emptyBodiesById = new Map<string, BodySnapshot>();
@@ -2165,11 +2316,18 @@ export class CinematicSolarSystemRenderer {
   private fireTrajectoryCount = 0;
   private solarDustPattern: CanvasPattern | null = null;
   private solarHazeEnabled = defaultSolarHazeEnabled;
+  private solarOcclusionEnabled = true;
+  private atmosphericScatteringEnabled = true;
+  private burnPreviewEffectsEnabled = false;
+  private firePreviewEffectsEnabled = true;
   private compactSunBloomEnabled = true;
   private bloomEnabled = true;
   private uiBloomEnabled = true;
   private heatDistortionEnabled = true;
-  private bloomRenderScale = cinematicBloomRenderScale;
+  private trajectoryReflectionMode: CinematicTrajectoryReflectionMode = "hover";
+  private readonly bloomRenderScale = cinematicBloomRenderScale;
+  private lowBloomProfileEnabled = true;
+  private bloomStrengthScale = lowCinematicBloomStrengthScale;
   private solarDustLastRenderedAt = Number.NEGATIVE_INFINITY;
   private solarDustLastRenderWidth = 0;
   private solarDustLastRenderHeight = 0;
@@ -2177,10 +2335,11 @@ export class CinematicSolarSystemRenderer {
   private tacticalPresentationLastUpdatedRenderFrameSerial = -tacticalPresentationMinimumFrameGap;
   private tacticalPresentationLastSignature = "";
   private tacticalPresentationCameraMotionWasActive = false;
+  private tacticalPresentationDisplayScaleDirty = false;
   private didUpdateTacticalPresentationThisFrame = false;
   private missileTransientPresentationLastUpdatedAt = Number.NEGATIVE_INFINITY;
   private isBuildingTacticalPresentation = false;
-  private nodePresentationLastSnapshot: SolarSystemSnapshot | null = null;
+  private nodePresentationLastStateSignature = "";
   private nodePresentationLastSignature = "";
   private nodePresentationNodeIdsToSync: ReadonlySet<string> | null = null;
   private nodePresentationDynamicNodeIds: ReadonlySet<string> = new Set();
@@ -2194,6 +2353,10 @@ export class CinematicSolarSystemRenderer {
   private hasAppliedOpeningSystemCamera = false;
   private hasLoggedTurnZeroScaleAudit = false;
   private driveWakeCameraDazzleStrength = 0;
+  private solarOcclusionFlarePresentation: SolarOcclusionFlarePresentation | null = null;
+  private solarOcclusionTransientState: SolarOcclusionTransientState =
+    createInitialSolarOcclusionTransientState();
+  private solarOcclusionExposureStrength = 0;
   private appliedShipBloomSourceGain = 1;
   private readonly shipBloomMaterialColors: THREE.Color[] = [];
   private readonly shipBloomShaderOpacityUniforms: Array<{ value: unknown }> = [];
@@ -2247,6 +2410,8 @@ export class CinematicSolarSystemRenderer {
     this.selectedNodeMarkerElement.className = "cinematic-selected-node-marker is-hidden";
     this.fireMarkerElement.className = "cinematic-fire-marker is-hidden";
     this.invalidActionBillboardElement.className = "cinematic-invalid-action-billboard is-hidden";
+    this.shipDestructionRetinalAfterimageLayerElement.className =
+      "cinematic-ship-destruction-retinal-layer";
     this.missileImpactWhiteoutElement.className = "cinematic-impact-whiteout is-hidden";
     for (const side of ["left", "right"] as const) {
       const bracket = document.createElement("span");
@@ -2273,7 +2438,7 @@ export class CinematicSolarSystemRenderer {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = this.tuning.toneMappingExposure;
     this.renderer.setClearColor(0x07111a, 1);
-    this.cinematicBloomPass.radius = this.tuning.sunGlobalBloomRadius;
+    this.cinematicBloomPass.radius = this.getCinematicBloomRadius(this.tuning.sunGlobalBloomRadius);
     this.cinematicBloomPass.threshold = this.tuning.sunGlobalBloomThreshold;
     this.cinematicRenderPass.clearColor = new THREE.Color(0x000000);
     this.cinematicRenderPass.clearAlpha = 0;
@@ -2290,6 +2455,7 @@ export class CinematicSolarSystemRenderer {
       this.renderer.domElement,
       this.solarDustCanvas,
       this.labelLayer,
+      this.shipDestructionRetinalAfterimageLayerElement,
       this.missileImpactWhiteoutElement
     );
     this.configureScene();
@@ -2303,7 +2469,7 @@ export class CinematicSolarSystemRenderer {
     this.invalidateCinematicWorldBloomCache();
     this.invalidateCinematicUiBloomCache();
     this.renderer.toneMappingExposure = this.tuning.toneMappingExposure;
-    this.cinematicBloomPass.radius = this.tuning.sunGlobalBloomRadius;
+    this.cinematicBloomPass.radius = this.getCinematicBloomRadius(this.tuning.sunGlobalBloomRadius);
     this.cinematicBloomPass.threshold = this.tuning.sunGlobalBloomThreshold;
 
     if (this.snapshot !== null) {
@@ -2334,12 +2500,79 @@ export class CinematicSolarSystemRenderer {
     }
   }
 
+  setSolarOcclusionEnabled(enabled: boolean): void {
+    if (this.solarOcclusionEnabled === enabled) {
+      return;
+    }
+
+    this.solarOcclusionEnabled = enabled;
+
+    if (!enabled) {
+      this.solarOcclusionFlarePresentation = null;
+      this.solarOcclusionTransientState = createInitialSolarOcclusionTransientState();
+      this.solarOcclusionExposureStrength = 0;
+      this.renderer.toneMappingExposure = this.tuning.toneMappingExposure;
+    }
+  }
+
+  setAtmosphericScatteringEnabled(enabled: boolean): void {
+    if (this.atmosphericScatteringEnabled === enabled) {
+      return;
+    }
+
+    this.atmosphericScatteringEnabled = enabled;
+
+    for (const bodyObject of this.bodyObjects.values()) {
+      if (bodyObject.atmosphereMesh !== null) {
+        bodyObject.atmosphereMesh.visible = enabled;
+      }
+    }
+
+    this.invalidateCinematicWorldBloomCache();
+  }
+
+  setBurnPreviewEffectsEnabled(enabled: boolean): void {
+    if (this.burnPreviewEffectsEnabled === enabled) {
+      return;
+    }
+
+    this.burnPreviewEffectsEnabled = enabled;
+    this.burnPreviewEffectGroup.visible = enabled;
+    this.confirmedBurnEffectGroup.visible = enabled;
+    this.invalidateCinematicUiBloomCache();
+  }
+
+  setFirePreviewEffectsEnabled(enabled: boolean): void {
+    if (this.firePreviewEffectsEnabled === enabled) {
+      return;
+    }
+
+    this.firePreviewEffectsEnabled = enabled;
+    this.firePreviewEffectGroup.visible = enabled;
+    this.confirmedFireEffectGroup.visible = enabled;
+    this.invalidateCinematicUiBloomCache();
+  }
+
   setCompactSunBloomEnabled(enabled: boolean): void {
     this.compactSunBloomEnabled = enabled;
   }
 
   setHeatDistortionEnabled(enabled: boolean): void {
     this.heatDistortionEnabled = enabled;
+  }
+
+  setTrajectoryReflectionMode(mode: CinematicTrajectoryReflectionMode): void {
+    if (this.trajectoryReflectionMode === mode) {
+      return;
+    }
+
+    this.trajectoryReflectionMode = mode;
+    this.invalidateCinematicUiBloomCache();
+
+    if (this.snapshot !== null) {
+      this.syncScene(this.snapshot);
+      this.renderFrame();
+    }
   }
 
   setBloomEnabled(enabled: boolean): void {
@@ -2361,18 +2594,30 @@ export class CinematicSolarSystemRenderer {
     this.invalidateCinematicUiBloomCache();
   }
 
-  setReducedBloomResolutionEnabled(enabled: boolean): void {
-    const nextBloomRenderScale = enabled
-      ? reducedCinematicBloomRenderScale
-      : cinematicBloomRenderScale;
+  setLowBloomProfileEnabled(enabled: boolean): void {
+    const nextBloomStrengthScale = enabled
+      ? lowCinematicBloomStrengthScale
+      : highCinematicBloomStrengthScale;
 
-    if (this.bloomRenderScale === nextBloomRenderScale) {
+    if (
+      this.lowBloomProfileEnabled === enabled &&
+      this.bloomStrengthScale === nextBloomStrengthScale
+    ) {
       return;
     }
 
-    this.bloomRenderScale = nextBloomRenderScale;
-    this.cinematicComposer.setPixelRatio(this.bloomRenderScale);
-    this.resizeCinematicBloomCacheTargets();
+    this.lowBloomProfileEnabled = enabled;
+    this.bloomStrengthScale = nextBloomStrengthScale;
+    this.invalidateCinematicWorldBloomCache();
+    this.invalidateCinematicCompactSunBloomCache();
+    this.invalidateCinematicUiBloomCache();
+  }
+
+  private getCinematicBloomRadius(radius: number): number {
+    return computeCinematicBloomRadius({
+      radius,
+      intensityScale: 1
+    });
   }
 
   setCameraInputEnabled(enabled: boolean): void {
@@ -2435,9 +2680,11 @@ export class CinematicSolarSystemRenderer {
 
     const isTimelineReset =
       this.snapshot !== null && snapshot !== this.snapshot && snapshot.turn < this.snapshot.turn;
+    this.syncConfirmedFireSolutionStartTimes(previousSnapshot, snapshot, isTimelineReset);
 
     if (isTimelineReset) {
       this.arrivalOrbitHandoffs.clear();
+      this.clearShipDestructionRetinalAfterimages();
       this.hasAppliedOpeningSystemCamera = false;
       this.clearTutorialNodeToNodeCameraAssist();
     } else {
@@ -2463,6 +2710,40 @@ export class CinematicSolarSystemRenderer {
     this.renderFrame();
   }
 
+  private syncConfirmedFireSolutionStartTimes(
+    previousSnapshot: SolarSystemSnapshot | null,
+    snapshot: SolarSystemSnapshot,
+    isTimelineReset: boolean
+  ): void {
+    const previousPendingIds = new Set(
+      previousSnapshot?.pendingFireOrders.map((order) => order.id) ?? []
+    );
+    const currentPendingIds = new Set(snapshot.pendingFireOrders.map((order) => order.id));
+    const completedStartedAt =
+      this.presentationElapsed -
+      this.tuning.fireConfirmedSolutionRevealDurationSeconds -
+      this.tuning.fireConfirmedSolutionFadeDurationSeconds;
+
+    for (const order of snapshot.pendingFireOrders) {
+      if (previousSnapshot === null || isTimelineReset) {
+        this.confirmedFireSolutionStartedAt.set(order.id, completedStartedAt);
+        continue;
+      }
+
+      if (!previousPendingIds.has(order.id)) {
+        this.confirmedFireSolutionStartedAt.set(order.id, this.presentationElapsed);
+      } else if (!this.confirmedFireSolutionStartedAt.has(order.id)) {
+        this.confirmedFireSolutionStartedAt.set(order.id, completedStartedAt);
+      }
+    }
+
+    for (const orderId of this.confirmedFireSolutionStartedAt.keys()) {
+      if (!currentPendingIds.has(orderId)) {
+        this.confirmedFireSolutionStartedAt.delete(orderId);
+      }
+    }
+  }
+
   setShipModelVariant(variant: ShipModelVariant): void {
     if (this.shipModelVariant === variant) {
       return;
@@ -2470,6 +2751,7 @@ export class CinematicSolarSystemRenderer {
 
     this.clearCachedActiveBurnMarkers();
     this.shipModelVariant = variant;
+    this.cinematicShaderWarmupRequired = true;
 
     for (const nodeObject of this.nodeObjects.values()) {
       nodeObject.shipMarkers.userData["markerKey"] = "";
@@ -2687,6 +2969,8 @@ export class CinematicSolarSystemRenderer {
         starLayerCount: this.starLayers.length,
         starAfterglowLayerCount: this.starAfterglowLayers.length,
         solarHazeEnabled: this.solarHazeEnabled,
+        solarOcclusionEnabled: this.solarOcclusionEnabled,
+        atmosphericScatteringEnabled: this.atmosphericScatteringEnabled,
         heatDistortionEnabled: this.heatDistortionEnabled,
         solarDustParticleOpacityMultiplier
       },
@@ -3278,9 +3562,13 @@ export class CinematicSolarSystemRenderer {
     this.missileSolutionBrokenPresentations.length = 0;
     this.missileVoidBurstPresentations.length = 0;
     this.missileWreckagePresentations.clear();
+    this.missileWreckageObjects.clear();
     this.registeredTransitionImpactKeys.clear();
+    this.missileImpactPresentationLastUpdatedAt = Number.NEGATIVE_INFINITY;
+    this.clearCachedMissileTransientObjects();
     clearGroup(this.missileImpactGroup);
     clearGroup(this.missileWreckageGroup);
+    this.clearShipDestructionRetinalAfterimages();
     this.updateMissileImpactWhiteout(0);
   }
 
@@ -4737,6 +5025,7 @@ export class CinematicSolarSystemRenderer {
     this.solarDustCanvas.remove();
     this.renderer.domElement.remove();
     this.labelLayer.remove();
+    this.shipDestructionRetinalAfterimageLayerElement.remove();
     this.missileImpactWhiteoutElement.remove();
     this.disposeGpuFrameTimer();
     this.deepSpaceBackgroundTexture.dispose();
@@ -4745,11 +5034,14 @@ export class CinematicSolarSystemRenderer {
     this.cinematicBloomOverlay.dispose();
     this.cinematicBloomOverlayMaterial.dispose();
     this.cinematicWorldBloomCacheTarget.dispose();
+    this.cinematicCompactSunBloomCacheTarget.dispose();
     this.cinematicUiBloomCacheTarget.dispose();
     this.cinematicBloomCacheCopy.dispose();
     this.cinematicBloomCacheCopyMaterial.dispose();
     this.cinematicHeatDistortionQuad.dispose();
     this.cinematicHeatDistortionMaterial.dispose();
+    this.cinematicSolarOcclusionFlareQuad.dispose();
+    this.cinematicSolarOcclusionFlareMaterial.dispose();
     this.cinematicSunHeatDistortionTexture.dispose();
     this.cinematicExhaustHeatDistortionTexture.dispose();
     this.cinematicGeometryWarmupTarget.dispose();
@@ -4787,18 +5079,23 @@ export class CinematicSolarSystemRenderer {
     this.clearCachedBurnTrajectoryPresentations();
     disposeObject(this.burnTransferFieldGroup);
     disposeObject(this.burnPreviewGroup);
+    disposeObject(this.burnPreviewEffectGroup);
+    disposeObject(this.confirmedBurnEffectGroup);
     disposeObject(this.pendingBurnGroup);
     disposeObject(this.activeBurnGroup);
     this.activeBurnMarkerCache.clear();
     this.clearCachedFireTrajectoryPresentations();
     this.clearCachedActiveMissileMarkers();
     disposeObject(this.firePreviewGroup);
+    disposeObject(this.firePreviewEffectGroup);
+    disposeObject(this.confirmedFireEffectGroup);
+    this.confirmedFireSolutionStartedAt.clear();
     disposeObject(this.pendingFireGroup);
     disposeObject(this.activeMissileGroup);
+    this.clearCachedMissileTransientObjects();
     disposeObject(this.missileTransientGroup);
     this.clearCachedOrbitTimingSegments();
     this.clearCachedOrbitTimingDots();
-    this.clearCachedFutureFireTargetMarkers();
     this.clearCachedFutureGhosts();
     disposeObject(this.futureDestinationGroup);
     disposeObject(this.tritiumWorkStreamsGroup);
@@ -4845,9 +5142,13 @@ export class CinematicSolarSystemRenderer {
 
     this.burnTransferFieldGroup.name = "burn-transfer-field";
     this.burnPreviewGroup.name = "burn-preview";
+    this.burnPreviewEffectGroup.name = "burn-preview-effects";
+    this.confirmedBurnEffectGroup.name = "confirmed-burn-effects";
     this.pendingBurnGroup.name = "pending-burn-orders";
     this.activeBurnGroup.name = "active-burn-transits";
     this.firePreviewGroup.name = "fire-preview";
+    this.firePreviewEffectGroup.name = "fire-preview-effects";
+    this.confirmedFireEffectGroup.name = "confirmed-fire-effects";
     this.pendingFireGroup.name = "pending-fire-orders";
     this.activeMissileGroup.name = "active-missiles";
     this.missileTransientGroup.name = "missile-transient-effects";
@@ -4867,10 +5168,14 @@ export class CinematicSolarSystemRenderer {
       this.pendingBurnGroup,
       this.activeBurnGroup,
       this.burnPreviewGroup,
+      this.burnPreviewEffectGroup,
+      this.confirmedBurnEffectGroup,
       this.pendingFireGroup,
       this.activeMissileGroup,
       this.missileTransientGroup,
       this.firePreviewGroup,
+      this.firePreviewEffectGroup,
+      this.confirmedFireEffectGroup,
       this.futureDestinationGroup,
       this.tritiumWorkStreamsGroup,
       this.workEffectsGroup,
@@ -4930,12 +5235,19 @@ export class CinematicSolarSystemRenderer {
       const position = this.getDisplayBodyPosition(body);
       bodyObject.group.position.copy(position);
       bodyObject.group.scale.setScalar(this.getDisplayBodyRadius(body));
-      this.syncSunGlowPresentation(bodyObject, body);
+      // During a rendered transition frame, animatePresentationOnly() updates the same dynamic
+      // lighting and stellar uniforms a few lines later. Avoid evaluating every body's lighting
+      // twice while preserving immediate updates for out-of-frame setSnapshot() calls.
+      if (!this.isRenderingFrame) {
+        this.syncSunGlowPresentation(bodyObject, body);
+      }
       this.syncJupiterRingSystem(bodyObject, body);
       this.syncNeptuneRingSystem(bodyObject, body);
       this.syncSaturnRingSystem(bodyObject, body, bodiesById);
       this.syncUranusRingSystem(bodyObject, body);
-      this.syncSunlitPresentation(bodyObject, body, position, bodiesById);
+      if (!this.isRenderingFrame) {
+        this.syncSunlitPresentation(bodyObject, body, position, bodiesById);
+      }
 
       if (node === undefined) {
         this.ensureLabel(`body:${body.id}`, body.name.toUpperCase(), undefined, position);
@@ -4959,13 +5271,21 @@ export class CinematicSolarSystemRenderer {
     }
     this.syncOrbitRailBatch();
 
+    const shouldSyncNodePresentation = this.shouldSyncNodePresentationFrame(snapshot);
+
     for (const node of snapshot.nodes) {
       const nodeObject = this.ensureNodeObject(node);
       const position = this.getDisplayNodePosition(node);
       nodeObject.group.position.copy(position);
       nodeObject.group.visible = true;
       nodeObject.picker.userData["targetKey"] = `node:${node.id}`;
-      this.syncNodePresentation(nodeObject, node);
+      if (
+        shouldSyncNodePresentation &&
+        (this.nodePresentationNodeIdsToSync === null ||
+          this.nodePresentationNodeIdsToSync.has(node.id))
+      ) {
+        this.syncNodePresentation(nodeObject, node);
+      }
       this.ensureLabel(`node:${node.id}`, node.label, node, position);
     }
     this.syncNodeRingBatches();
@@ -4975,8 +5295,11 @@ export class CinematicSolarSystemRenderer {
   }
 
   private requestCinematicResourceWarmup(): void {
-    this.cinematicShaderWarmupRequired = true;
-    this.scheduleCinematicShaderWarmup();
+    // Active markers reuse shader families compiled during initial scene warmup. Recompiling the
+    // entire world/world-bloom/UI-bloom scene whenever a missile or transit marker first appeared
+    // produced the large once-per-turn hitch it was meant to prevent. New buffers can upload on
+    // their first ordinary submission; only the decorative-light registry is structurally stale.
+    this.cinematicDecorativePointLightRegistryDirty = true;
   }
 
   private scheduleCinematicShaderWarmup(): void {
@@ -5893,7 +6216,6 @@ export class CinematicSolarSystemRenderer {
       return;
     }
 
-    this.cinematicShaderWarmupRequired = true;
     nodeObject.shipMarkers.userData["markerKey"] = markerKey;
     clearGroup(nodeObject.shipMarkers);
 
@@ -7915,6 +8237,7 @@ export class CinematicSolarSystemRenderer {
       this.labels.get(`node:${node.id}`)?.worldPosition.copy(position);
     }
     this.syncNodeRingBatches();
+    this.tacticalPresentationDisplayScaleDirty = true;
   }
 
   private recenterTrackedFocusTarget(): void {
@@ -8698,6 +9021,7 @@ export class CinematicSolarSystemRenderer {
     bodiesById: ReadonlyMap<string, BodySnapshot>
   ): void {
     if (
+      !physicalShadowConeMeshesEnabled ||
       body.visualClass === "star" ||
       bodyRadius <= 0 ||
       (this.tuning.physicalShadowConeOpacity <= 0 &&
@@ -9184,6 +9508,9 @@ export class CinematicSolarSystemRenderer {
       setShaderUniformVector(bodyObject.cloudMesh.material, "sunPosition", this.sunPosition);
       setShaderUniformVector(bodyObject.cloudMesh.material, "bodyWorldPosition", position);
     }
+    if (bodyObject.atmosphereMesh !== null) {
+      setShaderUniformVector(bodyObject.atmosphereMesh.material, "sunPosition", this.sunPosition);
+    }
     const sunDazzleStrength = solarGlareAndDazzleEnabled
       ? this.computeSunDazzleStrength(body, position, bodiesById)
       : 0;
@@ -9428,6 +9755,17 @@ export class CinematicSolarSystemRenderer {
       group.add(cloudMesh);
     }
 
+    const atmosphereProfile = getAtmosphericScatteringProfile(body);
+    const atmosphereMesh =
+      atmosphereProfile === null
+        ? null
+        : createAtmosphericScatteringMesh(geometry, body, atmosphereProfile, this.tuning);
+
+    if (atmosphereMesh !== null) {
+      atmosphereMesh.visible = this.atmosphericScatteringEnabled;
+      group.add(atmosphereMesh);
+    }
+
     if (body.id === "jupiter") {
       group.add(createJupiterRingSystem(this.tuning));
     }
@@ -9486,6 +9824,7 @@ export class CinematicSolarSystemRenderer {
       group,
       mesh,
       cloudMesh,
+      atmosphereMesh,
       picker,
       industrialLights,
       shadowCone,
@@ -10074,7 +10413,6 @@ export class CinematicSolarSystemRenderer {
     this.keyboardCameraControls.zoomOut = false;
     this.keyboardCameraControls.orbitClockwise = false;
     this.keyboardCameraControls.orbitCounterClockwise = false;
-    this.keyboardCameraControls.slowZoomOrbit = false;
     this.clearKeyboardPanControls();
   };
 
@@ -10088,12 +10426,6 @@ export class CinematicSolarSystemRenderer {
 
     if (event.key === "Shift" && !isPressed) {
       this.clearKeyboardPanControls();
-      return;
-    }
-
-    if (event.key === "Control") {
-      this.keyboardCameraControls.slowZoomOrbit =
-        isPressed && this.isKeyboardCameraZoomOrbitActive();
       return;
     }
 
@@ -10115,25 +10447,18 @@ export class CinematicSolarSystemRenderer {
       if (!this.releaseKeyboardCameraArrowKey(event.key)) {
         return;
       }
-      if (!this.isKeyboardCameraZoomOrbitActive()) {
-        this.keyboardCameraControls.slowZoomOrbit = false;
-      }
     } else if (event.key === "ArrowUp") {
       this.keyboardCameraControls.zoomIn = !isPanKey;
       this.keyboardCameraControls.panUp = isPanKey;
-      this.keyboardCameraControls.slowZoomOrbit = event.ctrlKey && !isPanKey;
     } else if (event.key === "ArrowDown") {
       this.keyboardCameraControls.zoomOut = !isPanKey;
       this.keyboardCameraControls.panDown = isPanKey;
-      this.keyboardCameraControls.slowZoomOrbit = event.ctrlKey && !isPanKey;
     } else if (event.key === "ArrowLeft") {
       this.keyboardCameraControls.orbitClockwise = !isPanKey;
       this.keyboardCameraControls.panLeft = isPanKey;
-      this.keyboardCameraControls.slowZoomOrbit = event.ctrlKey && !isPanKey;
     } else if (event.key === "ArrowRight") {
       this.keyboardCameraControls.orbitCounterClockwise = !isPanKey;
       this.keyboardCameraControls.panRight = isPanKey;
-      this.keyboardCameraControls.slowZoomOrbit = event.ctrlKey && !isPanKey;
     } else {
       return;
     }
@@ -10972,6 +11297,10 @@ export class CinematicSolarSystemRenderer {
     this.turnTransition = null;
     this.snapshot = transition.to;
     this.visualTurn = transition.to.turn;
+    // The transition snapshot keeps `to.turn` for its whole lifetime, so the ordinary tactical
+    // signature does not change again on the final frame. Force one exact endpoint rebuild here;
+    // otherwise orbit-to-ghost links retain the previous frame's start and appear one turn late.
+    this.tacticalPresentationLastSignature = "";
     this.syncScene(transition.to);
     this.pruneArrivalOrbitHandoffs(transition.to);
 
@@ -11237,18 +11566,17 @@ export class CinematicSolarSystemRenderer {
     let didMoveCamera = false;
 
     if (zoomDirection !== 0) {
-      const minCameraDistance = this.getMinimumCameraDistance();
+      const minimumDistance = this.getMinimumCameraDistance();
       const zoomOutLimit = this.getZoomOutLimit();
-      const baseDistance = clamp(this.distance, minCameraDistance, zoomOutLimit);
-      const zoomRate = this.keyboardCameraControls.slowZoomOrbit
-        ? keyboardSlowZoomDistanceRatePerSecond
-        : keyboardFastZoomDistanceRatePerSecond;
-      const zoomFactor = Math.exp(zoomDirection * zoomRate * deltaSeconds);
-      const nextDistance = clamp(baseDistance * zoomFactor, minCameraDistance, zoomOutLimit);
+      const baseDistance = clamp(this.distance, minimumDistance, zoomOutLimit);
+      const zoomFactor = Math.exp(
+        zoomDirection * keyboardCinematicZoomDistanceRatePerSecond * deltaSeconds
+      );
+      const nextDistance = clamp(baseDistance * zoomFactor, minimumDistance, zoomOutLimit);
 
       if (Math.abs(nextDistance - this.distance) > zoomOutDistanceEpsilon) {
         this.distance = nextDistance;
-        this.refreshDisplayScale();
+        this.refreshDisplayScaleForWheelZoom();
         didMoveCamera = true;
       }
     }
@@ -11258,10 +11586,7 @@ export class CinematicSolarSystemRenderer {
       (this.keyboardCameraControls.orbitClockwise ? 1 : 0);
 
     if (orbitDirection !== 0) {
-      const orbitRate = this.keyboardCameraControls.slowZoomOrbit
-        ? keyboardSlowOrbitCounterClockwiseRadiansPerSecond
-        : keyboardFastOrbitCounterClockwiseRadiansPerSecond;
-      const yawDelta = -orbitDirection * orbitRate * deltaSeconds;
+      const yawDelta = -orbitDirection * keyboardCinematicOrbitRadiansPerSecond * deltaSeconds;
       this.yaw += yawDelta;
       this.offsetActiveCameraTransitionRotation(yawDelta, 0);
       didMoveCamera = true;
@@ -11276,7 +11601,9 @@ export class CinematicSolarSystemRenderer {
     if (panXDirection !== 0 || panYDirection !== 0) {
       const previousFocus = this.focus.clone();
       const diagonalScale = panXDirection !== 0 && panYDirection !== 0 ? Math.SQRT1_2 : 1;
-      const panPixels = keyboardDronePanPixelsPerSecond * deltaSeconds * diagonalScale;
+      // Screen-space speed produces a deliberately slow move while panByScreenDelta converts it
+      // to world units using the current camera distance, so the pan remains relative to zoom.
+      const panPixels = keyboardCinematicPanPixelsPerSecond * deltaSeconds * diagonalScale;
       this.panByScreenDelta({
         x: panXDirection * panPixels,
         y: panYDirection * panPixels
@@ -11301,15 +11628,6 @@ export class CinematicSolarSystemRenderer {
       this.keyboardCameraControls.panRight ||
       this.keyboardCameraControls.panUp ||
       this.keyboardCameraControls.panDown
-    );
-  }
-
-  private isKeyboardCameraZoomOrbitActive(): boolean {
-    return (
-      this.keyboardCameraControls.zoomIn ||
-      this.keyboardCameraControls.zoomOut ||
-      this.keyboardCameraControls.orbitClockwise ||
-      this.keyboardCameraControls.orbitCounterClockwise
     );
   }
 
@@ -12584,11 +12902,19 @@ export class CinematicSolarSystemRenderer {
       }
 
       this.registeredTransitionImpactKeys.add(id);
+      const destroysShip = transition.to.debugEvents.some((event) => {
+        return (
+          event.type === "SHIP_DESTROYED" &&
+          event.nodeId === missile.targetNodeId &&
+          event.factionId === missile.targetFactionId
+        );
+      });
       const presentation: MissileImpactPresentation = {
         id,
         nodeId: missile.targetNodeId,
         factionId: missile.targetFactionId,
         source: "missile-impact",
+        createsScreenRetinalAfterimage: destroysShip,
         startedAt: this.getMissileImpactPresentationElapsed(),
         seed: hashBodySeed(id)
       };
@@ -12721,6 +13047,7 @@ export class CinematicSolarSystemRenderer {
         nodeId: event.nodeId,
         factionId: event.factionId,
         source: "contested-upkeep",
+        createsScreenRetinalAfterimage: true,
         startedAt: this.getNextMainBeatPresentationElapsed(),
         seed: hashBodySeed(id),
         anchorTurn: transition.from.turn,
@@ -12982,8 +13309,40 @@ export class CinematicSolarSystemRenderer {
   }
 
   private animatePresentationOnly(elapsed: number): void {
+    const shouldMeasurePresentationStages = this.isPerformanceDiagnosticsEnabled();
+    let presentationStageStartedAt = shouldMeasurePresentationStages ? performance.now() : 0;
     this.animateStarfield(elapsed);
     this.animateBurnTrajectoryDashPhases(elapsed);
+    const previewEffectPixelRatio = this.renderer.getPixelRatio();
+    const hasAnimatedBurnPreviewEffect =
+      this.burnPreviewEffectsEnabled &&
+      animateTrajectoryPreviewEffect(this.burnPreviewEffectGroup, elapsed, previewEffectPixelRatio);
+    const hasAnimatedFirePreviewEffect =
+      this.firePreviewEffectsEnabled &&
+      animateTrajectoryPreviewEffect(this.firePreviewEffectGroup, elapsed, previewEffectPixelRatio);
+    const hasAnimatedConfirmedFireEffect =
+      this.firePreviewEffectsEnabled &&
+      animateConfirmedTrajectoryEffect(
+        this.confirmedFireEffectGroup,
+        elapsed,
+        previewEffectPixelRatio
+      );
+
+    if (
+      hasAnimatedBurnPreviewEffect ||
+      hasAnimatedFirePreviewEffect ||
+      hasAnimatedConfirmedFireEffect
+    ) {
+      this.hasAnimatedUiBloomSource = true;
+    }
+    if (shouldMeasurePresentationStages) {
+      this.recordPerformanceSection(
+        "trajectoryAnimation",
+        performance.now() - presentationStageStartedAt
+      );
+      presentationStageStartedAt = performance.now();
+    }
+
     const beatPulse = this.getPresentationBeatPulse();
     const beatElapsedSeconds =
       beatPulse === null
@@ -13128,29 +13487,90 @@ export class CinematicSolarSystemRenderer {
       }
     }
 
+    if (shouldMeasurePresentationStages) {
+      this.recordPerformanceSection(
+        "bodyAnimation",
+        performance.now() - presentationStageStartedAt
+      );
+      presentationStageStartedAt = performance.now();
+    }
     this.animateShipMarkers(this.getShipMarkerTimelineElapsed(elapsed));
+    if (shouldMeasurePresentationStages) {
+      this.recordPerformanceSection(
+        "shipAnimation",
+        performance.now() - presentationStageStartedAt
+      );
+      presentationStageStartedAt = performance.now();
+    }
+    const effectAnimationStartedAt = presentationStageStartedAt;
+    this.updateSolarOcclusionFlare(elapsed);
     this.updateDriveWakeCameraDazzle();
     this.updateContestedThrusterJets(elapsed);
+    if (shouldMeasurePresentationStages) {
+      presentationStageStartedAt = performance.now();
+    }
     this.animateConstructionCargo(elapsed);
+    if (shouldMeasurePresentationStages) {
+      this.recordPerformanceSection(
+        "constructionAnimation",
+        performance.now() - presentationStageStartedAt
+      );
+      presentationStageStartedAt = performance.now();
+    }
     this.updateTritiumWorkStreams(elapsed);
+    if (shouldMeasurePresentationStages) {
+      this.recordPerformanceSection(
+        "tritiumAnimation",
+        performance.now() - presentationStageStartedAt
+      );
+      presentationStageStartedAt = performance.now();
+    }
     this.updateWorkEffects(elapsed);
+    if (shouldMeasurePresentationStages) {
+      this.recordPerformanceSection(
+        "workAnimation",
+        performance.now() - presentationStageStartedAt
+      );
+      presentationStageStartedAt = performance.now();
+    }
     this.updateMissileImpactPresentation(elapsed);
+    if (shouldMeasurePresentationStages) {
+      this.recordPerformanceSection(
+        "missileAnimation",
+        performance.now() - presentationStageStartedAt
+      );
+      presentationStageStartedAt = performance.now();
+    }
     this.syncActiveBodyFlashUniforms(elapsed);
     this.enforceDisabledSceneObjectChannels();
+    if (shouldMeasurePresentationStages) {
+      this.recordPerformanceSection(
+        "effectAnimation",
+        performance.now() - effectAnimationStartedAt
+      );
+      presentationStageStartedAt = performance.now();
+    }
     this.syncCinematicDecorativePointLightPools();
+    if (shouldMeasurePresentationStages) {
+      this.recordPerformanceSection("lightPools", performance.now() - presentationStageStartedAt);
+    }
   }
 
   private syncCinematicDecorativePointLightPools(): void {
+    if (this.cinematicDecorativePointLightRegistryDirty) {
+      this.refreshCinematicDecorativePointLightRegistry();
+    }
+
     let worldCandidateCount = 0;
     let uiCandidateCount = 0;
 
-    this.scene.traverseVisible((object) => {
+    for (const object of this.cinematicDecorativePointLightSources) {
       if (
-        !(object instanceof THREE.PointLight) ||
-        object.userData[cinematicDecorativePointLightSourceUserDataKey] !== true ||
+        !this.isObjectAttachedToScene(object) ||
+        !isObjectTreeVisible(object) ||
         object.intensity <= 0.0001
       ) {
-        return;
+        continue;
       }
 
       const targetLayer =
@@ -13180,7 +13600,7 @@ export class CinematicSolarSystemRenderer {
       const influenceDistance = Math.max(1, object.distance);
       const cameraDistance = this.camera.position.distanceTo(candidate.position);
       candidate.score = object.intensity / (1 + (cameraDistance / influenceDistance) ** 2);
-    });
+    }
 
     this.cinematicWorldDecorativePointLightCandidates.length = worldCandidateCount;
     this.cinematicUiDecorativePointLightCandidates.length = uiCandidateCount;
@@ -13192,6 +13612,29 @@ export class CinematicSolarSystemRenderer {
       this.cinematicUiDecorativePointLights,
       this.cinematicUiDecorativePointLightCandidates
     );
+  }
+
+  private refreshCinematicDecorativePointLightRegistry(): void {
+    this.cinematicDecorativePointLightSources.length = 0;
+    this.scene.traverse((object) => {
+      if (
+        object instanceof THREE.PointLight &&
+        object.userData[cinematicDecorativePointLightSourceUserDataKey] === true
+      ) {
+        this.cinematicDecorativePointLightSources.push(object);
+      }
+    });
+    this.cinematicDecorativePointLightRegistryDirty = false;
+  }
+
+  private isObjectAttachedToScene(object: THREE.Object3D): boolean {
+    let root = object;
+
+    while (root.parent !== null) {
+      root = root.parent;
+    }
+
+    return root === this.scene;
   }
 
   private syncCinematicDecorativePointLightPool(
@@ -13278,6 +13721,12 @@ export class CinematicSolarSystemRenderer {
         "dashPhase",
         anchorStartDash ? 0 : animationState.phase
       );
+      const accentSpeed = getNumericUserData(trajectory, "trajectoryAccentSpeed");
+      setObjectShaderUniformNumber(
+        trajectory,
+        "trajectoryAccentPhase",
+        Number.isFinite(accentSpeed) ? (elapsed * accentSpeed) % 1 : 0
+      );
       hasAnimatedBurnTrajectory ||= !anchorStartDash;
     }
 
@@ -13325,12 +13774,119 @@ export class CinematicSolarSystemRenderer {
     }
   }
 
+  private updateSolarOcclusionFlare(elapsed: number): void {
+    if (
+      !this.solarOcclusionEnabled ||
+      !this.tuning.solarOcclusionEnabled ||
+      this.snapshot === null
+    ) {
+      this.solarOcclusionFlarePresentation = null;
+      this.solarOcclusionTransientState = createInitialSolarOcclusionTransientState();
+      this.solarOcclusionExposureStrength = 0;
+      return;
+    }
+
+    const presentation = this.computeSolarOcclusionFlarePresentation();
+    const visibleCoverage = (presentation?.coverage ?? 0) * (presentation?.distanceVisibility ?? 0);
+
+    this.solarOcclusionFlarePresentation = presentation;
+    this.solarOcclusionTransientState = advanceSolarOcclusionTransientState(
+      this.solarOcclusionTransientState,
+      {
+        elapsed,
+        coverage: visibleCoverage,
+        durationSeconds: this.tuning.solarOcclusionReemergenceDurationSeconds,
+        armCoverage: this.tuning.solarOcclusionReemergenceArmCoverage,
+        releaseCoverage: this.tuning.solarOcclusionReemergenceReleaseCoverage
+      }
+    );
+    this.solarOcclusionExposureStrength = visibleCoverage;
+  }
+
+  private computeSolarOcclusionFlarePresentation(): SolarOcclusionFlarePresentation | null {
+    if (this.snapshot === null) {
+      return null;
+    }
+
+    const sunBody = this.snapshot.bodies.find((body) => body.visualClass === "star");
+    const sunProjection = this.getSolarScreenProjection();
+
+    if (sunBody === undefined || sunProjection === null) {
+      return null;
+    }
+
+    const width = Math.max(1, this.rendererCssWidth);
+    const height = Math.max(1, this.rendererCssHeight);
+    const projectionScale = height / (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2));
+    const sunForwardDistance = getCameraForwardDistance(this.camera, this.sunPosition);
+    const distanceVisibility = computeSolarOcclusionDistanceVisibility(
+      this.distance,
+      this.tuning.solarOcclusionZoomFadeStart,
+      this.tuning.solarOcclusionZoomFadeEnd
+    );
+
+    if (distanceVisibility <= 0.001) {
+      return null;
+    }
+
+    let strongestPresentation: SolarOcclusionFlarePresentation | null = null;
+
+    for (const body of this.snapshot.bodies) {
+      if (body.visualClass === "star") {
+        continue;
+      }
+
+      const position = this.getDisplayBodyPosition(body);
+      const bodyForwardDistance = getCameraForwardDistance(this.camera, position);
+
+      if (bodyForwardDistance >= sunForwardDistance) {
+        continue;
+      }
+
+      const screen = projectWorldPointToExtendedScreen(position, this.camera, width, height);
+
+      if (screen === null) {
+        continue;
+      }
+
+      const radius = Math.max(
+        this.tuning.solarOcclusionMinBodyRadius,
+        (this.getDisplayBodyRadius(body) / bodyForwardDistance) *
+          projectionScale *
+          this.tuning.solarOcclusionBodyRadiusMultiplier
+      );
+      const coverage = computeSolarDiscOcclusionCoverage(sunProjection, { ...screen, radius });
+
+      if (coverage <= 0.001 || coverage <= (strongestPresentation?.coverage ?? 0)) {
+        continue;
+      }
+
+      strongestPresentation = {
+        sunCenter: { x: sunProjection.x, y: sunProjection.y },
+        sunRadius: sunProjection.radius,
+        occluderCenter: screen,
+        occluderRadius: radius,
+        coverage,
+        distanceVisibility
+      };
+    }
+
+    return strongestPresentation;
+  }
+
   private updateDriveWakeCameraDazzle(): void {
     const width = this.rendererCssWidth;
     const height = this.rendererCssHeight;
+    const solarExposureMultiplier =
+      1 -
+      clamp(
+        this.tuning.solarOcclusionExposureCompression * this.solarOcclusionExposureStrength,
+        0,
+        0.7
+      );
 
     this.driveWakeCameraDazzleStrength = 0;
-    this.renderer.toneMappingExposure = this.tuning.toneMappingExposure;
+    this.renderer.toneMappingExposure = this.tuning.toneMappingExposure * solarExposureMultiplier;
 
     if (width <= 1 || height <= 1 || this.tuning.shipDriveWakeCameraDazzleIntensity <= 0) {
       return;
@@ -13480,7 +14036,84 @@ export class CinematicSolarSystemRenderer {
     this.driveWakeCameraDazzleStrength = strongestDazzle;
     this.renderer.toneMappingExposure =
       this.tuning.toneMappingExposure *
+      solarExposureMultiplier *
       (1 + this.tuning.shipDriveWakeCameraDazzleExposure * strongestDazzle);
+  }
+
+  private renderSolarOcclusionFlare(): void {
+    const presentation = this.solarOcclusionFlarePresentation;
+    const reemergenceStrength = this.solarOcclusionTransientState.flareStrength;
+    const coronaStrength =
+      (presentation?.coverage ?? 0) *
+      (presentation?.distanceVisibility ?? 0) *
+      this.tuning.solarOcclusionOpacity *
+      this.tuning.solarOcclusionCoronaIntensity;
+
+    if (coronaStrength <= 0.001 && reemergenceStrength <= 0.001) {
+      return;
+    }
+
+    const width = Math.max(1, this.rendererCssWidth);
+    const height = Math.max(1, this.rendererCssHeight);
+    const sunProjection = presentation?.sunCenter ?? this.getSolarScreenProjection();
+    const projectedSunRadius =
+      presentation?.sunRadius ?? this.getSolarScreenProjection()?.radius ?? 1;
+
+    if (sunProjection === null) {
+      return;
+    }
+
+    const distanceVisibility =
+      presentation?.distanceVisibility ??
+      computeSolarOcclusionDistanceVisibility(
+        this.distance,
+        this.tuning.solarOcclusionZoomFadeStart,
+        this.tuning.solarOcclusionZoomFadeEnd
+      );
+    const flareStrength =
+      reemergenceStrength *
+      distanceVisibility *
+      this.tuning.solarOcclusionOpacity *
+      this.tuning.solarOcclusionReemergenceIntensity;
+    const occluderCenter = presentation?.occluderCenter ?? sunProjection;
+    const occluderRadius = presentation?.occluderRadius ?? projectedSunRadius;
+    const uniforms = this.cinematicSolarOcclusionFlareMaterial.uniforms;
+
+    (uniforms["viewportSize"]!.value as THREE.Vector2).set(width, height);
+    (uniforms["sunCenter"]!.value as THREE.Vector2).set(sunProjection.x, height - sunProjection.y);
+    (uniforms["occluderCenter"]!.value as THREE.Vector2).set(
+      occluderCenter.x,
+      height - occluderCenter.y
+    );
+    uniforms["sunRadius"]!.value = Math.max(1, projectedSunRadius);
+    uniforms["occluderRadius"]!.value = Math.max(1, occluderRadius);
+    uniforms["coronaStrength"]!.value = coronaStrength;
+    uniforms["reemergenceStrength"]!.value = flareStrength;
+    uniforms["ringWidth"]!.value = clamp(
+      projectedSunRadius * (0.025 + this.tuning.solarOcclusionFade * 0.018),
+      1.1,
+      4.5
+    );
+    uniforms["flareLength"]!.value = clamp(
+      projectedSunRadius * this.tuning.solarOcclusionLength,
+      96,
+      width * 0.72
+    );
+    uniforms["flareWidth"]!.value = Math.max(
+      1.25,
+      projectedSunRadius * this.tuning.solarOcclusionWidth * 0.11
+    );
+    uniforms["flareFade"]!.value = clamp(this.tuning.solarOcclusionFade, 0.1, 2);
+
+    const previousAutoClear = this.renderer.autoClear;
+
+    try {
+      this.renderer.autoClear = false;
+      this.renderer.setRenderTarget(null);
+      this.cinematicSolarOcclusionFlareQuad.render(this.renderer);
+    } finally {
+      this.renderer.autoClear = previousAutoClear;
+    }
   }
 
   private renderCinematicHeatDistortion(): void {
@@ -13642,24 +14275,27 @@ export class CinematicSolarSystemRenderer {
     // a separate HDR target and composited additively afterwards, so post-processing never
     // re-tonemaps the background, neutral rails, or UI-coloured scene elements.
     this.renderer.info.reset();
+    this.syncCinematicBaseRenderScene();
     if (this.isPerformanceDiagnosticsEnabled()) {
       this.measurePerformanceSection("baseRender", () =>
-        this.renderer.render(this.scene, this.camera)
+        this.renderer.render(this.cinematicBaseRenderScene, this.camera)
       );
     } else {
-      this.renderer.render(this.scene, this.camera);
+      this.renderer.render(this.cinematicBaseRenderScene, this.camera);
     }
 
-    // Both bloom passes render the scene again. The soft UI bloom mask carries far less temporal
-    // detail than its sharp base geometry, so cap only that mask refresh at 30 Hz and composite
-    // the cached full-resolution texture between updates. Trajectory cores, markers and motion
-    // still render on every frame; this removes redundant selective-scene submissions rather than
-    // reducing geometry, resolution or the bloom effect itself.
+    // Bloom profiles share one stable extraction resolution so small HDR sources never collapse
+    // into oversized texels. LOW earns back GPU time through a fainter 15 Hz cached glow; HIGH
+    // keeps the restrained full strength and refreshes at 30 Hz. Sharp scene geometry still
+    // renders at presentation cadence in both profiles.
     const performanceMode = this.getEffectivePerformanceMode();
-    const worldBloomStrength = computeCinematicBloomStrength({
-      globalIntensity: this.bloomEnabled ? this.tuning.sunGlobalBloomIntensity : 0
-    });
-    const uiBloomStrength = this.uiBloomEnabled ? Math.max(0, this.tuning.uiBloomIntensity) : 0;
+    const worldBloomStrength =
+      computeCinematicBloomStrength({
+        globalIntensity: this.bloomEnabled ? this.tuning.sunGlobalBloomIntensity : 0
+      }) * this.bloomStrengthScale;
+    const uiBloomStrength =
+      (this.uiBloomEnabled ? Math.max(0, this.tuning.uiBloomIntensity) : 0) *
+      this.bloomStrengthScale;
     const activeWorldBloomStrength = performanceMode === "full" ? worldBloomStrength : 0;
     const activeUiBloomStrength =
       this.bloomEnabled && performanceMode !== "minimal" ? uiBloomStrength : 0;
@@ -13675,36 +14311,50 @@ export class CinematicSolarSystemRenderer {
 
     if (activeWorldBloomStrength <= 0.0001 && activeUiBloomStrength <= 0.0001) {
       this.renderCinematicHeatDistortion();
+      this.renderSolarOcclusionFlare();
       return;
     }
 
-    this.syncBloomProxyScenes(activeWorldBloomStrength > 0.0001, activeUiBloomStrength > 0.0001);
     const previousCameraLayerMask = this.camera.layers.mask;
     const previousBackground = this.scene.background;
     const bloomFrameNow = performance.now();
+    const bloomCameraSignature = this.getCinematicBloomCameraSignature();
+    const bloomCacheUpdateIntervalMs = this.lowBloomProfileEnabled
+      ? lowCinematicBloomCacheUpdateIntervalMs
+      : highCinematicBloomCacheUpdateIntervalMs;
+    const bloomCacheMaximumDeferralMs = bloomCacheUpdateIntervalMs * 2;
     let shipBloomSourceGainApplied = false;
     let didRefreshWorldBloomThisFrame = false;
+    let didRefreshCompactSunBloomThisFrame = false;
 
     try {
       if (activeWorldBloomStrength > 0.0001) {
         this.camera.layers.set(cinematicWorldRenderLayer);
         this.cinematicBloomPass.enabled = true;
         this.cinematicBloomPass.strength = activeWorldBloomStrength;
-        this.cinematicBloomPass.radius = this.tuning.sunGlobalBloomRadius;
+        this.cinematicBloomPass.radius = this.getCinematicBloomRadius(
+          this.tuning.sunGlobalBloomRadius
+        );
         this.cinematicBloomPass.threshold = this.tuning.sunGlobalBloomThreshold;
         const worldBloomCacheSignature = this.getCinematicWorldBloomCacheSignature();
         const worldBloomCacheAge = bloomFrameNow - this.cinematicWorldBloomCacheLastUpdatedAt;
-        const canReuseWorldBloomCache =
-          this.cinematicWorldBloomCacheValid &&
-          (worldBloomCacheAge < cinematicBloomCacheUpdateIntervalMs ||
-            (worldBloomCacheAge < cinematicBloomCacheMaximumDeferralMs &&
-              this.didUpdateTacticalPresentationThisFrame));
-        const shouldRefreshWorldBloomCache =
-          !this.cinematicWorldBloomCacheValid ||
-          (!canReuseWorldBloomCache &&
-            this.cinematicWorldBloomCacheSignature !== worldBloomCacheSignature);
+        const shouldRefreshWorldBloomCache = shouldRefreshCinematicBloomCache({
+          cacheValid: this.cinematicWorldBloomCacheValid,
+          cachedCameraSignature: this.cinematicWorldBloomCacheCameraSignature,
+          currentCameraSignature: bloomCameraSignature,
+          cachedContentSignature: this.cinematicWorldBloomCacheSignature,
+          currentContentSignature: worldBloomCacheSignature,
+          cacheAgeMs: worldBloomCacheAge,
+          updateIntervalMs: bloomCacheUpdateIntervalMs,
+          maximumDeferralMs: bloomCacheMaximumDeferralMs,
+          tacticalPresentationUpdatedThisFrame: this.didUpdateTacticalPresentationThisFrame
+        });
         const renderWorldBloom = (): void => {
           if (shouldRefreshWorldBloomCache) {
+            // The proxy list is only consumed while refreshing the cached mask. Rebuilding it on
+            // every presented frame traversed the entire scene even when the existing 30 Hz bloom
+            // texture was immediately reused.
+            this.syncBloomProxyScenes(true, false);
             this.setPlanetAndNodeBloomSourceGain(
               this.tuning.planetBloomSourceGain,
               1,
@@ -13717,14 +14367,17 @@ export class CinematicSolarSystemRenderer {
             this.cinematicRenderPass.scene = this.worldBloomScene;
 
             try {
+              this.applyCinematicBloomScreenSpaceSourceScale(this.worldBloomScene);
               this.cinematicComposer.render();
               this.cinematicWorldBloomCacheValid = this.cacheCurrentCinematicBloomTexture(
                 this.cinematicWorldBloomCacheTarget
               );
               this.cinematicWorldBloomCacheSignature = worldBloomCacheSignature;
+              this.cinematicWorldBloomCacheCameraSignature = bloomCameraSignature;
               this.cinematicWorldBloomCacheLastUpdatedAt = performance.now();
               didRefreshWorldBloomThisFrame = true;
             } finally {
+              this.restoreCinematicBloomScreenSpaceSourceScale();
               this.cinematicRenderPass.scene = previousBloomScene;
               this.restoreShipBloomSourceGain();
               shipBloomSourceGainApplied = false;
@@ -13758,6 +14411,21 @@ export class CinematicSolarSystemRenderer {
         activeWorldBloomStrength > 0.0001 &&
         this.compactSunBloomProxy !== null
       ) {
+        const compactSunBloomCacheSignature = `${this.snapshot?.turn ?? -1}|${this.renderFrameSerial}`;
+        const compactSunBloomCacheAge =
+          bloomFrameNow - this.cinematicCompactSunBloomCacheLastUpdatedAt;
+        const shouldRefreshCompactSunBloomCache = shouldRefreshCinematicBloomCache({
+          cacheValid: this.cinematicCompactSunBloomCacheValid,
+          cachedCameraSignature: this.cinematicCompactSunBloomCacheCameraSignature,
+          currentCameraSignature: bloomCameraSignature,
+          cachedContentSignature: this.cinematicCompactSunBloomCacheSignature,
+          currentContentSignature: compactSunBloomCacheSignature,
+          cacheAgeMs: compactSunBloomCacheAge,
+          updateIntervalMs: bloomCacheUpdateIntervalMs,
+          maximumDeferralMs: bloomCacheMaximumDeferralMs,
+          peerPassRefreshedThisFrame: didRefreshWorldBloomThisFrame,
+          tacticalPresentationUpdatedThisFrame: false
+        });
         const renderCompactSunBloom = (): void => {
           const sunBody = this.snapshot?.bodies.find((body) => body.visualClass === "star");
           const sunMesh =
@@ -13767,56 +14435,90 @@ export class CinematicSolarSystemRenderer {
             return;
           }
 
-          // The compact pass only ever renders the stellar surface. Rendering that one mesh from
-          // a dedicated scene preserves the exact shared geometry/material while avoiding a third
-          // traversal of every tactical marker, ship and cached effect in the main scene.
-          this.compactSunBloomProxy.matrix.copy(sunMesh.matrixWorld);
-          this.compactSunBloomProxy.matrixWorld.copy(sunMesh.matrixWorld);
-          this.camera.layers.set(cinematicSunCompactBloomRenderLayer);
-          this.scene.background = null;
-          this.cinematicBloomPass.enabled = true;
-          this.cinematicBloomPass.strength = activeWorldBloomStrength;
-          this.cinematicBloomPass.radius = cinematicSunCompactBloomRadius;
-          this.cinematicBloomPass.threshold = this.tuning.sunGlobalBloomThreshold;
-          this.setPlanetAndNodeBloomSourceGain(0, 0, true);
-          const previousBloomScene = this.cinematicRenderPass.scene;
-          this.cinematicRenderPass.scene = this.compactSunBloomScene;
+          if (shouldRefreshCompactSunBloomCache) {
+            // The compact pass only ever renders the stellar surface. Cache that full-resolution
+            // result too, then stagger it against the world/UI masks so no frame submits multiple
+            // blur chains while the sharp stellar surface continues animating at render cadence.
+            this.compactSunBloomProxy.matrix.copy(sunMesh.matrixWorld);
+            this.compactSunBloomProxy.matrixWorld.copy(sunMesh.matrixWorld);
+            this.camera.layers.set(cinematicSunCompactBloomRenderLayer);
+            this.scene.background = null;
+            this.cinematicBloomPass.enabled = true;
+            this.cinematicBloomPass.strength = activeWorldBloomStrength;
+            this.cinematicBloomPass.radius = this.getCinematicBloomRadius(
+              cinematicSunCompactBloomRadius
+            );
+            this.cinematicBloomPass.threshold = this.tuning.sunGlobalBloomThreshold;
+            this.setPlanetAndNodeBloomSourceGain(0, 0, true);
+            const previousBloomScene = this.cinematicRenderPass.scene;
+            this.cinematicRenderPass.scene = this.compactSunBloomScene;
 
-          try {
-            this.cinematicComposer.render();
-            this.compositeCurrentCinematicBloomTexture();
-          } finally {
-            this.cinematicRenderPass.scene = previousBloomScene;
-            this.setPlanetAndNodeBloomSourceGain(1, 1, false);
+            try {
+              this.cinematicComposer.render();
+              this.cinematicCompactSunBloomCacheValid = this.cacheCurrentCinematicBloomTexture(
+                this.cinematicCompactSunBloomCacheTarget
+              );
+              this.cinematicCompactSunBloomCacheSignature = compactSunBloomCacheSignature;
+              this.cinematicCompactSunBloomCacheCameraSignature = bloomCameraSignature;
+              this.cinematicCompactSunBloomCacheLastUpdatedAt = performance.now();
+              didRefreshCompactSunBloomThisFrame = true;
+            } finally {
+              this.cinematicRenderPass.scene = previousBloomScene;
+              this.setPlanetAndNodeBloomSourceGain(1, 1, false);
+            }
+          }
+
+          if (this.cinematicCompactSunBloomCacheValid) {
+            const solarOccluder = this.solarOcclusionFlarePresentation;
+            this.compositeCinematicBloomTexture(
+              this.cinematicCompactSunBloomCacheTarget.texture,
+              solarOccluder === null
+                ? undefined
+                : {
+                    center: solarOccluder.occluderCenter,
+                    radius: solarOccluder.occluderRadius
+                  }
+            );
           }
         };
 
         if (this.isPerformanceDiagnosticsEnabled()) {
-          this.measurePerformanceSection("worldBloom", renderCompactSunBloom);
+          this.measurePerformanceSection("sunBloom", renderCompactSunBloom);
         } else {
           renderCompactSunBloom();
         }
+      } else {
+        this.invalidateCinematicCompactSunBloomCache();
       }
 
       if (activeUiBloomStrength > 0.0001) {
         const uiBloomCacheSignature = this.getCinematicUiBloomCacheSignature();
         const uiBloomCacheAge = bloomFrameNow - this.cinematicUiBloomCacheLastUpdatedAt;
-        const canReuseUiBloomCache =
-          this.cinematicUiBloomCacheValid &&
-          (uiBloomCacheAge < cinematicBloomCacheUpdateIntervalMs ||
-            didRefreshWorldBloomThisFrame ||
-            (uiBloomCacheAge < cinematicBloomCacheMaximumDeferralMs &&
-              this.didUpdateTacticalPresentationThisFrame));
-        const shouldRefreshUiBloomCache =
-          !this.cinematicUiBloomCacheValid ||
-          (!canReuseUiBloomCache && this.cinematicUiBloomCacheSignature !== uiBloomCacheSignature);
+        const shouldRefreshUiBloomCache = shouldRefreshCinematicBloomCache({
+          cacheValid: this.cinematicUiBloomCacheValid,
+          cachedCameraSignature: this.cinematicUiBloomCacheCameraSignature,
+          currentCameraSignature: bloomCameraSignature,
+          cachedContentSignature: this.cinematicUiBloomCacheSignature,
+          currentContentSignature: uiBloomCacheSignature,
+          cacheAgeMs: uiBloomCacheAge,
+          updateIntervalMs: bloomCacheUpdateIntervalMs,
+          maximumDeferralMs: bloomCacheMaximumDeferralMs,
+          peerPassRefreshedThisFrame:
+            didRefreshWorldBloomThisFrame || didRefreshCompactSunBloomThisFrame,
+          tacticalPresentationUpdatedThisFrame: this.didUpdateTacticalPresentationThisFrame
+        });
         const renderUiBloom = (): void => {
           if (shouldRefreshUiBloomCache) {
+            // As above, keep the selective-scene traversal on actual cache-refresh frames. The
+            // sharp base UI still renders at presentation cadence; only its soft glow is cached.
+            this.syncBloomProxyScenes(false, true);
             this.camera.layers.set(cinematicUiBloomRenderLayer);
             this.scene.background = null;
             this.cinematicBloomPass.enabled = true;
             this.cinematicBloomPass.strength = activeUiBloomStrength;
-            this.cinematicBloomPass.radius = this.tuning.uiBloomRadius;
+            this.cinematicBloomPass.radius = this.getCinematicBloomRadius(
+              this.tuning.uiBloomRadius
+            );
             this.cinematicBloomPass.threshold = this.tuning.uiBloomThreshold;
             // Bodies share the UI layer only as black depth occluders. Their zero source gain keeps
             // planetary light out of the tight UI pass while preserving correct foreground masking.
@@ -13825,11 +14527,14 @@ export class CinematicSolarSystemRenderer {
             this.cinematicRenderPass.scene = this.uiBloomScene;
 
             try {
+              this.applyCinematicBloomScreenSpaceSourceScale(this.uiBloomScene);
               this.cinematicComposer.render();
               this.cinematicUiBloomCacheValid = this.cacheCurrentCinematicBloomTexture();
               this.cinematicUiBloomCacheSignature = uiBloomCacheSignature;
+              this.cinematicUiBloomCacheCameraSignature = bloomCameraSignature;
               this.cinematicUiBloomCacheLastUpdatedAt = performance.now();
             } finally {
+              this.restoreCinematicBloomScreenSpaceSourceScale();
               this.cinematicRenderPass.scene = previousBloomScene;
             }
           }
@@ -13848,6 +14553,7 @@ export class CinematicSolarSystemRenderer {
         this.invalidateCinematicUiBloomCache();
       }
     } finally {
+      this.restoreCinematicBloomScreenSpaceSourceScale();
       if (shipBloomSourceGainApplied) {
         this.restoreShipBloomSourceGain();
       }
@@ -13856,10 +14562,52 @@ export class CinematicSolarSystemRenderer {
       this.scene.background = previousBackground;
       this.cinematicBloomPass.enabled = activeWorldBloomStrength > 0.0001;
       this.cinematicBloomPass.strength = activeWorldBloomStrength;
-      this.cinematicBloomPass.radius = this.tuning.sunGlobalBloomRadius;
+      this.cinematicBloomPass.radius = this.getCinematicBloomRadius(
+        this.tuning.sunGlobalBloomRadius
+      );
       this.cinematicBloomPass.threshold = this.tuning.sunGlobalBloomThreshold;
     }
     this.renderCinematicHeatDistortion();
+    this.renderSolarOcclusionFlare();
+  }
+
+  private syncCinematicBaseRenderScene(): void {
+    // Three normally walks thousands of non-renderable hierarchy nodes once for matrices and once
+    // again for submission. Resolve the canonical hierarchy once, then submit the exact same
+    // renderables and lights through a flat borrowed list. Objects keep their original parents and
+    // world matrices; nothing is cloned, reparented, simplified or rendered at a lower resolution.
+    this.scene.updateMatrixWorld();
+    this.cinematicBaseRenderScene.children.length = 0;
+    this.cinematicBaseRenderScene.background = this.scene.background;
+    this.cinematicBaseRenderScene.environment = this.scene.environment;
+    this.cinematicBaseRenderScene.fog = this.scene.fog;
+    this.cinematicBaseRenderScene.overrideMaterial = this.scene.overrideMaterial;
+    this.cinematicBaseRenderScene.matrixWorldAutoUpdate = false;
+
+    const hasRenderableAncestor = (object: THREE.Object3D): boolean => {
+      let ancestor = object.parent;
+
+      while (ancestor !== null && ancestor !== this.scene) {
+        if (isDisposableRenderable(ancestor) || ancestor instanceof THREE.Light) {
+          return true;
+        }
+        ancestor = ancestor.parent;
+      }
+
+      return false;
+    };
+
+    this.scene.traverse((object) => {
+      if (
+        !isObjectTreeVisible(object) ||
+        (!isDisposableRenderable(object) && !(object instanceof THREE.Light)) ||
+        hasRenderableAncestor(object)
+      ) {
+        return;
+      }
+
+      this.cinematicBaseRenderScene.children.push(object);
+    });
   }
 
   private syncBloomProxyScenes(includeWorld: boolean, includeUi: boolean): void {
@@ -13912,19 +14660,41 @@ export class CinematicSolarSystemRenderer {
     });
   }
 
-  private compositeCurrentCinematicBloomTexture(): void {
+  private compositeCurrentCinematicBloomTexture(
+    occlusionMask?: Readonly<{
+      center: Vec2;
+      radius: number;
+    }>
+  ): void {
     const bloomTexture = this.cinematicBloomPass.renderTargetsHorizontal[0]?.texture;
 
     if (bloomTexture === undefined) {
       return;
     }
 
-    this.compositeCinematicBloomTexture(bloomTexture);
+    this.compositeCinematicBloomTexture(bloomTexture, occlusionMask);
   }
 
-  private compositeCinematicBloomTexture(bloomTexture: THREE.Texture): void {
-    this.cinematicBloomOverlayMaterial.uniforms["bloomTexture"]!.value = bloomTexture;
-    this.cinematicBloomOverlayMaterial.uniforms["gain"]!.value = cinematicBloomOverlayGain;
+  private compositeCinematicBloomTexture(
+    bloomTexture: THREE.Texture,
+    occlusionMask?: Readonly<{
+      center: Vec2;
+      radius: number;
+    }>
+  ): void {
+    const uniforms = this.cinematicBloomOverlayMaterial.uniforms;
+    const width = Math.max(1, this.rendererCssWidth);
+    const height = Math.max(1, this.rendererCssHeight);
+
+    uniforms["bloomTexture"]!.value = bloomTexture;
+    uniforms["gain"]!.value = cinematicBloomOverlayGain;
+    uniforms["occlusionMaskEnabled"]!.value = occlusionMask === undefined ? 0 : 1;
+    (uniforms["viewportSize"]!.value as THREE.Vector2).set(width, height);
+    (uniforms["occlusionMaskCenter"]!.value as THREE.Vector2).set(
+      occlusionMask?.center.x ?? 0,
+      occlusionMask === undefined ? 0 : height - occlusionMask.center.y
+    );
+    uniforms["occlusionMaskRadius"]!.value = Math.max(0, occlusionMask?.radius ?? 0);
     const previousAutoClear = this.renderer.autoClear;
     this.renderer.autoClear = false;
     this.renderer.setRenderTarget(null);
@@ -13966,21 +14736,96 @@ export class CinematicSolarSystemRenderer {
     }
 
     this.cinematicWorldBloomCacheTarget.setSize(bloomTarget.width, bloomTarget.height);
+    this.cinematicCompactSunBloomCacheTarget.setSize(bloomTarget.width, bloomTarget.height);
     this.cinematicUiBloomCacheTarget.setSize(bloomTarget.width, bloomTarget.height);
     this.invalidateCinematicWorldBloomCache();
+    this.invalidateCinematicCompactSunBloomCache();
     this.invalidateCinematicUiBloomCache();
+  }
+
+  private applyCinematicBloomScreenSpaceSourceScale(bloomScene: THREE.Scene): void {
+    this.restoreCinematicBloomScreenSpaceSourceScale();
+    const sourceScale = computeCinematicBloomScreenSpaceSourceScale({
+      bloomRenderScale: this.bloomRenderScale,
+      rendererPixelRatio: this.currentRendererPixelRatio
+    });
+
+    bloomScene.traverse((object) => {
+      if (!(object instanceof THREE.Points)) {
+        return;
+      }
+
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+
+      for (const material of materials) {
+        if (
+          !(material instanceof THREE.PointsMaterial) ||
+          material.sizeAttenuation ||
+          this.cinematicBloomScreenSpacePointPresentation.has(material)
+        ) {
+          continue;
+        }
+
+        const size = material.size;
+        const opacity = material.opacity;
+        const energyScale = computeCinematicBloomScreenSpaceSourceEnergyScale({
+          bloomRenderScale: this.bloomRenderScale,
+          pointSize: size,
+          referenceRenderScale: cinematicBloomRenderScale
+        });
+        this.cinematicBloomScreenSpacePointPresentation.set(material, { opacity, size });
+        material.size *= sourceScale;
+        material.opacity *= energyScale;
+      }
+    });
+  }
+
+  private restoreCinematicBloomScreenSpaceSourceScale(): void {
+    for (const [material, presentation] of this.cinematicBloomScreenSpacePointPresentation) {
+      material.size = presentation.size;
+      material.opacity = presentation.opacity;
+    }
+
+    this.cinematicBloomScreenSpacePointPresentation.clear();
   }
 
   private invalidateCinematicWorldBloomCache(): void {
     this.cinematicWorldBloomCacheValid = false;
     this.cinematicWorldBloomCacheSignature = "";
+    this.cinematicWorldBloomCacheCameraSignature = "";
     this.cinematicWorldBloomCacheLastUpdatedAt = Number.NEGATIVE_INFINITY;
   }
 
   private invalidateCinematicUiBloomCache(): void {
     this.cinematicUiBloomCacheValid = false;
     this.cinematicUiBloomCacheSignature = "";
+    this.cinematicUiBloomCacheCameraSignature = "";
     this.cinematicUiBloomCacheLastUpdatedAt = Number.NEGATIVE_INFINITY;
+  }
+
+  private invalidateCinematicCompactSunBloomCache(): void {
+    this.cinematicCompactSunBloomCacheValid = false;
+    this.cinematicCompactSunBloomCacheSignature = "";
+    this.cinematicCompactSunBloomCacheCameraSignature = "";
+    this.cinematicCompactSunBloomCacheLastUpdatedAt = Number.NEGATIVE_INFINITY;
+  }
+
+  private getCinematicBloomCameraSignature(): string {
+    const cameraPosition = this.camera.position;
+    const cameraRotation = this.camera.quaternion;
+
+    return [
+      cameraPosition.x,
+      cameraPosition.y,
+      cameraPosition.z,
+      cameraRotation.x,
+      cameraRotation.y,
+      cameraRotation.z,
+      cameraRotation.w,
+      this.camera.fov,
+      this.camera.aspect,
+      this.camera.zoom
+    ].join("|");
   }
 
   private getCinematicUiBloomCacheSignature(): string {
@@ -14395,6 +15240,8 @@ export class CinematicSolarSystemRenderer {
 
       const bodyRadius = this.getDisplayBodyRadius(body);
       const detailProgress = getShipDetailProgress(this.distance, this.tuning);
+      const useCoarseShipMarkerCulling =
+        detailProgress >= shipStrategicMarkerCoarseCullDetailThreshold;
       const viewportHeight = this.renderer.domElement.clientHeight;
       const bodyScreenRadiusPixels = this.projectWorldRadiusToScreenPixels(
         this.getDisplayBodyPosition(body),
@@ -14408,6 +15255,7 @@ export class CinematicSolarSystemRenderer {
         shipMarkerNodeCpuCullPadding;
 
       if (
+        useCoarseShipMarkerCulling &&
         !this.isWorldSphereVisibleInFrame(
           nodeWorldPosition,
           Math.max(nodeCullRadius, bodyRadius * 0.18)
@@ -14514,6 +15362,7 @@ export class CinematicSolarSystemRenderer {
         marker.getWorldPosition(worldPosition);
 
         if (
+          useCoarseShipMarkerCulling &&
           !this.isWorldSphereVisibleInFrame(
             worldPosition,
             markerReadableWorldSize * shipMarkerCpuCullRadiusMultiplier
@@ -15635,11 +16484,20 @@ export class CinematicSolarSystemRenderer {
   }
 
   private updateMissileImpactPresentation(elapsed: number): void {
+    this.updateMissileImpactWhiteout(elapsed);
+    this.updateShipDestructionRetinalAfterimages(elapsed);
+
+    if (
+      elapsed - this.missileImpactPresentationLastUpdatedAt <
+      missileImpactPresentationUpdateSeconds
+    ) {
+      return;
+    }
+
+    this.missileImpactPresentationLastUpdatedAt = elapsed;
     clearGroup(this.missileImpactGroup);
-    clearGroup(this.missileWreckageGroup);
 
     if (this.snapshot === null) {
-      this.updateMissileImpactWhiteout(elapsed);
       return;
     }
 
@@ -15675,8 +16533,6 @@ export class CinematicSolarSystemRenderer {
       }
     }
 
-    this.updateMissileImpactWhiteout(elapsed);
-
     const nodesById = this.snapshotNodesById;
 
     for (const presentation of this.missileWreckagePresentations.values()) {
@@ -15708,8 +16564,10 @@ export class CinematicSolarSystemRenderer {
   }
 
   private updateMissileImpactWhiteout(elapsed: number): void {
+    const shipDestructionBloomProfile = getShipDestructionBloomProfile(this.lowBloomProfileEnabled);
     const opacity = Math.max(
-      this.getMissileImpactWhiteoutOpacity(elapsed),
+      this.getMissileImpactWhiteoutOpacity(elapsed) *
+        shipDestructionBloomProfile.whiteoutOpacityScale,
       this.getMissileVoidBurstWhiteoutOpacity(elapsed)
     );
 
@@ -15721,6 +16579,115 @@ export class CinematicSolarSystemRenderer {
 
     this.missileImpactWhiteoutElement.style.opacity = String(opacity);
     this.missileImpactWhiteoutElement.classList.remove("is-hidden");
+  }
+
+  private updateShipDestructionRetinalAfterimages(elapsed: number): void {
+    if (this.snapshot !== null) {
+      for (const presentation of this.missileImpactPresentations) {
+        if (
+          !presentation.createsScreenRetinalAfterimage ||
+          elapsed < presentation.startedAt ||
+          this.shipDestructionRetinalAfterimages.has(presentation.id)
+        ) {
+          continue;
+        }
+
+        const node = this.snapshotNodesById.get(presentation.nodeId);
+        const nodeObject = this.nodeObjects.get(presentation.nodeId);
+
+        if (node === undefined || nodeObject === undefined) {
+          continue;
+        }
+
+        const impactPosition = this.getImpactPresentationWorldPosition(
+          nodeObject,
+          node,
+          presentation,
+          presentation.startedAt
+        );
+        const viewportPosition =
+          this.getShipDestructionRetinalAfterimageViewportPosition(impactPosition);
+
+        if (viewportPosition === null) {
+          continue;
+        }
+
+        const element = document.createElement("div");
+        element.className = "cinematic-ship-destruction-retinal-afterimage";
+        element.style.left = `${(viewportPosition.x * 100).toFixed(3)}%`;
+        element.style.top = `${(viewportPosition.y * 100).toFixed(3)}%`;
+        element.style.setProperty(
+          "--retinal-angle",
+          `${Math.round(hashStringToUnitInterval(`${presentation.id}:retinal-angle`) * 360)}deg`
+        );
+        this.shipDestructionRetinalAfterimageLayerElement.append(element);
+        this.shipDestructionRetinalAfterimages.set(presentation.id, {
+          element,
+          startedAt: presentation.startedAt
+        });
+      }
+    }
+
+    for (const [id, afterimage] of this.shipDestructionRetinalAfterimages) {
+      const frame = getShipDestructionRetinalAfterimageFrame(elapsed - afterimage.startedAt);
+
+      if (frame === null) {
+        afterimage.element.remove();
+        this.shipDestructionRetinalAfterimages.delete(id);
+        continue;
+      }
+
+      const shipDestructionBloomProfile = getShipDestructionBloomProfile(
+        this.lowBloomProfileEnabled
+      );
+      afterimage.element.style.opacity = String(
+        frame.opacity * shipDestructionBloomProfile.retinalOpacityScale
+      );
+      afterimage.element.style.setProperty(
+        "--retinal-scale",
+        String(frame.scale * shipDestructionBloomProfile.retinalSizeScale)
+      );
+      afterimage.element.style.setProperty(
+        "--retinal-halo-opacity",
+        String(frame.haloOpacity * shipDestructionBloomProfile.retinalOpacityScale)
+      );
+    }
+  }
+
+  private getShipDestructionRetinalAfterimageViewportPosition(
+    worldPosition: THREE.Vector3
+  ): Vec2 | null {
+    const cameraSpacePosition = worldPosition.clone().applyMatrix4(this.camera.matrixWorldInverse);
+
+    if (cameraSpacePosition.z >= 0) {
+      return null;
+    }
+
+    const projectedPosition = worldPosition.clone().project(this.camera);
+
+    if (
+      projectedPosition.z < -1 ||
+      projectedPosition.z > 1 ||
+      projectedPosition.x < -1.08 ||
+      projectedPosition.x > 1.08 ||
+      projectedPosition.y < -1.08 ||
+      projectedPosition.y > 1.08
+    ) {
+      return null;
+    }
+
+    return {
+      x: clamp(projectedPosition.x * 0.5 + 0.5, 0, 1),
+      y: clamp(projectedPosition.y * -0.5 + 0.5, 0, 1)
+    };
+  }
+
+  private clearShipDestructionRetinalAfterimages(): void {
+    for (const afterimage of this.shipDestructionRetinalAfterimages.values()) {
+      afterimage.element.remove();
+    }
+
+    this.shipDestructionRetinalAfterimages.clear();
   }
 
   private getMissileImpactWhiteoutOpacity(elapsed: number): number {
@@ -16466,6 +17433,7 @@ export class CinematicSolarSystemRenderer {
     const afterimageOpacity = Math.max(0, 1 - smoothStep(0.02, 0.82, afterglowProgress));
     const detailProgress = getShipDetailProgress(this.distance, this.tuning);
     const hardScienceImpactScale = THREE.MathUtils.lerp(0.34, 0.92, detailProgress) * sourceScale;
+    const shipDestructionBloomProfile = getShipDestructionBloomProfile(this.lowBloomProfileEnabled);
     const coreExpansion = smoothStep(0, 0.34, flashProgress);
     const effect = new THREE.Group();
 
@@ -16477,8 +17445,10 @@ export class CinematicSolarSystemRenderer {
           "missile-impact-nuclear-glare",
           impactPosition,
           0xffffff,
-          THREE.MathUtils.lerp(96, 420, coreExpansion) * hardScienceImpactScale,
-          Math.min(1, flashOpacity * 0.92),
+          THREE.MathUtils.lerp(96, 420, coreExpansion) *
+            hardScienceImpactScale *
+            shipDestructionBloomProfile.glareSizeScale,
+          Math.min(1, flashOpacity * 0.92) * shipDestructionBloomProfile.glareOpacityScale,
           50
         )
       );
@@ -16487,8 +17457,10 @@ export class CinematicSolarSystemRenderer {
           "missile-impact-flash-point",
           impactPosition,
           0xfffdf4,
-          THREE.MathUtils.lerp(18, 160, coreExpansion) * hardScienceImpactScale,
-          Math.min(1, flashOpacity * 1.55),
+          THREE.MathUtils.lerp(18, 160, coreExpansion) *
+            hardScienceImpactScale *
+            shipDestructionBloomProfile.coreSizeScale,
+          Math.min(1, flashOpacity * 1.55) * shipDestructionBloomProfile.coreOpacityScale,
           52
         )
       );
@@ -16503,8 +17475,11 @@ export class CinematicSolarSystemRenderer {
           this.tuning.missileImpactBodyFlashColor,
           (THREE.MathUtils.lerp(72, 240, afterimageExpansion) +
             THREE.MathUtils.lerp(0, 48, afterglowProgress)) *
-            hardScienceImpactScale,
-          afterimageOpacity * THREE.MathUtils.lerp(0.74, 0.045, afterglowProgress),
+            hardScienceImpactScale *
+            shipDestructionBloomProfile.glareSizeScale,
+          afterimageOpacity *
+            THREE.MathUtils.lerp(0.74, 0.045, afterglowProgress) *
+            shipDestructionBloomProfile.glareOpacityScale,
           47
         )
       );
@@ -16832,8 +17807,15 @@ export class CinematicSolarSystemRenderer {
             this.getDisplayBodyRadius(body),
             viewportHeight
           );
-    const wreckageRoot = new THREE.Group();
-    wreckageRoot.name = "missile-impact-wreckage";
+    let wreckageRoot = this.missileWreckageObjects.get(presentation.id);
+
+    if (wreckageRoot === undefined) {
+      wreckageRoot = new THREE.Group();
+      wreckageRoot.name = "missile-impact-wreckage";
+      wreckageRoot.add(createMissileWreckageChunkObject(0), createMissileWreckageChunkObject(1));
+      this.missileWreckageObjects.set(presentation.id, wreckageRoot);
+      this.missileWreckageGroup.add(wreckageRoot);
+    }
 
     for (let chunkIndex = 0; chunkIndex < 2; chunkIndex += 1) {
       const driftDirection = chunkIndex === 0 ? 1 : -1;
@@ -16860,7 +17842,11 @@ export class CinematicSolarSystemRenderer {
         Math.sin(angle) * currentRadius
       );
       const worldPosition = nodeObject.group.localToWorld(localPosition.clone());
-      const chunk = createMissileWreckageChunkObject(chunkIndex);
+      const chunk = wreckageRoot.children[chunkIndex];
+
+      if (chunk === undefined) {
+        continue;
+      }
       const chunkPixels =
         THREE.MathUtils.lerp(
           this.tuning.shipDotScreenPixels * 0.42,
@@ -16886,13 +17872,11 @@ export class CinematicSolarSystemRenderer {
       );
       chunk.scale.setScalar(Math.max(0.28, chunkWorldSize / nodeScale));
       setObjectOpacity(chunk, modelOpacity);
-      wreckageRoot.add(chunk);
     }
 
     wreckageRoot.position.copy(nodeObject.group.position);
     wreckageRoot.scale.copy(nodeObject.group.scale);
     wreckageRoot.visible = fadeIn > 0.02;
-    this.missileWreckageGroup.add(wreckageRoot);
   }
 
   private createShipyardEventPulse(
@@ -17421,6 +18405,7 @@ export class CinematicSolarSystemRenderer {
   private updateLabels(): void {
     const width = this.renderer.domElement.clientWidth;
     const height = this.renderer.domElement.clientHeight;
+    this.updateTrajectoryLabels(width, height);
     const placedLabels: Array<{ x: number; y: number; width: number; height: number }> = [];
     const cameraMotionActive = this.isTrajectoryLabelCameraMotionActive(performance.now());
     const cursorAvoidBounds =
@@ -17615,6 +18600,41 @@ export class CinematicSolarSystemRenderer {
     }
 
     this.updateMissileThreatIndicators(width, height);
+  }
+
+  private updateTrajectoryLabels(width: number, height: number): void {
+    this.trajectoryLabelBounds.length = 0;
+
+    for (const label of this.trajectoryLabels) {
+      const projected = label.worldAnchor.clone().project(this.camera);
+      const visible =
+        projected.z >= -1 &&
+        projected.z <= 1 &&
+        projected.x >= -1.18 &&
+        projected.x <= 1.18 &&
+        projected.y >= -1.18 &&
+        projected.y <= 1.18;
+
+      if (!visible) {
+        label.element.style.display = "none";
+        continue;
+      }
+
+      const anchor = {
+        x: (projected.x * 0.5 + 0.5) * width,
+        y: (-projected.y * 0.5 + 0.5) * height
+      };
+      const placement = this.placeTrajectoryLabelWithOffset(
+        anchor,
+        label.size,
+        label.screenOffset,
+        width,
+        height
+      );
+      label.element.style.display = "";
+      label.element.style.transform = `translate(${placement.x.toFixed(1)}px, ${placement.y.toFixed(1)}px)`;
+      this.trajectoryLabelBounds.push(placement.bounds);
+    }
   }
 
   private getCinematicLabelSize(label: LabelObject): TrajectoryLabelSize {
@@ -18371,47 +19391,16 @@ export class CinematicSolarSystemRenderer {
   }
 
   private handleContextFireClickAtScreenPoint(point: Vec2): void {
+    void point;
     this.lastPrimaryClick = null;
 
-    const targetKey = this.pickAtScreenPoint(point) ?? this.pickBurnPreviewHoverZone(point);
-
-    if (!this.canAcceptTargetInput(targetKey)) {
-      return;
-    }
-
-    if (this.tryRequestFireOrderFromContextClick(targetKey)) {
+    if (this.selectedActionMode === "fire") {
+      this.selectedActionMode = "burn";
+      this.setSelectedTarget(this.selectedTargetKey);
       return;
     }
 
     this.toggleSelectedNodeFireModeFromContextClick();
-  }
-
-  private tryRequestFireOrderFromContextClick(targetKey: string | null): boolean {
-    if (this.snapshot === null || !this.canUseFireMode()) {
-      return false;
-    }
-
-    const originNodeId = this.getContextFireOriginNodeId();
-    const targetNodeId = getNodeIdFromTargetKey(targetKey);
-
-    if (
-      originNodeId === null ||
-      targetKey === null ||
-      targetNodeId === null ||
-      originNodeId === targetNodeId
-    ) {
-      return false;
-    }
-
-    const plan = this.getFirePlan?.(originNodeId, targetNodeId) ?? null;
-
-    if (plan === null || plan.isValidTarget === false) {
-      return false;
-    }
-
-    this.selectedActionMode = "fire";
-    this.setSelectedTarget(`node:${originNodeId}`);
-    return this.tryRequestFireOrder(targetKey);
   }
 
   private toggleSelectedNodeFireModeFromContextClick(): void {
@@ -18438,21 +19427,8 @@ export class CinematicSolarSystemRenderer {
       return;
     }
 
-    this.selectedActionMode = this.selectedActionMode === "fire" ? "burn" : "fire";
+    this.selectedActionMode = "fire";
     this.setSelectedTarget(this.selectedTargetKey);
-  }
-
-  private getContextFireOriginNodeId(): string | null {
-    if (
-      this.snapshot === null ||
-      this.selectedTargetKey === null ||
-      this.lockedSelectionTargetKey !== null ||
-      !this.canPlayerNodeOriginateFire(this.selectedTargetKey)
-    ) {
-      return null;
-    }
-
-    return getNodeIdFromTargetKey(this.selectedTargetKey);
   }
 
   private selectAtScreenPoint(point: Vec2): void {
@@ -19064,6 +20040,7 @@ export class CinematicSolarSystemRenderer {
 
     const cameraPosition = this.camera.position;
     const cameraRotation = this.camera.quaternion;
+    const stateSignature = this.getNodePresentationStateSignature(snapshot);
     const signature = [
       this.selectedTargetKey ?? "",
       this.hoveredTargetKey ?? "",
@@ -19084,18 +20061,44 @@ export class CinematicSolarSystemRenderer {
       cameraRotation.w
     ].join("|");
     const shouldSyncAll =
-      snapshot !== this.nodePresentationLastSnapshot ||
+      stateSignature !== this.nodePresentationLastStateSignature ||
       signature !== this.nodePresentationLastSignature ||
       tutorialPulse !== null;
     const shouldSync = shouldSyncAll || nodeIdsToSync.size > 0;
     this.nodePresentationNodeIdsToSync = shouldSyncAll ? null : nodeIdsToSync;
 
     if (shouldSync) {
-      this.nodePresentationLastSnapshot = snapshot;
+      this.nodePresentationLastStateSignature = stateSignature;
       this.nodePresentationLastSignature = signature;
     }
 
     return shouldSync;
+  }
+
+  private getNodePresentationStateSignature(snapshot: SolarSystemSnapshot): string {
+    const nodeSignature = snapshot.nodes
+      .map((node) =>
+        [
+          node.id,
+          node.type,
+          node.controllable ? 1 : 0,
+          node.contestable ? 1 : 0,
+          node.protectedNoWar ? 1 : 0,
+          node.weaponsOffline ? 1 : 0,
+          node.shipyardProgress,
+          node.shipyardWorkerFactionId ?? "",
+          node.isWorking ? 1 : 0,
+          node.workingFactionId ?? "",
+          node.isContested ? 1 : 0,
+          node.contestedFactionIds.join(",")
+        ].join(":")
+      )
+      .join("|");
+    const occupancySignature = snapshot.nodeOccupancies
+      .map((occupancy) => `${occupancy.nodeId}:${occupancy.factionId}:${occupancy.shipCount}`)
+      .join("|");
+
+    return `${nodeSignature};${occupancySignature}`;
   }
 
   private shouldUpdateTacticalPresentationFrame(elapsed: number): boolean {
@@ -19109,14 +20112,31 @@ export class CinematicSolarSystemRenderer {
 
     if (signature !== this.tacticalPresentationLastSignature) {
       this.tacticalPresentationLastSignature = signature;
+      this.tacticalPresentationDisplayScaleDirty = false;
+      this.tacticalPresentationLastUpdatedAt = elapsed;
+      this.tacticalPresentationLastUpdatedRenderFrameSerial = this.renderFrameSerial;
+      return true;
+    }
+
+    const framesSinceLastUpdate =
+      this.renderFrameSerial - this.tacticalPresentationLastUpdatedRenderFrameSerial;
+
+    // Wheel zoom changes the non-linear display-space layout used by BURN/FIRE endpoints. Camera
+    // rotation and pan can keep using the existing shader-facing ribbons, but stale display-scale
+    // geometry visibly trails the bodies. Refresh zoom-driven geometry on the very next rendered
+    // frame; the cached presentation objects keep this path allocation-light, and the normal
+    // tactical cadence below remains capped when display scale is stable.
+    if (this.tacticalPresentationDisplayScaleDirty) {
+      this.tacticalPresentationDisplayScaleDirty = false;
       this.tacticalPresentationLastUpdatedAt = elapsed;
       this.tacticalPresentationLastUpdatedRenderFrameSerial = this.renderFrameSerial;
       return true;
     }
 
     const isCameraMotionActive = this.isTrajectoryLabelCameraMotionActive(performance.now());
+    const needsContinuousRebuild = this.needsContinuousTacticalPresentationRebuild();
 
-    if (isCameraMotionActive && !this.needsContinuousTacticalPresentationRebuild()) {
+    if (isCameraMotionActive && !needsContinuousRebuild) {
       this.tacticalPresentationCameraMotionWasActive = true;
       return false;
     }
@@ -19128,10 +20148,17 @@ export class CinematicSolarSystemRenderer {
       return true;
     }
 
+    // Stable BURN/FIRE geometry is persistent: dash phase, active-flight clipping and vehicle
+    // markers all advance independently at render cadence. Rebuilding every trajectory at 30 Hz
+    // usually rewrites the same buffers, with cost scaling linearly with every inbound missile.
+    // Keep cadence-driven rebuilds for geometry that genuinely morphs: advancing future
+    // ephemerides, resolution withdrawals, and tutorial attention.
+    if (!needsContinuousRebuild) {
+      return false;
+    }
+
     const performanceMode = this.getEffectivePerformanceMode();
     const updateInterval = this.getTacticalPresentationUpdateIntervalSeconds(performanceMode);
-    const framesSinceLastUpdate =
-      this.renderFrameSerial - this.tacticalPresentationLastUpdatedRenderFrameSerial;
 
     if (
       elapsed - this.tacticalPresentationLastUpdatedAt < updateInterval ||
@@ -19165,10 +20192,20 @@ export class CinematicSolarSystemRenderer {
       transition?.from.pendingFireOrders.some((order) => {
         return !transition.to.activeMissiles.some((missile) => missile.id === order.id);
       }) === true;
+    const hasAdvancingFutureOrbitTiming =
+      transition !== null &&
+      this.snapshot !== null &&
+      (this.getPresentationActiveBurnTransits(this.snapshot).some((transit) => {
+        return transit.arrivalTurn > this.visualTurn + 0.001;
+      }) ||
+        this.snapshot.activeMissiles.some((missile) => {
+          return missile.impactTurn > this.visualTurn + 0.001;
+        }));
 
     return (
       hasResolvingBurnWithdrawal ||
       hasResolvingFireWithdrawal ||
+      hasAdvancingFutureOrbitTiming ||
       (this.getTutorialAttentionPulse?.() ?? null) !== null
     );
   }
@@ -19352,7 +20389,11 @@ export class CinematicSolarSystemRenderer {
   private applyExtremeZoomTacticalUiFade(): void {
     const opacityMultiplier = this.getExtremeZoomTacticalUiOpacityMultiplier();
     fadeMarkedExtremeZoomUiObjects(this.burnPreviewGroup, opacityMultiplier);
+    fadeMarkedExtremeZoomUiObjects(this.burnPreviewEffectGroup, opacityMultiplier);
+    fadeMarkedExtremeZoomUiObjects(this.confirmedBurnEffectGroup, opacityMultiplier);
     fadeMarkedExtremeZoomUiObjects(this.firePreviewGroup, opacityMultiplier);
+    fadeMarkedExtremeZoomUiObjects(this.firePreviewEffectGroup, opacityMultiplier);
+    fadeMarkedExtremeZoomUiObjects(this.confirmedFireEffectGroup, opacityMultiplier);
     fadeMarkedExtremeZoomUiObjects(this.futureDestinationGroup, opacityMultiplier);
     fadeMarkedExtremeZoomCelestialGhosts(
       this.futureDestinationGroup,
@@ -19366,19 +20407,19 @@ export class CinematicSolarSystemRenderer {
     this.burnTrajectoryPresentationKeysInUse.clear();
     this.activeBurnResolvedTrajectories.clear();
     this.pruneActiveBurnOriginPresentationHeights(snapshot);
-    this.clearActiveBurnPickables();
+    this.clearActiveBurnFrameTargets();
     this.detachCachedActiveBurnMarkers();
     this.detachCachedBurnTrajectoryPresentations();
     this.orbitTimingSegmentKeysInUse.clear();
     this.detachCachedOrbitTimingSegments();
     this.orbitTimingDotKeysInUse.clear();
     this.detachCachedOrbitTimingDots();
-    this.futureFireTargetMarkerKeysInUse.clear();
-    this.detachCachedFutureFireTargetMarkers();
     this.futureGhostKeysInUse.clear();
     this.detachCachedFutureGhosts();
     clearGroup(this.burnTransferFieldGroup);
     clearGroup(this.burnPreviewGroup);
+    clearGroup(this.burnPreviewEffectGroup);
+    clearGroup(this.confirmedBurnEffectGroup);
     clearGroup(this.pendingBurnGroup);
     clearGroup(this.activeBurnGroup);
     clearGroup(this.futureDestinationGroup);
@@ -19395,6 +20436,7 @@ export class CinematicSolarSystemRenderer {
         true
       );
       this.renderPendingBurnFutureDestinationLink(order, color);
+      this.renderConfirmedBurnOrderEffect(order);
 
       if (labelAnchor !== null) {
         this.showTrajectoryLabel(
@@ -19487,6 +20529,7 @@ export class CinematicSolarSystemRenderer {
     }
 
     if (isHoverPlanAffordable) {
+      this.renderBurnPreviewEffect(hoverPlan);
       this.renderFutureBodyPreview(hoverPlan, this.getBurnTrajectoryColor(hoverPlan));
       const deltaHint = this.getBurnTransferDeltaHint?.(
         hoverPlan.originNodeId,
@@ -19557,7 +20600,8 @@ export class CinematicSolarSystemRenderer {
         trajectory.color,
         this.tuning.pendingBurnOpacity * 0.64,
         this.getFutureBurnDestinationLineRadius(),
-        withdrawalProgress
+        withdrawalProgress,
+        "astronomical"
       );
 
       if (terminal !== null) {
@@ -19690,7 +20734,19 @@ export class CinematicSolarSystemRenderer {
       this.getTacticalTrajectoryDetailMode(),
       this.camera.position,
       this.getPresentationBeatPulse(),
-      1.35
+      1.35,
+      undefined,
+      0,
+      false,
+      {
+        accentSpeed:
+          options.group === this.pendingFireGroup
+            ? this.tuning.firePreviewEffectFlowSpeed
+            : this.tuning.burnPreviewEffectFlowSpeed,
+        enabled: this.shouldRenderTrajectoryPlaneReflection(options.group),
+        elapsed: this.presentationElapsed,
+        showAnimatedAccent: false
+      }
     );
     trajectory.name = options.name;
     trajectory.userData["extremeZoomUiFade"] = true;
@@ -19725,7 +20781,8 @@ export class CinematicSolarSystemRenderer {
     color: THREE.ColorRepresentation,
     opacity: number,
     radius: number,
-    withdrawalProgress: number
+    withdrawalProgress: number,
+    style: OrbitTimingStyle = "tactical"
   ): THREE.Vector3 | null {
     const preview = this.createFutureOrbitTimingPreview(
       nodeId,
@@ -19752,7 +20809,9 @@ export class CinematicSolarSystemRenderer {
       visiblePoints,
       color,
       opacity * (1 - smootherStep(0.86, 1, withdrawalProgress)),
-      radius
+      radius,
+      undefined,
+      style
     );
     link.name = `future-timing-withdrawal:${nodeId}`;
     this.futureDestinationGroup.add(link);
@@ -19779,7 +20838,7 @@ export class CinematicSolarSystemRenderer {
       return;
     }
 
-    this.clearActiveBurnPickables();
+    this.clearActiveBurnFrameTargets();
 
     for (const transit of activeTransits) {
       const trajectory = this.activeBurnResolvedTrajectories.get(transit.id);
@@ -19801,10 +20860,15 @@ export class CinematicSolarSystemRenderer {
       return;
     }
 
-    this.clearActiveMissilePickables();
+    this.activeMissileTargetPositions.clear();
 
     for (const missile of snapshot.activeMissiles) {
-      const baseTrajectory = this.resolveFireTrajectory(missile);
+      // The ribbon rebuild already resolved and cached the path at tactical cadence. Sampling that
+      // exact path keeps the marker attached to the visible ribbon and avoids rebuilding future
+      // orbital snapshots once per missile on every presented frame.
+      const baseTrajectory =
+        this.activeMissileResolvedTrajectories.get(missile.id) ??
+        this.resolveFireTrajectory(missile);
 
       if (baseTrajectory === null) {
         continue;
@@ -20426,6 +21490,10 @@ export class CinematicSolarSystemRenderer {
     );
 
     for (const sample of samples) {
+      if (this.hoveredTargetKey === `node:${sample.plan.destinationNodeId}`) {
+        continue;
+      }
+
       const etaProgress = clamp((sample.plan.etaTurns - 2) / 5, 0, 1);
       const costProgress = clamp((sample.plan.burnCost - 2) / 4, 0, 1);
       const haloRadius = sample.destination.ringRadius * (1.08 + etaProgress * 0.1);
@@ -20443,42 +21511,57 @@ export class CinematicSolarSystemRenderer {
   }
 
   private updateFirePresentation(snapshot: SolarSystemSnapshot): void {
+    const performanceDiagnosticsEnabled = this.isPerformanceDiagnosticsEnabled();
+    let firePhaseStartedAt = performanceDiagnosticsEnabled ? performance.now() : 0;
     this.fireTrajectoryCount = 0;
     this.fireTrajectoryPresentationKeysInUse.clear();
     this.resolvedFireTrajectoryPathKeysInUse.clear();
+    this.activeMissileResolvedTrajectories.clear();
     this.pruneActiveMissileLaunchSamples(snapshot);
-    this.clearActiveMissilePickables();
+    this.activeMissileTargetPositions.clear();
     this.detachCachedActiveMissileMarkers();
     this.detachCachedFireTrajectoryPresentations();
     clearGroup(this.firePreviewGroup);
+    clearGroup(this.firePreviewEffectGroup);
+    clearGroup(this.confirmedFireEffectGroup);
     clearGroup(this.pendingFireGroup);
     clearGroup(this.activeMissileGroup);
+    const activeMissiles = [...snapshot.activeMissiles].sort(compareFireArrivalsForPresentation);
+    const pendingFireOrders = [...snapshot.pendingFireOrders].sort(
+      compareFireArrivalsForPresentation
+    );
     const incomingMissilesByTarget = groupIncomingMissilesByTarget([
-      ...snapshot.activeMissiles,
-      ...snapshot.pendingFireOrders
+      ...activeMissiles,
+      ...pendingFireOrders
     ]);
+    this.prepareFutureFireImpactLabelAvoidBounds(incomingMissilesByTarget);
 
-    for (const order of snapshot.pendingFireOrders) {
+    for (const order of pendingFireOrders) {
       const weight = getFireTrajectoryVisualWeight(getFireEtaTurns(order, this.visualTurn));
       const labelAnchor = this.renderFireArc(
         order,
         this.pendingFireGroup,
-        this.tuning.pendingFireOpacity
+        this.tuning.pendingFireOpacity * this.getPendingFireConfirmationOpacityMultiplier(order)
       );
+      this.renderConfirmedFireOrderEffect(order);
 
       if (labelAnchor !== null) {
         this.showTrajectoryLabel(
-          labelAnchor,
+          this.getFireImpactBillboardAnchor(order) ?? labelAnchor,
           `T-${order.missileEtaTurns}`,
           "fire",
           weight.labelOpacityMultiplier
         );
       }
     }
+    if (performanceDiagnosticsEnabled) {
+      this.recordPerformanceSection("firePending", performance.now() - firePhaseStartedAt);
+      firePhaseStartedAt = performance.now();
+    }
 
     this.renderResolvingFireOrderWithdrawals();
 
-    for (const missile of snapshot.activeMissiles) {
+    for (const missile of activeMissiles) {
       const baseTrajectory = this.resolveFireTrajectory(missile);
 
       if (baseTrajectory === null) {
@@ -20496,6 +21579,7 @@ export class CinematicSolarSystemRenderer {
           missile
         )
       };
+      this.activeMissileResolvedTrajectories.set(missile.id, trajectory);
       const labelAnchor = this.renderFireArc(
         missile,
         this.activeMissileGroup,
@@ -20507,7 +21591,7 @@ export class CinematicSolarSystemRenderer {
       if (labelAnchor !== null && this.hoveredTargetKey === `node:${missile.targetNodeId}`) {
         const remainingTurns = Math.max(0, Math.ceil(missile.impactTurn - this.visualTurn));
         this.showTrajectoryLabel(
-          labelAnchor,
+          this.getFireImpactBillboardAnchor(missile) ?? labelAnchor,
           `T-${remainingTurns}`,
           "fire",
           weight.labelOpacityMultiplier
@@ -20516,12 +21600,23 @@ export class CinematicSolarSystemRenderer {
 
       this.renderActiveMissileMarker(missile, launchPresentation, trajectory);
     }
+    if (performanceDiagnosticsEnabled) {
+      this.recordPerformanceSection("fireActive", performance.now() - firePhaseStartedAt);
+      firePhaseStartedAt = performance.now();
+    }
 
     this.pruneCachedActiveMissileMarkers(snapshot.activeMissiles);
 
     this.updateTransientMissilePresentations();
+    if (performanceDiagnosticsEnabled) {
+      this.recordPerformanceSection("fireTransient", performance.now() - firePhaseStartedAt);
+      firePhaseStartedAt = performance.now();
+    }
     this.renderIncomingFireTargetPreviews(incomingMissilesByTarget);
     this.renderSelectedFireEngagementField(snapshot);
+    if (performanceDiagnosticsEnabled) {
+      this.recordPerformanceSection("fireTargets", performance.now() - firePhaseStartedAt);
+    }
 
     const hoverPlan = this.getHoverFirePlan();
 
@@ -20530,7 +21625,6 @@ export class CinematicSolarSystemRenderer {
       this.pruneCachedFireTrajectoryPaths();
       this.pruneCachedOrbitTimingSegments();
       this.pruneCachedOrbitTimingDots();
-      this.pruneCachedFutureFireTargetMarkers();
       this.pruneCachedFutureGhosts();
       return;
     }
@@ -20542,9 +21636,14 @@ export class CinematicSolarSystemRenderer {
     );
 
     if (labelAnchor !== null) {
-      this.showTrajectoryLabel(labelAnchor, `T-${hoverPlan.missileEtaTurns}`, "fire");
+      this.showTrajectoryLabel(
+        this.getFireImpactBillboardAnchor(hoverPlan) ?? labelAnchor,
+        `T-${hoverPlan.missileEtaTurns}`,
+        "fire"
+      );
     }
 
+    this.renderFirePreviewEffect(hoverPlan);
     this.renderFireFutureTargetPreview(hoverPlan);
     const deltaHint = this.getFireTransferDeltaHint?.(
       hoverPlan.originNodeId,
@@ -20559,7 +21658,6 @@ export class CinematicSolarSystemRenderer {
     this.pruneCachedFireTrajectoryPaths();
     this.pruneCachedOrbitTimingSegments();
     this.pruneCachedOrbitTimingDots();
-    this.pruneCachedFutureFireTargetMarkers();
     this.pruneCachedFutureGhosts();
   }
 
@@ -20571,6 +21669,7 @@ export class CinematicSolarSystemRenderer {
     }
 
     const color = this.tuning.fireMarkerColor;
+    const presentations: RenderableFirePlan[] = [];
 
     for (const node of snapshot.nodes) {
       if (node.id === originNodeId) {
@@ -20589,6 +21688,12 @@ export class CinematicSolarSystemRenderer {
         continue;
       }
 
+      presentations.push(plan);
+    }
+
+    presentations.sort(compareFireArrivalsForPresentation);
+
+    for (const plan of presentations) {
       const labelAnchor = this.renderFireArc(
         plan,
         this.firePreviewGroup,
@@ -20601,7 +21706,7 @@ export class CinematicSolarSystemRenderer {
 
       const weight = getFireTrajectoryVisualWeight(getFireEtaTurns(plan, this.visualTurn));
       this.showTrajectoryLabel(
-        labelAnchor,
+        this.getFireImpactBillboardAnchor(plan) ?? labelAnchor,
         `T-${plan.missileEtaTurns}`,
         "fire-field",
         0.92 * weight.labelOpacityMultiplier,
@@ -20622,7 +21727,24 @@ export class CinematicSolarSystemRenderer {
   private renderIncomingFireTargetPreviews(
     incomingMissilesByTarget: ReadonlyMap<string, readonly PendingFireOrder[]>
   ): void {
-    for (const [targetNodeId, missiles] of incomingMissilesByTarget) {
+    const targetsByArrival = [...incomingMissilesByTarget.entries()].sort(
+      ([, firstMissiles], [, secondMissiles]) => {
+        const first = getEarliestIncomingMissile(firstMissiles);
+        const second = getEarliestIncomingMissile(secondMissiles);
+
+        if (first === null) {
+          return second === null ? 0 : 1;
+        }
+
+        if (second === null) {
+          return -1;
+        }
+
+        return compareFireArrivalsForPresentation(first, second);
+      }
+    );
+
+    for (const [targetNodeId, missiles] of targetsByArrival) {
       const earliestMissile = getEarliestIncomingMissile(missiles);
       const impactChronology = getIncomingFireImpactChronology(missiles);
 
@@ -20658,7 +21780,7 @@ export class CinematicSolarSystemRenderer {
           targetNodeId,
           previousImpactTurn ?? impact.issuedTurn,
           impact.impactTurn,
-          this.tuning.fireMarkerColor,
+          targetColor,
           () => 0.28 * weight.timingOpacityMultiplier,
           `fire-impact:${targetNodeId}:${impact.id}`
         );
@@ -20667,7 +21789,7 @@ export class CinematicSolarSystemRenderer {
           const link = this.getCachedOrbitTimingSegment(
             `fire-impact:${targetNodeId}:${impact.id}:${impact.impactTurn}`,
             timingPreview.points,
-            this.tuning.fireMarkerColor,
+            targetColor,
             this.getFutureFireTargetLinkOpacity(weight),
             this.getFutureFireTargetLinkRadius(weight),
             { start: timingPreview.start, end: timingPreview.target }
@@ -20680,15 +21802,15 @@ export class CinematicSolarSystemRenderer {
         const targetRingPoints = createNodeHoverRingPoints(futureTarget);
         firstTargetRingPoints ??= targetRingPoints;
         hoverPoints.push(...targetRingPoints);
-        this.futureDestinationGroup.add(
-          this.getCachedFutureFireTargetMarker(
-            `fire-impact:${targetNodeId}:${impact.id}`,
-            futureTarget,
-            targetColor,
-            this.tuning.futureDestinationMarkerOpacity * weight.targetOpacityMultiplier,
-            this.getFireImpactTargetDotScreenDiameter()
-          )
+        const impactMarker = this.getCachedFutureFireImpactMarker(
+          `fire-impact-marker:${targetNodeId}:${impact.id}`,
+          futureTarget,
+          this.tuning.fireMarkerColor,
+          targetColor,
+          this.tuning.futureDestinationMarkerOpacity * weight.targetOpacityMultiplier
         );
+        impactMarker.name = `fire-future-impact-marker:${targetNodeId}`;
+        this.futureDestinationGroup.add(impactMarker);
         previousImpactTurn = impact.impactTurn;
       }
 
@@ -20724,19 +21846,64 @@ export class CinematicSolarSystemRenderer {
     }
   }
 
+  private prepareFutureFireImpactLabelAvoidBounds(
+    incomingMissilesByTarget: ReadonlyMap<string, readonly PendingFireOrder[]>
+  ): void {
+    this.futureFireImpactLabelAvoidBounds.length = 0;
+    const viewport = this.renderer.domElement.getBoundingClientRect();
+
+    for (const [targetNodeId, missiles] of incomingMissilesByTarget) {
+      for (const impact of getIncomingFireImpactChronology(missiles)) {
+        const destination = this.getDisplayNodeRenderDataAtTurn(targetNodeId, impact.impactTurn);
+
+        if (destination === null) {
+          continue;
+        }
+
+        const center = projectWorldPointToViewportScreen(
+          destination.center,
+          this.camera,
+          viewport.width,
+          viewport.height
+        );
+
+        if (center === null) {
+          continue;
+        }
+
+        const markerOuterRadiusWorld =
+          Math.max(0.72, destination.ringRadius * 0.84) * futureFireImpactTickOuterRadius;
+        const markerRadiusPixels = Math.max(
+          futureFireImpactTickMinimumOuterRadiusPixels,
+          getScreenPixelsForWorldRadius(
+            this.camera,
+            destination.center,
+            viewport.height,
+            markerOuterRadiusWorld
+          )
+        );
+        const avoidRadius = markerRadiusPixels + futureFireImpactLabelGapPixels;
+        this.futureFireImpactLabelAvoidBounds.push({
+          x: center.x - avoidRadius,
+          y: center.y - avoidRadius,
+          width: avoidRadius * 2,
+          height: avoidRadius * 2
+        });
+      }
+    }
+  }
+
+  private getFireImpactBillboardAnchor(plan: RenderableFirePlan): THREE.Vector3 | null {
+    return (
+      this.getDisplayNodeRenderDataAtTurn(plan.targetNodeId, plan.impactTurn)?.center.clone() ??
+      null
+    );
+  }
+
   private getFutureFireTargetLineRadius(): number {
     const detailProgress = getShipDetailProgress(this.distance, this.tuning);
     const extremeZoomOutProgress = 1 - smoothStep(0, 0.08, detailProgress);
     return THREE.MathUtils.lerp(0.34, 0.54, extremeZoomOutProgress);
-  }
-
-  private getFireImpactTargetDotScreenDiameter(): number {
-    const detailProgress = getShipDetailProgress(this.distance, this.tuning);
-    return THREE.MathUtils.lerp(
-      fireImpactTargetDotZoomOutScreenDiameterPixels,
-      fireImpactTargetDotZoomInScreenDiameterPixels,
-      smootherStep(0.08, 0.72, detailProgress)
-    );
   }
 
   private getFutureFireTargetLinkOpacity(weight: FireTrajectoryVisualWeight): number {
@@ -20754,6 +21921,204 @@ export class CinematicSolarSystemRenderer {
     return this.isReducedPerformanceMode() ? "simple" : "full";
   }
 
+  private renderBurnPreviewEffect(plan: RenderableBurnPlan): void {
+    if (!this.burnPreviewEffectsEnabled) {
+      return;
+    }
+
+    const trajectory = this.resolveBurnTrajectory(plan, this.burnPreviewGroup);
+
+    if (trajectory === null) {
+      return;
+    }
+
+    const effect = createBurnPreviewEffect(trajectory.visiblePoints, {
+      color: trajectory.color,
+      opacity: this.tuning.burnPreviewEffectOpacity,
+      particleCount: this.tuning.burnPreviewEffectParticleCount,
+      particleSizePixels: this.tuning.burnPreviewEffectParticleSizePixels,
+      apertureSizePixels: this.tuning.burnPreviewEffectApertureSizePixels,
+      flowSpeed: this.tuning.burnPreviewEffectFlowSpeed,
+      pixelRatio: this.renderer.getPixelRatio(),
+      renderLayer: cinematicUiBloomRenderLayer,
+      showArrivalAperture: false
+    });
+
+    if (effect !== null) {
+      this.burnPreviewEffectGroup.add(effect);
+    }
+  }
+
+  private renderFirePreviewEffect(plan: RenderableFirePlan): void {
+    if (!this.firePreviewEffectsEnabled) {
+      return;
+    }
+
+    const trajectory = this.resolveFireTrajectory(plan, undefined, "orbit-center");
+
+    if (trajectory === null) {
+      return;
+    }
+
+    const effect = createFirePreviewEffect(trajectory.points, {
+      color: this.tuning.fireMarkerColor,
+      opacity: this.tuning.firePreviewEffectOpacity,
+      particleCount: this.tuning.firePreviewEffectParticleCount,
+      particleSizePixels: this.tuning.firePreviewEffectParticleSizePixels,
+      reticleSizePixels: this.tuning.firePreviewEffectReticleSizePixels,
+      targetPosition: trajectory.target.center,
+      showTerminalLock: false,
+      flowSpeed: this.tuning.firePreviewEffectFlowSpeed,
+      pixelRatio: this.renderer.getPixelRatio(),
+      renderLayer: cinematicUiBloomRenderLayer
+    });
+
+    if (effect !== null) {
+      this.firePreviewEffectGroup.add(effect);
+    }
+  }
+
+  private renderConfirmedBurnOrderEffect(order: PendingBurnOrder): void {
+    if (!this.burnPreviewEffectsEnabled) {
+      return;
+    }
+
+    const trajectory = this.resolveBurnTrajectory(order, this.pendingBurnGroup);
+
+    if (trajectory === null) {
+      return;
+    }
+
+    const effect = createBurnPreviewEffect(trajectory.visiblePoints, {
+      color: trajectory.color,
+      opacity:
+        this.tuning.burnPreviewEffectOpacity * this.tuning.confirmedOrderEffectOpacityMultiplier,
+      particleCount: Math.max(
+        10,
+        Math.round(
+          this.tuning.burnPreviewEffectParticleCount *
+            this.tuning.confirmedOrderEffectParticleMultiplier
+        )
+      ),
+      particleSizePixels:
+        this.tuning.burnPreviewEffectParticleSizePixels *
+        this.tuning.confirmedOrderEffectSizeMultiplier,
+      apertureSizePixels:
+        this.tuning.burnPreviewEffectApertureSizePixels *
+        this.tuning.confirmedOrderEffectSizeMultiplier,
+      flowSpeed: this.tuning.burnPreviewEffectFlowSpeed,
+      pixelRatio: this.renderer.getPixelRatio(),
+      renderLayer: cinematicUiBloomRenderLayer,
+      presentation: "confirmed"
+    });
+
+    if (effect !== null) {
+      effect.name = `${effect.name}:${order.id}`;
+      this.confirmedBurnEffectGroup.add(effect);
+    }
+  }
+
+  private renderConfirmedFireOrderEffect(order: PendingFireOrder): void {
+    if (!this.firePreviewEffectsEnabled) {
+      return;
+    }
+
+    const timingPreview = this.createFutureOrbitTimingPreview(
+      order.targetNodeId,
+      order.issuedTurn,
+      order.impactTurn,
+      this.tuning.fireMarkerColor,
+      () => 0
+    );
+
+    if (timingPreview === null) {
+      return;
+    }
+
+    const origin = this.getFireOriginRenderData(order);
+
+    if (origin === null) {
+      return;
+    }
+
+    const finalTrajectory = this.resolveFireTrajectory(order);
+
+    if (finalTrajectory === null) {
+      return;
+    }
+
+    const initialAimPoints = buildMissileTrajectoryPreview(
+      origin,
+      timingPreview.start,
+      order.issuedTurn,
+      order.missileEtaTurns,
+      order,
+      {
+        includeDepartureContinuity:
+          origin.departureOrbit !== undefined || origin.departureDirection !== undefined
+      }
+    );
+
+    const revealDurationSeconds = this.tuning.fireConfirmedSolutionRevealDurationSeconds;
+    const effect = createFirePreviewEffect(finalTrajectory.points, {
+      color: this.tuning.fireMarkerColor,
+      opacity:
+        this.tuning.firePreviewEffectOpacity * this.tuning.confirmedOrderEffectOpacityMultiplier,
+      particleCount: Math.max(
+        12,
+        Math.round(
+          this.tuning.firePreviewEffectParticleCount *
+            this.tuning.confirmedOrderEffectParticleMultiplier
+        )
+      ),
+      particleSizePixels:
+        this.tuning.firePreviewEffectParticleSizePixels *
+        this.tuning.confirmedOrderEffectSizeMultiplier,
+      reticleSizePixels:
+        this.tuning.firePreviewEffectReticleSizePixels *
+        this.tuning.confirmedOrderEffectSizeMultiplier,
+      flowSpeed: this.tuning.firePreviewEffectFlowSpeed,
+      pixelRatio: this.renderer.getPixelRatio(),
+      renderLayer: cinematicUiBloomRenderLayer,
+      presentation: "confirmed",
+      solutionStartedAt:
+        this.confirmedFireSolutionStartedAt.get(order.id) ??
+        this.presentationElapsed -
+          revealDurationSeconds -
+          this.tuning.fireConfirmedSolutionFadeDurationSeconds,
+      solutionRevealDurationSeconds: revealDurationSeconds,
+      solutionFadeDurationSeconds: this.tuning.fireConfirmedSolutionFadeDurationSeconds,
+      initialSolutionPoints: initialAimPoints,
+      solutionAimAcquireProgress: this.tuning.fireConfirmedSolutionAimAcquireProgress
+    });
+
+    if (effect !== null) {
+      effect.name = `${effect.name}:${order.id}`;
+      this.confirmedFireEffectGroup.add(effect);
+    }
+  }
+
+  private getPendingFireConfirmationOpacityMultiplier(order: PendingFireOrder): number {
+    const startedAt = this.confirmedFireSolutionStartedAt.get(order.id);
+
+    if (startedAt === undefined) {
+      return 1;
+    }
+
+    const revealDurationSeconds = Math.max(
+      0.001,
+      this.tuning.fireConfirmedSolutionRevealDurationSeconds
+    );
+    const revealProgress = computeConfirmedSolutionRevealProgress(
+      this.presentationElapsed - startedAt,
+      revealDurationSeconds
+    );
+    return computeConfirmedFireArcPhase(
+      revealProgress,
+      this.tuning.fireConfirmedSolutionAimAcquireProgress
+    ).morphProgress;
+  }
+
   private getFutureBurnDestinationLineRadius(): number {
     const detailProgress = getShipDetailProgress(this.distance, this.tuning);
     const extremeZoomOutProgress = 1 - smoothStep(0, 0.08, detailProgress);
@@ -20761,59 +22126,94 @@ export class CinematicSolarSystemRenderer {
   }
 
   private renderFireFutureTargetPreview(plan: RenderableFirePlan): void {
-    const currentTarget = this.getCurrentDisplayNodeRenderData(plan.targetNodeId);
-    const futureTarget = this.getDisplayNodeRenderDataAtTurn(plan.targetNodeId, plan.impactTurn);
-
-    if (currentTarget === null || futureTarget === null) {
-      return;
-    }
-
     const targetKey = `node:${plan.targetNodeId}`;
     const targetColor = this.getFireTargetFactionColor(plan);
     const isTargetHovered = this.hoveredTargetKey === targetKey;
     const weight = isTargetHovered
       ? getFullFireTrajectoryVisualWeight()
       : getFireTrajectoryVisualWeight(getFireEtaTurns(plan, this.visualTurn));
+    const presentationKey = `fire-target:${this.getFireTrajectoryPresentationCacheKey(
+      plan,
+      this.futureDestinationGroup
+    )}`;
+    const timingPreview = this.createFutureOrbitTimingPreview(
+      plan.targetNodeId,
+      plan.issuedTurn,
+      plan.impactTurn,
+      targetColor,
+      () => (isTargetHovered ? 0 : clamp(0.22 + weight.timingOpacityMultiplier * 0.18, 0.22, 0.4)),
+      presentationKey
+    );
+
+    if (timingPreview === null) {
+      return;
+    }
+
+    const currentTarget = timingPreview.start;
+    const futureTarget = timingPreview.target;
     const targetRingPoints = createNodeHoverRingPoints(futureTarget);
-    const hoverPoints = [
-      currentTarget.center.clone(),
-      futureTarget.center.clone(),
-      ...targetRingPoints
-    ];
+    const hoverPoints = [...timingPreview.points, ...targetRingPoints];
     const targetPulse = this.getTutorialAttentionPulseForTarget(targetKey);
     const tutorialLinkPulse = getTutorialAttentionNodeColorPulse(targetPulse);
-    const link = this.getCachedOrbitTimingSegment(
-      `fire-target:${this.getFireTrajectoryPresentationCacheKey(
-        plan,
-        this.futureDestinationGroup
-      )}`,
-      [currentTarget.center, futureTarget.center],
-      this.tuning.fireMarkerColor,
-      clamp(
-        this.getFutureFireTargetLinkOpacity(weight) +
-          tutorialLinkPulse * tutorialAttentionFutureLinkOpacityBoost,
-        0,
-        tutorialAttentionFutureLinkMaxOpacity
-      ),
-      this.getFutureFireTargetLinkRadius(weight) *
-        (1 + tutorialLinkPulse * tutorialAttentionFutureLinkRadiusBoost),
-      { start: currentTarget, end: futureTarget }
-    );
-    const marker = this.getCachedFutureFireTargetMarker(
-      `fire-target:${this.getFireTrajectoryPresentationCacheKey(
-        plan,
-        this.futureDestinationGroup
-      )}`,
+    const markerOpacity =
+      this.tuning.futureDestinationMarkerOpacity * weight.targetOpacityMultiplier;
+    const impactMarker = this.getCachedFutureFireImpactMarker(
+      `fire-preview-impact:${presentationKey}`,
       futureTarget,
+      this.tuning.fireMarkerColor,
       targetColor,
-      this.tuning.futureDestinationMarkerOpacity * weight.targetOpacityMultiplier,
-      this.getFireImpactTargetDotScreenDiameter()
+      markerOpacity,
+      isTargetHovered ? 1.08 : 1
     );
+    impactMarker.name = `fire-future-impact-marker:${plan.targetNodeId}`;
 
-    setPreserveExtremeZoomUiOpacity(link, targetPulse !== null);
-    setPreserveExtremeZoomUiOpacity(marker, targetPulse !== null);
+    setPreserveExtremeZoomUiOpacity(impactMarker, targetPulse !== null);
+    this.futureDestinationGroup.add(...timingPreview.timingDots, impactMarker);
 
-    this.futureDestinationGroup.add(link, marker);
+    if (timingPreview.points.length >= 2) {
+      const endpoints: OrbitTimingSegmentEndpoints = {
+        start: currentTarget,
+        end: futureTarget
+      };
+      const link = this.getCachedOrbitTimingSegment(
+        presentationKey,
+        timingPreview.points,
+        targetColor,
+        clamp(
+          this.getFutureFireTargetLinkOpacity(weight) +
+            tutorialLinkPulse * tutorialAttentionFutureLinkOpacityBoost,
+          0,
+          tutorialAttentionFutureLinkMaxOpacity
+        ),
+        this.getFutureFireTargetLinkRadius(weight) *
+          (1 + tutorialLinkPulse * tutorialAttentionFutureLinkRadiusBoost),
+        endpoints
+      );
+      link.name = "fire-target-prediction-track";
+      setPreserveExtremeZoomUiOpacity(link, targetPulse !== null);
+      this.futureDestinationGroup.add(link);
+
+      if (isTargetHovered) {
+        const tickWorldSize = getWorldUnitsForScreenPixels(
+          this.camera,
+          futureTarget.center,
+          this.renderer.domElement.clientHeight,
+          5.5
+        );
+        const rulerTicks = createFirePredictionRulerTicks(
+          timingPreview.points,
+          targetColor,
+          clamp(markerOpacity * 0.72, 0.16, 0.48),
+          tickWorldSize,
+          clamp(Math.round(plan.missileEtaTurns * 1.4), 4, 9),
+          endpoints
+        );
+        rulerTicks.name = "fire-target-prediction-ruler-ticks";
+        setPreserveExtremeZoomUiOpacity(rulerTicks, targetPulse !== null);
+        this.futureDestinationGroup.add(rulerTicks);
+      }
+    }
+
     this.firePreviewHoverZones.push({
       targetKey,
       points: hoverPoints,
@@ -20840,6 +22240,8 @@ export class CinematicSolarSystemRenderer {
     activeProgress?: number,
     resolvedTrajectory?: ResolvedFireTrajectory | null
   ): THREE.Vector3 | null {
+    const isPreview = group === this.firePreviewGroup;
+    const hasPlaneReflection = this.shouldRenderTrajectoryPlaneReflection(group);
     const trajectory = resolvedTrajectory ?? this.resolveFireTrajectory(plan, activeProgress);
 
     if (trajectory === null) {
@@ -20848,14 +22250,15 @@ export class CinematicSolarSystemRenderer {
 
     const animationSpeedMultiplier =
       group === this.firePreviewGroup || group === this.pendingFireGroup ? 1.68 : 1.45;
-    const weight =
-      group === this.firePreviewGroup
-        ? getFullFireTrajectoryVisualWeight()
-        : getFireTrajectoryVisualWeight(getFireEtaTurns(plan, this.visualTurn));
+    const weight = isPreview
+      ? getFullFireTrajectoryVisualWeight()
+      : getFireTrajectoryVisualWeight(getFireEtaTurns(plan, this.visualTurn));
+    const renderedPoints = trajectory.points;
+    const anchorEndDash = !("launchedTurn" in plan);
     const trajectoryCacheKey = this.getFireTrajectoryPresentationCacheKey(plan, group);
     const reusableTrajectory = this.fireTrajectoryPresentationCache.get(trajectoryCacheKey);
     const trajectoryMesh = createBurnTrajectoryMesh(
-      trajectory.points,
+      renderedPoints,
       this.tuning.fireMarkerColor,
       opacity * weight.opacityMultiplier,
       activeProgress === undefined
@@ -20870,7 +22273,14 @@ export class CinematicSolarSystemRenderer {
       this.getPresentationBeatPulse(),
       animationSpeedMultiplier,
       reusableTrajectory,
-      trajectory.visibleStartProgress
+      trajectory.visibleStartProgress,
+      anchorEndDash,
+      {
+        accentSpeed: this.tuning.firePreviewEffectFlowSpeed,
+        enabled: hasPlaneReflection,
+        elapsed: this.presentationElapsed,
+        showAnimatedAccent: isPreview
+      }
     );
     this.fireTrajectoryPresentationCache.set(trajectoryCacheKey, trajectoryMesh);
     this.fireTrajectoryPresentationKeysInUse.add(trajectoryCacheKey);
@@ -20878,12 +22288,13 @@ export class CinematicSolarSystemRenderer {
     group.add(trajectoryMesh);
     this.fireTrajectoryCount += 1;
 
-    return getTrajectoryLabelAnchor(trajectory.points);
+    return getTrajectoryLabelAnchor(renderedPoints);
   }
 
   private resolveFireTrajectory(
     plan: RenderableFirePlan,
-    activeProgress?: number
+    activeProgress?: number,
+    targetMode?: FireTrajectoryTargetMode
   ): ResolvedFireTrajectory | null {
     const origin = this.getFireOriginRenderData(plan);
     const baseTarget = this.getFireTargetBaseRenderData(plan);
@@ -20892,8 +22303,13 @@ export class CinematicSolarSystemRenderer {
       return null;
     }
 
-    const target = this.getFireTargetRenderData(plan, baseTarget);
-    const cacheKey = this.getFirePlanPresentationKey(plan);
+    const resolvedTargetMode =
+      targetMode ?? ("launchedTurn" in plan ? "tracked-ship" : "orbit-center");
+    const target =
+      resolvedTargetMode === "orbit-center"
+        ? baseTarget
+        : this.getFireTargetRenderData(plan, baseTarget);
+    const cacheKey = `${this.getFirePlanPresentationKey(plan)}:${resolvedTargetMode}`;
     const signature = `${getDisplayNodeRenderDataTrajectorySignature(
       origin
     )};${getDisplayNodeRenderDataTrajectorySignature(target)}`;
@@ -21038,28 +22454,23 @@ export class CinematicSolarSystemRenderer {
       this.renderer.domElement.clientHeight,
       pickerScreenRadius
     );
+    let pickerWasCreated = false;
     if (occlusion < 0.995) {
       const cachedPicker = marker.getObjectByName("active-missile-picker");
       const picker =
         cachedPicker instanceof THREE.Mesh
           ? cachedPicker
           : createTargetPickerObject("active-missile-picker");
+      pickerWasCreated = !(cachedPicker instanceof THREE.Mesh);
       picker.userData["targetKey"] = targetKey;
       picker.visible = true;
       picker.scale.setScalar(Math.max(1, pickerWorldRadius / Math.max(0.001, markerScale)));
       if (picker.parent !== marker) {
         marker.add(picker);
       }
-      this.pickableTargets.set(picker, targetKey);
-      this.activeMissilePickables.add(picker);
-      marker.traverse((child) => {
-        if (!(child instanceof THREE.Mesh)) {
-          return;
-        }
-
-        this.pickableTargets.set(child, targetKey);
-        this.activeMissilePickables.add(child);
-      });
+      if (markerWasCreated || pickerWasCreated) {
+        this.registerActiveMissileMarkerPickables(marker, targetKey);
+      }
     } else {
       const cachedPicker = marker.getObjectByName("active-missile-picker");
 
@@ -21067,8 +22478,9 @@ export class CinematicSolarSystemRenderer {
         cachedPicker.visible = false;
       }
     }
-    this.activeMissileTargetPositions.set(targetKey, motion.position.clone());
-    this.transientTargetLastKnownPositions.set(targetKey, motion.position.clone());
+    const targetPosition = motion.position.clone();
+    this.activeMissileTargetPositions.set(targetKey, targetPosition);
+    this.transientTargetLastKnownPositions.set(targetKey, targetPosition);
     this.activeMissileGroup.add(marker);
     if (markerWasCreated) {
       this.requestCinematicResourceWarmup();
@@ -21161,20 +22573,21 @@ export class CinematicSolarSystemRenderer {
 
   private updateTransientMissilePresentations(): void {
     this.missileTransientPresentationLastUpdatedAt = this.presentationElapsed;
+    this.missileTransientCacheKeysInUse.clear();
+    this.detachCachedMissileTransientObjects();
+    clearGroup(this.missileTransientGroup);
 
     if (
       this.missileEvadePresentations.length === 0 &&
       this.missileSolutionBrokenPresentations.length === 0
     ) {
-      if (this.missileTransientGroup.children.length > 0) {
-        clearGroup(this.missileTransientGroup);
-      }
+      this.pruneCachedMissileTransientObjects();
       return;
     }
 
-    clearGroup(this.missileTransientGroup);
     this.renderEvadedMissilePresentations();
     this.renderMissileSolutionBrokenPresentations();
+    this.pruneCachedMissileTransientObjects();
   }
 
   private shouldUpdateTransientMissilePresentations(): boolean {
@@ -21223,8 +22636,6 @@ export class CinematicSolarSystemRenderer {
       const opacity = Math.max(0, 1 - smoothStep(0, 1, fadeProgress));
       const missileVisibility =
         1 - smoothStep(detonationDelaySeconds - 0.045, detonationDelaySeconds, age);
-      const blinkAngle = getBeatSynchronizedCycleAngle(age, 48, this.getPresentationBeatPulse());
-      const blink = 0.28 + 0.72 * (0.5 + 0.5 * Math.sin(blinkAngle + presentation.seed * 0.017));
       const points = buildMissileTrajectoryPreview(
         origin,
         target,
@@ -21253,6 +22664,7 @@ export class CinematicSolarSystemRenderer {
       );
 
       if (fadingPoints.length >= 2) {
+        const trajectoryCacheKey = `evade-trajectory:${presentation.id}`;
         const fadingTrajectory = createBurnTrajectoryMesh(
           fadingPoints,
           this.tuning.fireMarkerColor,
@@ -21265,8 +22677,11 @@ export class CinematicSolarSystemRenderer {
           this.getTacticalTrajectoryDetailMode(),
           this.camera.position,
           this.getPresentationBeatPulse(),
-          1.35
+          1.35,
+          this.missileTransientTrajectoryCache.get(trajectoryCacheKey)
         );
+        this.missileTransientTrajectoryCache.set(trajectoryCacheKey, fadingTrajectory);
+        this.missileTransientCacheKeysInUse.add(trajectoryCacheKey);
         fadingTrajectory.userData["extremeZoomUiFade"] = true;
         this.missileTransientGroup.add(fadingTrajectory);
         this.fireTrajectoryCount += 1;
@@ -21276,6 +22691,7 @@ export class CinematicSolarSystemRenderer {
       const detailProgress = getShipDetailProgress(this.distance, this.tuning);
 
       if (missileVisibility > 0.01) {
+        const markerCacheKey = `evade-marker:${presentation.id}`;
         const markerPosition =
           presentation.detonationPosition === undefined
             ? motion.position
@@ -21286,7 +22702,11 @@ export class CinematicSolarSystemRenderer {
                   presentation.detonationPosition,
                 age / detonationDelaySeconds
               );
-        const marker = createMissileMarkerObject(this.tuning);
+        const marker =
+          this.missileTransientMarkerCache.get(markerCacheKey) ??
+          createMissileMarkerObject(this.tuning);
+        this.missileTransientMarkerCache.set(markerCacheKey, marker);
+        this.missileTransientCacheKeysInUse.add(markerCacheKey);
         marker.position.copy(markerPosition);
         marker.rotation.y = getYawForDirection(motion.direction);
         const markerScreenPixels =
@@ -21294,9 +22714,7 @@ export class CinematicSolarSystemRenderer {
             this.tuning.missileMarkerScreenPixels * 1.18,
             this.tuning.missileMarkerScreenPixels * 1.72,
             detailProgress
-          ) *
-          getOrbitObjectReadabilityBoost(detailProgress, this.tuning, 0.72) *
-          (1 + blink * 0.22);
+          ) * getOrbitObjectReadabilityBoost(detailProgress, this.tuning, 0.72);
         const markerWorldSize = getWorldUnitsForScreenPixels(
           this.camera,
           markerPosition,
@@ -21305,13 +22723,11 @@ export class CinematicSolarSystemRenderer {
         );
         marker.scale.setScalar(Math.max(markerWorldSize, 0.82));
         syncMissileMarkerPresentation(marker, {
-          animationSpeedMultiplier: missileCancellationBlinkSpeedMultiplier,
           beatPulse: this.getPresentationBeatPulse(),
           detailProgress,
-          elapsed:
-            this.presentationElapsed +
-            (presentation.seed * 0.001) / missileCancellationBlinkSpeedMultiplier,
-          opacity: this.tuning.activeMissileOpacity * opacity * missileVisibility * blink
+          disableBlink: true,
+          elapsed: this.presentationElapsed + presentation.seed * 0.001,
+          opacity: this.tuning.activeMissileOpacity * opacity * missileVisibility
         });
         this.missileTransientGroup.add(marker);
       }
@@ -21328,7 +22744,7 @@ export class CinematicSolarSystemRenderer {
           futureTimingTerminal ?? target.center,
           labelText,
           "fire-summary",
-          opacity * blink
+          opacity
         );
       }
     }
@@ -21397,6 +22813,7 @@ export class CinematicSolarSystemRenderer {
       );
 
       if (fadingPoints.length >= 2) {
+        const trajectoryCacheKey = `solution-broken-trajectory:${presentation.id}`;
         const fadingTrajectory = createBurnTrajectoryMesh(
           fadingPoints,
           this.tuning.fireMarkerColor,
@@ -21409,14 +22826,60 @@ export class CinematicSolarSystemRenderer {
           this.getTacticalTrajectoryDetailMode(),
           this.camera.position,
           this.getPresentationBeatPulse(),
-          1.35
+          1.35,
+          this.missileTransientTrajectoryCache.get(trajectoryCacheKey)
         );
+        this.missileTransientTrajectoryCache.set(trajectoryCacheKey, fadingTrajectory);
+        this.missileTransientCacheKeysInUse.add(trajectoryCacheKey);
         fadingTrajectory.name = "missile-solution-broken-trajectory";
         fadingTrajectory.userData["extremeZoomUiFade"] = true;
         this.missileTransientGroup.add(fadingTrajectory);
         this.fireTrajectoryCount += 1;
       }
     }
+  }
+
+  private detachCachedMissileTransientObjects(): void {
+    for (const object of this.missileTransientTrajectoryCache.values()) {
+      object.removeFromParent();
+    }
+    for (const object of this.missileTransientMarkerCache.values()) {
+      object.removeFromParent();
+    }
+  }
+
+  private pruneCachedMissileTransientObjects(): void {
+    for (const [key, object] of this.missileTransientTrajectoryCache) {
+      if (this.missileTransientCacheKeysInUse.has(key)) {
+        continue;
+      }
+      object.removeFromParent();
+      disposeObject(object);
+      this.missileTransientTrajectoryCache.delete(key);
+    }
+    for (const [key, object] of this.missileTransientMarkerCache) {
+      if (this.missileTransientCacheKeysInUse.has(key)) {
+        continue;
+      }
+      object.removeFromParent();
+      disposeObject(object);
+      this.missileTransientMarkerCache.delete(key);
+    }
+  }
+
+  private clearCachedMissileTransientObjects(): void {
+    this.missileTransientCacheKeysInUse.clear();
+    for (const object of this.missileTransientTrajectoryCache.values()) {
+      object.removeFromParent();
+      disposeObject(object);
+    }
+    for (const object of this.missileTransientMarkerCache.values()) {
+      object.removeFromParent();
+      disposeObject(object);
+    }
+    this.missileTransientTrajectoryCache.clear();
+    this.missileTransientMarkerCache.clear();
+    clearGroup(this.missileTransientGroup);
   }
 
   private renderMissileEvadePointDefenseEffect(
@@ -21491,10 +22954,36 @@ export class CinematicSolarSystemRenderer {
     }
 
     this.activeBurnPickables.clear();
+    this.clearActiveBurnFrameTargets();
+  }
+
+  private clearActiveBurnFrameTargets(): void {
     this.activeBurnTargetPositions.clear();
     this.activeBurnTargetMarkerRadii.clear();
     this.activeBurnTargetDirections.clear();
     this.activeBurnCameraSamples.clear();
+  }
+
+  private registerActiveBurnMarkerPickables(marker: THREE.Object3D, targetKey: string): void {
+    marker.traverse((child) => {
+      if (child.userData["shipDriveWakeDecorative"] === true || !(child instanceof THREE.Mesh)) {
+        return;
+      }
+
+      this.pickableTargets.set(child, targetKey);
+      this.activeBurnPickables.add(child);
+    });
+  }
+
+  private unregisterActiveBurnMarkerPickables(marker: THREE.Object3D): void {
+    marker.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) {
+        return;
+      }
+
+      this.pickableTargets.delete(child);
+      this.activeBurnPickables.delete(child);
+    });
   }
 
   private getActiveBurnMarkerCacheKey(transit: ActiveBurnTransit): string {
@@ -21517,6 +23006,7 @@ export class CinematicSolarSystemRenderer {
         continue;
       }
 
+      this.unregisterActiveBurnMarkerPickables(marker);
       marker.removeFromParent();
       disposeObject(marker);
       this.activeBurnMarkerCache.delete(key);
@@ -21524,6 +23014,8 @@ export class CinematicSolarSystemRenderer {
   }
 
   private clearCachedActiveBurnMarkers(): void {
+    this.clearActiveBurnPickables();
+
     for (const marker of this.activeBurnMarkerCache.values()) {
       marker.removeFromParent();
       disposeObject(marker);
@@ -21586,6 +23078,12 @@ export class CinematicSolarSystemRenderer {
     plan: RenderableFirePlan,
     group: THREE.Group
   ): string {
+    if ("id" in plan) {
+      // A confirmed FIRE solution becomes an active missile with the same id. Keep one ribbon,
+      // reflection, and accent phase across that boundary instead of deleting and recreating it.
+      return `order:${String(plan.id)}`;
+    }
+
     const presentationKind =
       group === this.activeMissileGroup
         ? "active"
@@ -21594,10 +23092,7 @@ export class CinematicSolarSystemRenderer {
           : group === this.firePreviewGroup
             ? "preview"
             : "other";
-    const planKey =
-      "id" in plan
-        ? String(plan.id)
-        : `${plan.originNodeId}:${plan.targetNodeId}:${plan.issuedTurn}:${plan.impactTurn}`;
+    const planKey = `${plan.originNodeId}:${plan.targetNodeId}:${plan.issuedTurn}:${plan.impactTurn}`;
     return `${presentationKind}:${planKey}`;
   }
 
@@ -21645,13 +23140,15 @@ export class CinematicSolarSystemRenderer {
     color: THREE.ColorRepresentation,
     opacity: number,
     radius = 0.34,
-    endpoints?: OrbitTimingSegmentEndpoints
+    endpoints?: OrbitTimingSegmentEndpoints,
+    style: OrbitTimingStyle = "tactical"
   ): THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial> {
     const cached = this.orbitTimingSegmentCache.get(key);
-    const line = cached ?? createOrbitTimingSegment(points, color, opacity, radius, endpoints);
+    const line =
+      cached ?? createOrbitTimingSegment(points, color, opacity, radius, endpoints, style);
 
     if (cached !== undefined) {
-      syncOrbitTimingSegment(cached, points, color, opacity, radius, endpoints);
+      syncOrbitTimingSegment(cached, points, color, opacity, radius, endpoints, style);
     } else {
       this.orbitTimingSegmentCache.set(key, line);
     }
@@ -21692,13 +23189,14 @@ export class CinematicSolarSystemRenderer {
     key: string,
     position: THREE.Vector3,
     color: THREE.ColorRepresentation,
-    opacity: number
+    opacity: number,
+    style: OrbitTimingStyle = "tactical"
   ): THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> {
     const cached = this.orbitTimingDotCache.get(key);
-    const dot = cached ?? createOrbitTimingDot(position, color, opacity);
+    const dot = cached ?? createOrbitTimingDot(position, color, opacity, style);
 
     if (cached !== undefined) {
-      syncOrbitTimingDot(cached, position, color, opacity);
+      syncOrbitTimingDot(cached, position, color, opacity, style);
     } else {
       this.orbitTimingDotCache.set(key, dot);
     }
@@ -21735,55 +23233,6 @@ export class CinematicSolarSystemRenderer {
     this.orbitTimingDotKeysInUse.clear();
   }
 
-  private getCachedFutureFireTargetMarker(
-    key: string,
-    destination: DisplayNodeRenderData,
-    color: THREE.ColorRepresentation,
-    opacity: number,
-    screenDiameterPixels: number
-  ): THREE.Group {
-    const cached = this.futureFireTargetMarkerCache.get(key);
-    const marker =
-      cached ?? createFutureFireTargetMarker(destination, color, opacity, screenDiameterPixels);
-
-    if (cached !== undefined) {
-      syncFutureFireTargetMarker(marker, destination, color, opacity, screenDiameterPixels);
-    } else {
-      this.futureFireTargetMarkerCache.set(key, marker);
-    }
-
-    this.futureFireTargetMarkerKeysInUse.add(key);
-    return marker;
-  }
-
-  private detachCachedFutureFireTargetMarkers(): void {
-    for (const marker of this.futureFireTargetMarkerCache.values()) {
-      marker.removeFromParent();
-    }
-  }
-
-  private pruneCachedFutureFireTargetMarkers(): void {
-    for (const [key, marker] of this.futureFireTargetMarkerCache) {
-      if (this.futureFireTargetMarkerKeysInUse.has(key)) {
-        continue;
-      }
-
-      marker.removeFromParent();
-      disposeObject(marker);
-      this.futureFireTargetMarkerCache.delete(key);
-    }
-  }
-
-  private clearCachedFutureFireTargetMarkers(): void {
-    for (const marker of this.futureFireTargetMarkerCache.values()) {
-      marker.removeFromParent();
-      disposeObject(marker);
-    }
-
-    this.futureFireTargetMarkerCache.clear();
-    this.futureFireTargetMarkerKeysInUse.clear();
-  }
-
   private getCachedFutureDestinationMarker(
     key: string,
     position: THREE.Vector3,
@@ -21817,6 +23266,55 @@ export class CinematicSolarSystemRenderer {
         : createFutureNodeGhost(destination, color, opacity);
 
     syncFutureNodeGhost(marker, destination, color, opacity, scale);
+    this.futureGhostCache.set(key, marker);
+    this.futureGhostKeysInUse.add(key);
+    return marker;
+  }
+
+  private getCachedFutureFireImpactMarker(
+    key: string,
+    destination: DisplayNodeRenderData,
+    fireColor: THREE.ColorRepresentation,
+    targetColor: THREE.ColorRepresentation,
+    opacity: number,
+    scale = 1
+  ): THREE.Group {
+    const cached = this.futureGhostCache.get(key);
+    const minimumTickOuterRadiusWorld = getWorldUnitsForScreenPixels(
+      this.camera,
+      destination.center,
+      this.renderer.domElement.clientHeight,
+      futureFireImpactTickMinimumOuterRadiusPixels
+    );
+    const tickThicknessWorld = getWorldUnitsForScreenPixels(
+      this.camera,
+      destination.center,
+      this.renderer.domElement.clientHeight,
+      futureFireImpactTickThicknessPixels
+    );
+    const marker: THREE.Group =
+      cached instanceof THREE.Group && cached.userData["futureFireImpactMarker"] === true
+        ? (cached as THREE.Group)
+        : createFutureFireImpactMarker(
+            destination,
+            fireColor,
+            targetColor,
+            opacity,
+            scale,
+            minimumTickOuterRadiusWorld,
+            tickThicknessWorld
+          );
+
+    syncFutureFireImpactMarker(
+      marker,
+      destination,
+      fireColor,
+      targetColor,
+      opacity,
+      scale,
+      minimumTickOuterRadiusWorld,
+      tickThicknessWorld
+    );
     this.futureGhostCache.set(key, marker);
     this.futureGhostKeysInUse.add(key);
     return marker;
@@ -21875,6 +23373,28 @@ export class CinematicSolarSystemRenderer {
     this.activeMissileTargetPositions.clear();
   }
 
+  private registerActiveMissileMarkerPickables(marker: THREE.Object3D, targetKey: string): void {
+    marker.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) {
+        return;
+      }
+
+      this.pickableTargets.set(child, targetKey);
+      this.activeMissilePickables.add(child);
+    });
+  }
+
+  private unregisterActiveMissileMarkerPickables(marker: THREE.Object3D): void {
+    marker.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) {
+        return;
+      }
+
+      this.pickableTargets.delete(child);
+      this.activeMissilePickables.delete(child);
+    });
+  }
+
   private detachCachedActiveMissileMarkers(): void {
     for (const marker of this.activeMissileMarkerCache.values()) {
       marker.removeFromParent();
@@ -21889,6 +23409,7 @@ export class CinematicSolarSystemRenderer {
         continue;
       }
 
+      this.unregisterActiveMissileMarkerPickables(marker);
       marker.removeFromParent();
       disposeObject(marker);
       this.activeMissileMarkerCache.delete(missileId);
@@ -21896,6 +23417,8 @@ export class CinematicSolarSystemRenderer {
   }
 
   private clearCachedActiveMissileMarkers(): void {
+    this.clearActiveMissilePickables();
+
     for (const marker of this.activeMissileMarkerCache.values()) {
       marker.removeFromParent();
       disposeObject(marker);
@@ -22261,6 +23784,10 @@ export class CinematicSolarSystemRenderer {
     plan: RenderableFirePlan,
     target: DisplayNodeRenderData
   ): DisplayNodeRenderData {
+    if (!("id" in plan)) {
+      return target;
+    }
+
     const targetFactionId = this.getFirePlanTargetFactionId(plan);
 
     if (targetFactionId === null) {
@@ -22310,9 +23837,9 @@ export class CinematicSolarSystemRenderer {
       return this.getActiveMissileTargetOrbitAngle(plan);
     }
 
-    // Preview targets keep moving with their ship's orbital phase. At launch that phase is
-    // captured by getActiveMissileTargetOrbitAngle, preventing the terminal end of the FIRE
-    // trajectory from snapping away from its preview position.
+    // Queued targets keep moving with their ship's orbital phase. At launch that phase is
+    // captured by getActiveMissileTargetOrbitAngle, preventing the terminal end of the active
+    // FIRE trajectory from snapping away from its queued position.
     return undefined;
   }
 
@@ -22503,7 +24030,8 @@ export class CinematicSolarSystemRenderer {
     const origin = this.getPlanOriginRenderData(transit);
     const destination = this.getPlanDestinationRenderData(transit);
     const seed = hashStringToUnitInterval(transit.id);
-    const launchProgress = 0.035 + seed * activeBurnVisualLaunchWindow;
+    const ignitionTiming = computeFusionIgnitionPresentationTiming(transit.etaTurns, seed);
+    const launchProgress = ignitionTiming.startProgress;
     const arrivalJitter = (1 - seed) * activeBurnVisualArrivalWindow;
     const arrivalAngle = this.getBurnPlanArrivalAngle(transit);
 
@@ -22514,6 +24042,7 @@ export class CinematicSolarSystemRenderer {
       );
       return {
         launchProgress,
+        ignitionRampDuration: ignitionTiming.rampDurationProgress,
         arrivalAngle,
         arrivalProgress: clamp(
           fallbackArrivalProgress,
@@ -22530,6 +24059,7 @@ export class CinematicSolarSystemRenderer {
 
     return {
       launchProgress,
+      ignitionRampDuration: ignitionTiming.rampDurationProgress,
       arrivalAngle,
       arrivalProgress: clamp(
         arrivalProgress,
@@ -22554,7 +24084,7 @@ export class CinematicSolarSystemRenderer {
   private getActiveBurnIgnitionProgress(progress: number, timing: ActiveBurnVisualTiming): number {
     return smoothStep(
       timing.launchProgress,
-      timing.launchProgress + activeBurnIgnitionRampDuration,
+      timing.launchProgress + timing.ignitionRampDuration,
       progress
     );
   }
@@ -22784,7 +24314,6 @@ export class CinematicSolarSystemRenderer {
       return null;
     }
 
-    const target = this.getFireTargetRenderData(plan, baseTarget);
     const previewLaunchKey = `fire-launch:${this.getFirePlanPresentationKey(plan)}`;
     const factionId = this.getFirePlanOriginFactionId(plan);
     const renderedLaunchPosition =
@@ -22795,7 +24324,7 @@ export class CinematicSolarSystemRenderer {
 
     return createLaunchOriginRenderData({
       baseOrigin,
-      destination: target,
+      destination: baseTarget,
       // Pending FIRE and the active missile now share the rendered launcher mount instead of
       // switching from a synthetic orbit slot during the launch frame.
       capturedLaunchPosition: renderedLaunchPosition,
@@ -23123,7 +24652,14 @@ export class CinematicSolarSystemRenderer {
       this.getPresentationBeatPulse(),
       activeProgress === undefined ? 1 : 1.55,
       reusableTrajectory,
-      visibleStartProgress
+      visibleStartProgress,
+      false,
+      {
+        accentSpeed: this.tuning.burnPreviewEffectFlowSpeed,
+        enabled: this.shouldRenderTrajectoryPlaneReflection(group),
+        elapsed: this.presentationElapsed,
+        showAnimatedAccent: group === this.burnPreviewGroup
+      }
     );
     this.burnTrajectoryPresentationCache.set(trajectoryCacheKey, trajectory);
     this.burnTrajectoryPresentationKeysInUse.add(trajectoryCacheKey);
@@ -23133,7 +24669,7 @@ export class CinematicSolarSystemRenderer {
     }
     this.burnTrajectoryCount += 1;
 
-    if (showFutureMarker && isAffordable) {
+    if (showFutureMarker && isAffordable && group !== this.burnPreviewGroup) {
       const targetKey = "id" in plan ? `burn:${plan.id}` : null;
       if (targetKey !== null) {
         this.transientTargetLastKnownPositions.set(targetKey, destination.center.clone());
@@ -23176,6 +24712,26 @@ export class CinematicSolarSystemRenderer {
     return (
       getBurnFutureLabelAnchor(origin.center, destination.center, destination.ringRadius) ??
       getBurnTrajectoryLabelAnchor(points)
+    );
+  }
+
+  private shouldRenderTrajectoryPlaneReflection(group: THREE.Group): boolean {
+    if (this.trajectoryReflectionMode === "off") {
+      return false;
+    }
+
+    const isHoverPreview = group === this.burnPreviewGroup || group === this.firePreviewGroup;
+
+    if (this.trajectoryReflectionMode === "hover") {
+      return isHoverPreview;
+    }
+
+    return (
+      isHoverPreview ||
+      group === this.pendingBurnGroup ||
+      group === this.activeBurnGroup ||
+      group === this.pendingFireGroup ||
+      group === this.activeMissileGroup
     );
   }
 
@@ -23299,7 +24855,8 @@ export class CinematicSolarSystemRenderer {
       plan.arrivalTurn,
       color,
       () => 0,
-      `pending-burn:${plan.id}`
+      `pending-burn:${plan.id}`,
+      "astronomical"
     );
 
     if (timingPreview === null) {
@@ -23313,7 +24870,8 @@ export class CinematicSolarSystemRenderer {
         color,
         this.tuning.pendingBurnOpacity * 0.64,
         this.getFutureBurnDestinationLineRadius(),
-        { start: timingPreview.start, end: timingPreview.target }
+        { start: timingPreview.start, end: timingPreview.target },
+        "astronomical"
       );
       link.name = "pending-burn-future-destination-link";
       this.futureDestinationGroup.add(link);
@@ -23643,10 +25201,12 @@ export class CinematicSolarSystemRenderer {
       pickerScreenRadius
     );
     const cachedPicker = marker.getObjectByName("active-burn-picker");
+    let pickerWasCreated = false;
 
     if (occlusion < 0.995) {
       const picker =
         cachedPicker instanceof THREE.Mesh ? cachedPicker : createActiveBurnPickerObject();
+      pickerWasCreated = !(cachedPicker instanceof THREE.Mesh);
       picker.userData["targetKey"] = targetKey;
       picker.visible = true;
       picker.scale.setScalar(Math.max(1, pickerWorldRadius / Math.max(0.001, markerScale)));
@@ -23655,20 +25215,9 @@ export class CinematicSolarSystemRenderer {
         marker.add(picker);
       }
 
-      this.pickableTargets.set(picker, targetKey);
-      this.activeBurnPickables.add(picker);
-      marker.traverse((child) => {
-        if (child.userData["shipDriveWakeDecorative"] === true) {
-          return;
-        }
-
-        if (!(child instanceof THREE.Mesh)) {
-          return;
-        }
-
-        this.pickableTargets.set(child, targetKey);
-        this.activeBurnPickables.add(child);
-      });
+      if (markerWasCreated || pickerWasCreated) {
+        this.registerActiveBurnMarkerPickables(marker, targetKey);
+      }
     } else if (cachedPicker !== undefined) {
       cachedPicker.visible = false;
     }
@@ -23691,8 +25240,9 @@ export class CinematicSolarSystemRenderer {
   private renderFutureBodyPreview(
     plan: RenderableBurnPlan,
     color: THREE.ColorRepresentation,
-    includeDestinationGhosts = true
+    includeDestinationNodeGhost = true
   ): void {
+    const isHoverPreview = !("id" in plan);
     const destinationNodeId = plan.destinationNodeId;
     const presentationKey = this.getBurnTrajectoryPresentationCacheKey(
       plan,
@@ -23703,8 +25253,9 @@ export class CinematicSolarSystemRenderer {
       plan.issuedTurn,
       plan.arrivalTurn,
       color,
-      (sampleTurn) => 0.48 + ((sampleTurn - plan.issuedTurn) / Math.max(1, plan.etaTurns)) * 0.22,
-      `burn-future:${presentationKey}`
+      (sampleTurn) => 0.18 + ((sampleTurn - plan.issuedTurn) / Math.max(1, plan.etaTurns)) * 0.12,
+      `burn-future:${presentationKey}`,
+      "astronomical"
     );
 
     if (timingPreview === null) {
@@ -23717,23 +25268,28 @@ export class CinematicSolarSystemRenderer {
           `burn-future:${presentationKey}`,
           timingPreview.points,
           color,
-          0.48,
+          isHoverPreview ? 0.36 : 0.48,
           this.getFutureBurnDestinationLineRadius(),
-          { start: timingPreview.start, end: timingPreview.target }
+          { start: timingPreview.start, end: timingPreview.target },
+          "astronomical"
         ),
         ...timingPreview.timingDots
       );
     }
 
-    if (includeDestinationGhosts) {
+    if (includeDestinationNodeGhost) {
       this.futureDestinationGroup.add(
-        this.getCachedFutureBodyGhost(`burn-body:${presentationKey}`, timingPreview.target),
         this.getCachedFutureNodeGhost(
           `burn-preview-node:${presentationKey}`,
           timingPreview.target,
           color,
           this.tuning.futureDestinationMarkerOpacity
         )
+      );
+    }
+    if (isHoverPreview) {
+      this.futureDestinationGroup.add(
+        this.getCachedFutureBodyGhost(`burn-hover-body:${presentationKey}`, timingPreview.target)
       );
     }
     const destinationRingPoints = createNodeHoverRingPoints(timingPreview.target);
@@ -23750,7 +25306,8 @@ export class CinematicSolarSystemRenderer {
     targetTurn: number,
     color: THREE.ColorRepresentation,
     getDotOpacity: (sampleTurn: number) => number,
-    timingDotCacheKeyPrefix?: string
+    timingDotCacheKeyPrefix?: string,
+    style: OrbitTimingStyle = "tactical"
   ): FutureOrbitTimingPreview | null {
     const target = this.getDisplayNodeRenderDataAtTurn(nodeId, targetTurn);
     const start = this.getFutureOrbitTimingStartNodeRenderData(nodeId, startTurn, targetTurn);
@@ -23763,7 +25320,7 @@ export class CinematicSolarSystemRenderer {
     const points: THREE.Vector3[] = [start.center.clone()];
     const timingDots: THREE.Mesh[] = [];
 
-    for (const sampleTurn of this.getFutureOrbitTimingSampleTurns(
+    for (const sampleTurn of getFutureOrbitTimingSampleTurns(
       visibleStartTurn,
       startTurn,
       targetTurn
@@ -23782,12 +25339,13 @@ export class CinematicSolarSystemRenderer {
       if (dotOpacity > 0.001) {
         const timingDot =
           timingDotCacheKeyPrefix === undefined
-            ? createOrbitTimingDot(sample.center, color, dotOpacity)
+            ? createOrbitTimingDot(sample.center, color, dotOpacity, style)
             : this.getCachedOrbitTimingDot(
                 `${timingDotCacheKeyPrefix}:${roundedTurn}`,
                 sample.center,
                 color,
-                dotOpacity
+                dotOpacity,
+                style
               );
         timingDots.push(timingDot);
       }
@@ -23805,39 +25363,6 @@ export class CinematicSolarSystemRenderer {
       start,
       target
     };
-  }
-
-  private getFutureOrbitTimingSampleTurns(
-    visibleStartTurn: number,
-    startTurn: number,
-    targetTurn: number
-  ): readonly number[] {
-    const duration = targetTurn - visibleStartTurn;
-
-    if (duration <= 0.001) {
-      return [];
-    }
-
-    const sampleTurns = new Set<number>();
-    const fractionalSampleCount = Math.round(clamp(duration * 6, 6, 24));
-
-    for (let index = 1; index < fractionalSampleCount; index += 1) {
-      const sampleTurn = visibleStartTurn + (duration * index) / fractionalSampleCount;
-
-      if (sampleTurn > visibleStartTurn + 0.001 && sampleTurn < targetTurn - 0.001) {
-        sampleTurns.add(roundFutureOrbitTimingSampleTurn(sampleTurn));
-      }
-    }
-
-    const firstWholeTurn = Math.max(Math.floor(visibleStartTurn) + 1, Math.floor(startTurn) + 1);
-
-    for (let sampleTurn = firstWholeTurn; sampleTurn < targetTurn; sampleTurn += 1) {
-      if (sampleTurn > visibleStartTurn + 0.001) {
-        sampleTurns.add(sampleTurn);
-      }
-    }
-
-    return [...sampleTurns].sort((first, second) => first - second);
   }
 
   private getFutureOrbitTimingStartNodeRenderData(
@@ -23893,7 +25418,8 @@ export class CinematicSolarSystemRenderer {
             `transfer-hint:${mode}:${plan.originNodeId}:${nodeId}:${baseArrivalTurn}:${hint.arrivalTurn}:${offset}`,
             sample.center,
             color,
-            mode === "fire" ? 0.34 : 0.3
+            mode === "fire" ? 0.34 : 0.2,
+            mode === "fire" ? "tactical" : "astronomical"
           )
         );
       }
@@ -23911,7 +25437,8 @@ export class CinematicSolarSystemRenderer {
           (mode === "fire"
             ? this.getFutureFireTargetLineRadius()
             : this.getFutureBurnDestinationLineRadius()) * 0.64,
-          { start: baseDestination, end: hintedDestination }
+          { start: baseDestination, end: hintedDestination },
+          mode === "fire" ? "tactical" : "astronomical"
         ),
         ...timingDots
       );
@@ -23964,16 +25491,34 @@ export class CinematicSolarSystemRenderer {
   }
 
   private syncTacticalDisplayCaches(snapshot: SolarSystemSnapshot): void {
+    const geometrySignature = [
+      snapshot.bodies
+        .map((body) =>
+          [
+            body.id,
+            body.parentId ?? "",
+            body.kind,
+            body.orbitRadius,
+            body.orbitPeriodTurns,
+            body.initialAngle,
+            body.visualRadius,
+            body.visualClass
+          ].join(":")
+        )
+        .join("|"),
+      snapshot.nodes
+        .map((node) => [node.id, node.bodyId, node.type, node.nodeOrbitRadius].join(":"))
+        .join("|")
+    ].join(";");
     const signature = [
+      geometrySignature,
       this.getDisplayScaleFocusTargetKey() ?? "",
       this.getDisplayScaleDistance(),
       this.getRawZoomOutDistance(snapshot)
     ].join("|");
 
-    if (
-      snapshot === this.tacticalDisplayCacheSnapshot &&
-      signature === this.tacticalDisplayCacheSignature
-    ) {
+    if (signature === this.tacticalDisplayCacheSignature) {
+      this.tacticalDisplayCacheSnapshot = snapshot;
       return;
     }
 
@@ -23981,6 +25526,7 @@ export class CinematicSolarSystemRenderer {
     this.tacticalDisplayCacheSignature = signature;
     this.tacticalDisplayStateCache.clear();
     this.tacticalDisplayNodeRenderDataCache.clear();
+    this.tacticalDisplaySnapshotCache.clear();
   }
 
   private invalidateTacticalDisplayCaches(): void {
@@ -23988,6 +25534,7 @@ export class CinematicSolarSystemRenderer {
     this.tacticalDisplayCacheSignature = "";
     this.tacticalDisplayStateCache.clear();
     this.tacticalDisplayNodeRenderDataCache.clear();
+    this.tacticalDisplaySnapshotCache.clear();
   }
 
   private getCurrentDisplayNodeRenderData(nodeId: string): DisplayNodeRenderData | null {
@@ -24089,17 +25636,35 @@ export class CinematicSolarSystemRenderer {
       return this.snapshot;
     }
 
+    if (this.isBuildingTacticalPresentation) {
+      const cacheKey = turn.toFixed(6);
+      const cached = this.tacticalDisplaySnapshotCache.get(cacheKey);
+
+      if (cached !== undefined) {
+        return cached;
+      }
+
+      const resolved = this.getSnapshotAtTurn?.(turn) ?? null;
+
+      if (resolved !== null) {
+        this.tacticalDisplaySnapshotCache.set(cacheKey, resolved);
+      }
+
+      return resolved;
+    }
+
     return this.getSnapshotAtTurn?.(turn) ?? null;
   }
 
   private clearTrajectoryLabels(): void {
     for (const label of this.trajectoryLabels) {
-      label.style.display = "none";
-      this.trajectoryLabelPool.push(label);
+      label.element.style.display = "none";
+      this.trajectoryLabelPool.push(label.element);
     }
 
     this.trajectoryLabels.length = 0;
     this.trajectoryLabelBounds.length = 0;
+    this.futureFireImpactLabelAvoidBounds.length = 0;
     this.trajectoryLabelRenderIndex = 0;
   }
 
@@ -24129,6 +25694,16 @@ export class CinematicSolarSystemRenderer {
     const x = (projected.x * 0.5 + 0.5) * rect.width;
     const y = (-projected.y * 0.5 + 0.5) * rect.height;
     const size = estimateTrajectoryLabelSize(text, kind);
+    const etaClassName = getTrajectoryEtaLabelClassName(text, kind);
+    const anchorAvoidBounds =
+      etaClassName === null
+        ? []
+        : [
+            createCenteredScreenRect(
+              { x, y },
+              futureFireImpactTickMinimumOuterRadiusPixels + futureFireImpactLabelGapPixels
+            )
+          ];
     const stableOffset =
       rememberedOffset ??
       (this.stabilizeTrajectoryLabelOffsetsForCameraMotion
@@ -24147,12 +25722,16 @@ export class CinematicSolarSystemRenderer {
     const shouldReuseStablePlacement =
       stablePlacement !== null &&
       (this.stabilizeTrajectoryLabelOffsetsForCameraMotion ||
-        !this.doesTrajectoryLabelPlacementNeedReflow(stablePlacement, rect.width, rect.height));
+        !this.doesTrajectoryLabelPlacementNeedReflow(
+          stablePlacement,
+          rect.width,
+          rect.height,
+          anchorAvoidBounds
+        ));
     const placement = shouldReuseStablePlacement
       ? stablePlacement
-      : this.placeTrajectoryLabel({ x, y }, size, kind, rect.width, rect.height);
+      : this.placeTrajectoryLabel({ x, y }, size, kind, rect.width, rect.height, anchorAvoidBounds);
     const label = this.trajectoryLabelPool.pop() ?? document.createElement("div");
-    const etaClassName = getTrajectoryEtaLabelClassName(text, kind);
     label.style.display = "";
     label.className = `cinematic-trajectory-label cinematic-trajectory-label--${kind}${
       etaClassName === null ? "" : ` ${etaClassName}`
@@ -24179,7 +25758,15 @@ export class CinematicSolarSystemRenderer {
 
     label.style.transform = `translate(${placement.x.toFixed(1)}px, ${placement.y.toFixed(1)}px)`;
     this.labelLayer.append(label);
-    this.trajectoryLabels.push(label);
+    this.trajectoryLabels.push({
+      element: label,
+      worldAnchor: anchor.clone(),
+      screenOffset: {
+        x: placement.x - x,
+        y: placement.y - y
+      },
+      size
+    });
     this.trajectoryLabelBounds.push(placement.bounds);
 
     if (!this.stabilizeTrajectoryLabelOffsetsForCameraMotion || rememberedOffset === undefined) {
@@ -24218,11 +25805,13 @@ export class CinematicSolarSystemRenderer {
   private doesTrajectoryLabelPlacementNeedReflow(
     placement: TrajectoryLabelPlacement,
     viewportWidth: number,
-    viewportHeight: number
+    viewportHeight: number,
+    additionalAvoidBounds: readonly ScreenRect[] = []
   ): boolean {
     return [
       ...this.trajectoryLabelBounds,
-      ...this.getTrajectoryLabelAvoidRects(viewportWidth, viewportHeight)
+      ...this.getTrajectoryLabelAvoidRects(viewportWidth, viewportHeight),
+      ...additionalAvoidBounds
     ].some((bounds) => labelsOverlap(placement.bounds, bounds));
   }
 
@@ -24231,10 +25820,14 @@ export class CinematicSolarSystemRenderer {
     size: TrajectoryLabelSize,
     kind: TrajectoryLabelKind,
     viewportWidth: number,
-    viewportHeight: number
+    viewportHeight: number,
+    additionalAvoidBounds: readonly ScreenRect[] = []
   ): TrajectoryLabelPlacement {
     const candidates = getTrajectoryLabelOffsetCandidates(kind, size);
-    const avoidBounds = this.getTrajectoryLabelAvoidRects(viewportWidth, viewportHeight);
+    const avoidBounds = [
+      ...this.getTrajectoryLabelAvoidRects(viewportWidth, viewportHeight),
+      ...additionalAvoidBounds
+    ];
     let bestPlacement: TrajectoryLabelPlacement | null = null;
     let bestScore = Number.POSITIVE_INFINITY;
 
@@ -24314,7 +25907,10 @@ export class CinematicSolarSystemRenderer {
     viewportWidth: number,
     viewportHeight: number
   ): ScreenRect[] {
-    const rects = this.getProjectedNodeAvoidRects(viewportWidth, viewportHeight);
+    const rects = [
+      ...this.getProjectedNodeAvoidRects(viewportWidth, viewportHeight),
+      ...this.futureFireImpactLabelAvoidBounds
+    ];
 
     const layerRect = this.labelLayer.getBoundingClientRect();
     const visibleElements = [
@@ -28724,6 +30320,7 @@ function syncMissileMarkerPresentation(
     animationSpeedMultiplier?: number;
     beatPulse?: CinematicVisualPulse | null;
     detailProgress: number;
+    disableBlink?: boolean;
     enginePower?: number;
     elapsed: number;
     ignitionFlash?: number;
@@ -28758,7 +30355,10 @@ function syncMissileMarkerPresentation(
   const overviewBlink =
     Math.sin(context.elapsed * 12.4 * animationSpeedMultiplier) > 0 ? 1 : missileOverviewBlinkFloor;
   const overviewBlinkWeight = 1 - smoothStep(0.44, 0.84, detailProgress);
-  const blink = THREE.MathUtils.lerp(beatBlink, overviewBlink, overviewBlinkWeight);
+  const blink =
+    context.disableBlink === true
+      ? 1
+      : THREE.MathUtils.lerp(beatBlink, overviewBlink, overviewBlinkWeight);
   const occludedOpacity = 1 - clamp(context.occlusion ?? 0, 0, 1);
   const enginePower = clamp(context.enginePower ?? 1, 0, 1);
   const ignitionFlash = clamp(context.ignitionFlash ?? 0, 0, 1);
@@ -29201,6 +30801,17 @@ function syncShipMarkerPresentation(
   const dotFade = 1 - smoothStep(0.32, 0.92, detailProgress);
   const silhouetteFade = 1 - smoothStep(0.48, 0.94, detailProgress);
   const occludedOpacity = 1 - clamp(context.occlusion, 0, 1);
+  // At strategic zoom the collapsed ship is positional UI, not physical hull geometry. Keep its
+  // dot/silhouette readable through planets and solar glare while the detailed model continues to
+  // obey normal celestial occlusion.
+  const strategicMarkerVisibility =
+    1 -
+    smoothStep(
+      shipStrategicMarkerOcclusionFadeStart,
+      shipStrategicMarkerOcclusionFadeEnd,
+      detailProgress
+    );
+  const collapsedOccludedOpacity = Math.max(occludedOpacity, strategicMarkerVisibility);
   const opacityMultiplier = context.opacityMultiplier ?? 1;
   const beatSyncEnabled = context.beatSyncEnabled !== false;
   const beatPulse = beatSyncEnabled ? (context.beatPulse ?? context.driveWakePulse ?? null) : null;
@@ -29232,7 +30843,7 @@ function syncShipMarkerPresentation(
   const zoomOutDotGlowSuppression =
     context.suppressZoomOutDotGlow === true ? smoothStep(0.42, 0.82, detailProgress) : 1;
 
-  if (occludedOpacity <= 0.012) {
+  if (occludedOpacity <= 0.012 && collapsedOccludedOpacity <= 0.012) {
     marker.visible = false;
     return;
   }
@@ -29260,7 +30871,7 @@ function syncShipMarkerPresentation(
     const minimalDotOpacity =
       context.tuning.shipMarkerOpacity *
       presentationOpacityMultiplier *
-      occludedOpacity *
+      collapsedOccludedOpacity *
       (0.46 + dotPulse * 0.18);
 
     if (dot !== undefined) {
@@ -29273,7 +30884,7 @@ function syncShipMarkerPresentation(
         context.tuning.shipMarkerOpacity *
         context.tuning.shipDotGlowStrength *
         presentationOpacityMultiplier *
-        occludedOpacity *
+        collapsedOccludedOpacity *
         zoomOutDotGlowSuppression *
         (0.22 + dotPulse * 0.12);
       dotGlow.visible = minimalGlowOpacity > 0.012;
@@ -29349,7 +30960,7 @@ function syncShipMarkerPresentation(
       dot,
       context.tuning.shipMarkerOpacity *
         presentationOpacityMultiplier *
-        occludedOpacity *
+        collapsedOccludedOpacity *
         dotFade *
         0.32
     );
@@ -29361,7 +30972,7 @@ function syncShipMarkerPresentation(
       silhouette,
       context.tuning.shipMarkerOpacity *
         presentationOpacityMultiplier *
-        occludedOpacity *
+        collapsedOccludedOpacity *
         silhouetteFade *
         (0.72 + dotPulse * 0.24)
     );
@@ -29375,7 +30986,7 @@ function syncShipMarkerPresentation(
         context.tuning.shipDotGlowStrength *
         presentationOpacityMultiplier *
         (0.65 + dotPulse * 0.35) *
-        occludedOpacity *
+        collapsedOccludedOpacity *
         dotFade *
         zoomOutDotGlowSuppression *
         0.52
@@ -29388,8 +30999,11 @@ function syncShipMarkerPresentation(
       enginePointPulse *
       occludedOpacity *
       smoothStep(0.02, 0.62, detailProgress);
-    engineBloomPoint.visible = enginePointOpacity > 0.012;
-    setObjectOpacity(engineBloomPoint, enginePointOpacity);
+    syncShipEngineBloomPointPresentation(engineBloomPoint, {
+      charge: enginePointCharge,
+      detailProgress,
+      opacity: enginePointOpacity
+    });
   }
 
   syncShipDriveWakePresentation(driveWake, {
@@ -29425,6 +31039,47 @@ function syncShipMarkerPresentation(
       context.markerScale
     );
   }
+}
+
+function syncShipEngineBloomPointPresentation(
+  engineBloomPoint: THREE.Object3D,
+  context: Readonly<{
+    charge: number;
+    detailProgress: number;
+    opacity: number;
+  }>
+): void {
+  // The general bloom passes deliberately reuse blurred framebuffers. A ship exhaust cannot use
+  // that cache because orbiting ships move every frame: the cached glow visibly trails the actual
+  // engine. Render this tiny radial source directly in screen space so its transform is always the
+  // current ship transform while retaining the same luminous appearance.
+  if (engineBloomPoint.userData["shipEngineDirectGlowConfigured"] !== true) {
+    setExclusiveObjectRenderLayer(engineBloomPoint, cinematicDirectUiRenderLayer);
+    engineBloomPoint.traverse((child) => {
+      if (!(child instanceof THREE.Points) || !(child.material instanceof THREE.PointsMaterial)) {
+        return;
+      }
+
+      child.material.map = getRetinalFlashTexture();
+      child.material.needsUpdate = true;
+    });
+    engineBloomPoint.userData["shipEngineDirectGlowConfigured"] = true;
+  }
+
+  const opacity = clamp(context.opacity, 0, 1);
+  const charge = clamp(context.charge, 0, 1);
+  const detailProgress = clamp(context.detailProgress, 0, 1);
+  engineBloomPoint.visible = opacity > 0.012;
+  setObjectOpacity(engineBloomPoint, opacity);
+
+  engineBloomPoint.traverse((child) => {
+    if (!(child instanceof THREE.Points) || !(child.material instanceof THREE.PointsMaterial)) {
+      return;
+    }
+
+    child.material.size =
+      THREE.MathUtils.lerp(8.5, 15, detailProgress) * THREE.MathUtils.lerp(1, 1.45, charge);
+  });
 }
 
 function syncShipServiceBlinkLightPresentation(
@@ -32678,14 +34333,26 @@ function createBurnTrajectoryMesh(
   beatPulse: CinematicVisualPulse | null = null,
   animationSpeedMultiplier = 1,
   reusableGroup?: THREE.Group,
-  visibleStartProgress = 0
+  visibleStartProgress = 0,
+  anchorEndDash = false,
+  planeReflection: TrajectoryPlaneReflectionOptions = {
+    accentSpeed: 0,
+    enabled: false,
+    elapsed,
+    showAnimatedAccent: false
+  }
 ): THREE.Group {
   // Camera-facing ribbon extrusion is handled in the vertex shader.
   void cameraPosition;
-  const distance = measurePolylineLength(points);
+  const group = reusableGroup ?? new THREE.Group();
+  const hasUnchangedPoints = group.userData["burnTrajectoryPoints"] === points;
+  const cachedDistance = getNumericUserData(group, "burnTrajectoryDistance");
+  const distance =
+    hasUnchangedPoints && Number.isFinite(cachedDistance)
+      ? cachedDistance
+      : measurePolylineLength(points);
   const dashCycle = isInvalid ? clamp(distance * 0.048, 11, 30) : clamp(distance * 0.055, 12, 34);
   const dashLength = dashCycle * (isInvalid ? 0.32 : 0.58);
-  const group = reusableGroup ?? new THREE.Group();
   const dashAnimationState = rebaseBurnTrajectoryDashAnimationState(
     getBurnTrajectoryDashAnimationState(group),
     dashCycle,
@@ -32705,6 +34372,11 @@ function createBurnTrajectoryMesh(
   group.userData["burnTrajectoryAnimationSpeedMultiplier"] = animationSpeedMultiplier;
   group.userData["burnTrajectoryAnchorStartDash"] = anchorStartDash;
   group.userData["burnTrajectoryDashAnimationState"] = dashAnimationState;
+  group.userData["burnTrajectoryPoints"] = points;
+  group.userData["burnTrajectoryDistance"] = distance;
+  group.userData["trajectoryAccentSpeed"] = planeReflection.showAnimatedAccent
+    ? Math.max(0, planeReflection.accentSpeed)
+    : 0;
 
   if (points.length < 2) {
     return group;
@@ -32726,7 +34398,17 @@ function createBurnTrajectoryMesh(
     coreRadiusLimit,
     detailMode,
     reusableDashGroup,
-    visibleStartProgress
+    visibleStartProgress,
+    anchorEndDash,
+    hasUnchangedPoints,
+    planeReflection
+  );
+  setObjectShaderUniformNumber(
+    dashGroup,
+    "trajectoryAccentPhase",
+    planeReflection.showAnimatedAccent && planeReflection.accentSpeed > 0
+      ? (planeReflection.elapsed * planeReflection.accentSpeed) % 1
+      : 0
   );
 
   for (const child of [...group.children]) {
@@ -32804,17 +34486,29 @@ function createBurnTrajectoryDash(
   coreRadiusLimit?: number,
   detailMode: BurnTrajectoryDetailMode = "full",
   reusableGroup?: THREE.Group,
-  visibleStartProgress = 0
+  visibleStartProgress = 0,
+  anchorEndDash = false,
+  hasUnchangedPoints = false,
+  planeReflection: TrajectoryPlaneReflectionOptions = {
+    accentSpeed: 0,
+    enabled: false,
+    elapsed: 0,
+    showAnimatedAccent: false
+  }
 ): THREE.Group {
   const rawCoreRadius = clamp(distance * 0.0018, 0.34, 1.2) * thicknessMultiplier;
   const coreRadius =
     coreRadiusLimit === undefined ? rawCoreRadius : Math.min(rawCoreRadius, coreRadiusLimit);
   const group = reusableGroup ?? new THREE.Group();
+  const terminalAnchorProgress = anchorEndDash
+    ? clamp((dashLength * 0.42) / Math.max(0.001, distance), 0.0015, 0.025)
+    : 0;
   group.name = "burn-trajectory";
   const trajectoryLayerNames = new Set([
     "burn-trajectory-glow",
     "burn-trajectory-edge-spine",
-    "burn-trajectory-core"
+    "burn-trajectory-core",
+    "burn-trajectory-plane-reflection"
   ]);
 
   for (const child of [...group.children]) {
@@ -32841,11 +34535,33 @@ function createBurnTrajectoryDash(
     coreEdgeSoftness,
     0,
     reusableCore,
-    visibleStartProgress
+    visibleStartProgress,
+    terminalAnchorProgress,
+    undefined,
+    hasUnchangedPoints
   );
   core.name = "burn-trajectory-core";
   core.renderOrder = 38;
   core.visible = true;
+  setShaderUniformNumber(
+    core.material,
+    "trajectoryAccentStrength",
+    planeReflection.showAnimatedAccent ? 1.2 : 0
+  );
+  const reflection = syncBurnTrajectoryPlaneReflection(
+    group,
+    core,
+    color,
+    opacity,
+    distance,
+    dashCycle,
+    dashLength,
+    dashPhase,
+    visibleStartProgress,
+    terminalAnchorProgress,
+    coreRadius,
+    planeReflection
+  );
 
   if (detailMode === "simple") {
     const reusableGlow = getBurnTrajectoryDashLayer(group, "burn-trajectory-glow");
@@ -32857,6 +34573,9 @@ function createBurnTrajectoryDash(
       reusableEdgeSpine.visible = false;
     }
     group.add(core);
+    if (reflection !== undefined) {
+      group.add(reflection);
+    }
     return group;
   }
 
@@ -32875,11 +34594,17 @@ function createBurnTrajectoryDash(
     0,
     reusableGlow,
     visibleStartProgress,
+    terminalAnchorProgress,
     core.geometry
   );
   glow.name = "burn-trajectory-glow";
   glow.renderOrder = 37.8;
   glow.visible = true;
+  setShaderUniformNumber(
+    glow.material,
+    "trajectoryAccentStrength",
+    planeReflection.showAnimatedAccent ? 0.36 : 0
+  );
 
   const reusableEdgeSpine = getBurnTrajectoryDashLayer(group, "burn-trajectory-edge-spine");
   const edgeHalfWidth = coreRadius * 1.25;
@@ -32896,13 +34621,100 @@ function createBurnTrajectoryDash(
     0.78,
     reusableEdgeSpine,
     visibleStartProgress,
+    terminalAnchorProgress,
     core.geometry
   );
   edgeSpine.name = "burn-trajectory-edge-spine";
   edgeSpine.renderOrder = 37.9;
   edgeSpine.visible = true;
+  setShaderUniformNumber(
+    edgeSpine.material,
+    "trajectoryAccentStrength",
+    planeReflection.showAnimatedAccent ? 0.58 : 0
+  );
   group.add(glow, edgeSpine, core);
+  if (reflection !== undefined) {
+    group.add(reflection);
+  }
   return group;
+}
+
+function syncBurnTrajectoryPlaneReflection(
+  group: THREE.Group,
+  core: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>,
+  color: THREE.ColorRepresentation,
+  opacity: number,
+  distance: number,
+  dashCycle: number,
+  dashLength: number,
+  dashPhase: number,
+  visibleStartProgress: number,
+  terminalAnchorProgress: number,
+  coreRadius: number,
+  options: TrajectoryPlaneReflectionOptions
+): THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> | undefined {
+  const reusableReflection = getBurnTrajectoryDashLayer(group, "burn-trajectory-plane-reflection");
+
+  if (!options.enabled) {
+    if (reusableReflection !== undefined) {
+      reusableReflection.visible = false;
+    }
+    return undefined;
+  }
+
+  const reflection =
+    reusableReflection ??
+    new THREE.Mesh(
+      core.geometry,
+      createBurnTrajectoryPlaneReflectionMaterial(
+        color,
+        opacity * trajectoryPlaneReflectionOpacityMultiplier,
+        distance,
+        dashCycle,
+        dashLength,
+        dashPhase,
+        visibleStartProgress,
+        terminalAnchorProgress,
+        coreRadius * trajectoryPlaneReflectionWidthMultiplier,
+        options.showAnimatedAccent && options.accentSpeed > 0
+          ? (options.elapsed * options.accentSpeed) % 1
+          : 0,
+        options.showAnimatedAccent ? 1 : 0
+      )
+    );
+  reflection.geometry = core.geometry;
+  reflection.userData["usesSharedGeometry"] = true;
+  reflection.frustumCulled = false;
+  reflection.name = "burn-trajectory-plane-reflection";
+  reflection.renderOrder = 37.65;
+  reflection.visible = true;
+  const reflectionDepth = clamp(
+    Math.max(
+      distance * trajectoryPlaneReflectionDistanceDepthRatio,
+      coreRadius * trajectoryPlaneReflectionCoreDepthMultiplier
+    ),
+    trajectoryPlaneReflectionMinimumDepth,
+    trajectoryPlaneReflectionMaximumDepth
+  );
+  reflection.position.set(0, -reflectionDepth, 0);
+  reflection.scale.set(1, -trajectoryPlaneReflectionVerticalScale, 1);
+  syncBurnTrajectoryPlaneReflectionMaterial(
+    reflection.material,
+    color,
+    opacity * trajectoryPlaneReflectionOpacityMultiplier,
+    distance,
+    dashCycle,
+    dashLength,
+    dashPhase,
+    visibleStartProgress,
+    terminalAnchorProgress,
+    coreRadius * trajectoryPlaneReflectionWidthMultiplier,
+    options.showAnimatedAccent && options.accentSpeed > 0
+      ? (options.elapsed * options.accentSpeed) % 1
+      : 0,
+    options.showAnimatedAccent ? 1 : 0
+  );
+  return reflection;
 }
 
 function createBurnTrajectoryDashLayer(
@@ -32918,8 +34730,10 @@ function createBurnTrajectoryDashLayer(
   verticalBias = 0,
   reusableMesh?: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>,
   visibleStartProgress = 0,
-  sharedGeometry?: THREE.BufferGeometry
-): THREE.Mesh {
+  terminalAnchorProgress = 0,
+  sharedGeometry?: THREE.BufferGeometry,
+  hasUnchangedPoints = false
+): THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> {
   if (reusableMesh === undefined) {
     const mesh = new THREE.Mesh(
       sharedGeometry ?? createBurnTrajectoryRibbonGeometry(points, distance),
@@ -32932,6 +34746,7 @@ function createBurnTrajectoryDashLayer(
         dashPhase,
         edgeSoftnessMultiplier,
         visibleStartProgress,
+        terminalAnchorProgress,
         radius,
         verticalBias
       )
@@ -32944,7 +34759,9 @@ function createBurnTrajectoryDashLayer(
   }
 
   if (sharedGeometry === undefined) {
-    syncBurnTrajectoryRibbonGeometry(reusableMesh, points, distance);
+    if (!hasUnchangedPoints) {
+      syncBurnTrajectoryRibbonGeometry(reusableMesh, points, distance);
+    }
   } else {
     reusableMesh.geometry = sharedGeometry;
   }
@@ -32958,6 +34775,7 @@ function createBurnTrajectoryDashLayer(
     dashPhase,
     edgeSoftnessMultiplier,
     visibleStartProgress,
+    terminalAnchorProgress,
     radius,
     verticalBias
   );
@@ -33164,6 +34982,7 @@ function syncBurnTrajectoryDashMaterial(
   dashPhase: number,
   edgeSoftnessMultiplier: number,
   visibleStartProgress: number,
+  terminalAnchorProgress: number,
   halfWidth: number,
   verticalBias: number
 ): void {
@@ -33181,6 +35000,11 @@ function syncBurnTrajectoryDashMaterial(
   setShaderUniformNumber(material, "dashPhase", dashPhase);
   setShaderUniformNumber(material, "dashEdgeSoftness", Math.max(0.45, edgeSoftnessMultiplier));
   setShaderUniformNumber(material, "dashVisibleStart", clamp(visibleStartProgress, 0, 1));
+  setShaderUniformNumber(
+    material,
+    "dashTerminalAnchorProgress",
+    clamp(terminalAnchorProgress, 0, 0.1)
+  );
   setShaderUniformNumber(material, "ribbonHalfWidth", Math.max(0.001, halfWidth));
   setShaderUniformNumber(material, "ribbonVerticalBias", clamp(verticalBias, 0, 1));
 }
@@ -33222,6 +35046,7 @@ function createBurnTrajectoryDashMaterial(
   dashPhase: number,
   edgeSoftnessMultiplier: number,
   visibleStartProgress: number,
+  terminalAnchorProgress: number,
   halfWidth: number,
   verticalBias: number
 ): THREE.ShaderMaterial {
@@ -33235,8 +35060,11 @@ function createBurnTrajectoryDashMaterial(
       dashPhase: { value: dashPhase },
       dashEdgeSoftness: { value: Math.max(0.45, edgeSoftnessMultiplier) },
       dashVisibleStart: { value: clamp(visibleStartProgress, 0, 1) },
+      dashTerminalAnchorProgress: { value: clamp(terminalAnchorProgress, 0, 0.1) },
       ribbonHalfWidth: { value: Math.max(0.001, halfWidth) },
-      ribbonVerticalBias: { value: clamp(verticalBias, 0, 1) }
+      ribbonVerticalBias: { value: clamp(verticalBias, 0, 1) },
+      trajectoryAccentPhase: { value: 0 },
+      trajectoryAccentStrength: { value: 0 }
     },
     transparent: true,
     // A trajectory can be viewed almost edge-on when the camera is lowered to the orbital
@@ -33292,6 +35120,9 @@ function createBurnTrajectoryDashMaterial(
       uniform float dashPhase;
       uniform float dashEdgeSoftness;
       uniform float dashVisibleStart;
+      uniform float dashTerminalAnchorProgress;
+      uniform float trajectoryAccentPhase;
+      uniform float trajectoryAccentStrength;
       varying vec2 vDashUv;
 
       void main() {
@@ -33305,16 +35136,225 @@ function createBurnTrajectoryDashMaterial(
         float visibleMask = dashVisibleStart <= 0.0001
           ? 1.0
           : smoothstep(dashVisibleStart, dashVisibleStart + 0.003, vDashUv.x);
-        float dashMask = clamp(min(lead, trail) * lateralMask * visibleMask, 0.0, 1.0);
+        float terminalAnchor = dashTerminalAnchorProgress <= 0.000001
+          ? 0.0
+          : smoothstep(
+              1.0 - dashTerminalAnchorProgress,
+              1.0 - dashTerminalAnchorProgress * 0.28,
+              vDashUv.x
+            );
+        float dashMask = clamp(
+          max(min(lead, trail), terminalAnchor) * lateralMask * visibleMask,
+          0.0,
+          1.0
+        );
+        float wrappedAccentDistance = abs(
+          fract(vDashUv.x - trajectoryAccentPhase + 0.5) - 0.5
+        );
+        float accent = exp(
+          -pow(wrappedAccentDistance / ${trajectoryPlaneReflectionGlintWidth.toFixed(3)}, 2.0)
+        );
+        float accentCross = pow(max(0.0, 1.0 - lateral), 5.0);
+        float accentMask =
+          accent * accentCross * visibleMask * trajectoryAccentStrength;
+        float combinedMask = clamp(dashMask + accentMask * 1.15, 0.0, 1.35);
 
-        if (dashMask <= 0.01) {
+        if (combinedMask <= 0.01) {
           discard;
         }
 
-        gl_FragColor = vec4(dashColor, dashOpacity * dashMask);
+        vec3 accentColor = mix(
+          dashColor,
+          vec3(1.0),
+          clamp(accentMask * 1.45, 0.0, 1.0)
+        );
+        gl_FragColor = vec4(accentColor, dashOpacity * combinedMask);
       }
     `
   });
+}
+
+function syncBurnTrajectoryPlaneReflectionMaterial(
+  material: THREE.ShaderMaterial,
+  color: THREE.ColorRepresentation,
+  opacity: number,
+  distance: number,
+  dashCycle: number,
+  dashLength: number,
+  dashPhase: number,
+  visibleStartProgress: number,
+  terminalAnchorProgress: number,
+  halfWidth: number,
+  accentPhase: number,
+  accentStrength: number
+): void {
+  const reflectionColor: unknown = material.uniforms["reflectionColor"]?.value;
+
+  if (reflectionColor instanceof THREE.Color) {
+    reflectionColor.set(color).lerp(new THREE.Color(0xd9fbff), 0.48);
+  }
+
+  setShaderUniformNumber(material, "reflectionOpacity", opacity);
+  material.userData["extremeZoomBase:reflectionOpacity"] = opacity;
+  setShaderUniformNumber(material, "dashDistance", Math.max(0.001, distance));
+  setShaderUniformNumber(material, "dashCycle", Math.max(0.001, dashCycle));
+  setShaderUniformNumber(material, "dashLength", Math.max(0.001, dashLength));
+  setShaderUniformNumber(material, "dashPhase", dashPhase);
+  setShaderUniformNumber(material, "dashVisibleStart", clamp(visibleStartProgress, 0, 1));
+  setShaderUniformNumber(
+    material,
+    "dashTerminalAnchorProgress",
+    clamp(terminalAnchorProgress, 0, 0.1)
+  );
+  setShaderUniformNumber(material, "ribbonHalfWidth", Math.max(0.001, halfWidth));
+  setShaderUniformNumber(material, "trajectoryAccentPhase", accentPhase);
+  setShaderUniformNumber(material, "trajectoryAccentStrength", accentStrength);
+}
+
+function createBurnTrajectoryPlaneReflectionMaterial(
+  color: THREE.ColorRepresentation,
+  opacity: number,
+  distance: number,
+  dashCycle: number,
+  dashLength: number,
+  dashPhase: number,
+  visibleStartProgress: number,
+  terminalAnchorProgress: number,
+  halfWidth: number,
+  accentPhase: number,
+  accentStrength: number
+): THREE.ShaderMaterial {
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      reflectionColor: {
+        value: new THREE.Color(color).lerp(new THREE.Color(0xd9fbff), 0.48)
+      },
+      reflectionOpacity: { value: opacity },
+      trajectoryAccentPhase: { value: accentPhase },
+      trajectoryAccentStrength: { value: accentStrength },
+      dashDistance: { value: Math.max(0.001, distance) },
+      dashCycle: { value: Math.max(0.001, dashCycle) },
+      dashLength: { value: Math.max(0.001, dashLength) },
+      dashPhase: { value: dashPhase },
+      dashVisibleStart: { value: clamp(visibleStartProgress, 0, 1) },
+      dashTerminalAnchorProgress: { value: clamp(terminalAnchorProgress, 0, 0.1) },
+      ribbonHalfWidth: { value: Math.max(0.001, halfWidth) }
+    },
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    vertexShader: `
+      attribute vec3 ribbonTangent;
+      attribute float ribbonSideSign;
+      uniform float ribbonHalfWidth;
+      varying vec2 vReflectionUv;
+      varying float vReflectionGrazing;
+
+      void main() {
+        vec4 worldCenter = modelMatrix * vec4(position, 1.0);
+        vec3 worldTangent = normalize(mat3(modelMatrix) * ribbonTangent);
+        vec3 toCamera = cameraPosition - worldCenter.xyz;
+        float toCameraLengthSq = dot(toCamera, toCamera);
+        vec3 viewDirection = toCameraLengthSq > 0.000001
+          ? toCamera * inversesqrt(toCameraLengthSq)
+          : vec3(0.0, 1.0, 0.0);
+        vec3 cameraFacingSide = cross(worldTangent, viewDirection);
+        vec3 planarTangent = vec3(worldTangent.x, 0.0, worldTangent.z);
+
+        if (dot(planarTangent, planarTangent) <= 0.000001) {
+          planarTangent = vec3(1.0, 0.0, 0.0);
+        } else {
+          planarTangent = normalize(planarTangent);
+        }
+
+        vec3 planarSide = normalize(vec3(-planarTangent.z, 0.0, planarTangent.x));
+        vec3 ribbonSide = dot(cameraFacingSide, cameraFacingSide) > 0.000001
+          ? normalize(cameraFacingSide)
+          : planarSide;
+        vec3 worldPosition =
+          worldCenter.xyz + ribbonSide * ribbonSideSign * ribbonHalfWidth;
+        vReflectionUv = uv;
+        vReflectionGrazing = 1.0 - abs(dot(viewDirection, vec3(0.0, 1.0, 0.0)));
+        vec4 clipPosition = projectionMatrix * viewMatrix * vec4(worldPosition, 1.0);
+        // A small refractive split keeps the reflection legible even when the camera is nearly
+        // normal to the orbital plane, where a geometrically exact mirror would fully overlap.
+        clipPosition.xy += vec2(
+          ${trajectoryPlaneReflectionScreenOffsetX.toFixed(4)},
+          ${trajectoryPlaneReflectionScreenOffsetY.toFixed(4)}
+        ) * clipPosition.w;
+        gl_Position = clipPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 reflectionColor;
+      uniform float reflectionOpacity;
+      uniform float trajectoryAccentPhase;
+      uniform float trajectoryAccentStrength;
+      uniform float dashDistance;
+      uniform float dashCycle;
+      uniform float dashLength;
+      uniform float dashPhase;
+      uniform float dashVisibleStart;
+      uniform float dashTerminalAnchorProgress;
+      varying vec2 vReflectionUv;
+      varying float vReflectionGrazing;
+
+      void main() {
+        float alongDistance = vReflectionUv.x * dashDistance;
+        float dashPosition = mod(alongDistance - dashPhase + dashCycle, dashCycle);
+        float edgeWidth = min(dashLength * 0.5, dashCycle * 0.24);
+        float lead = smoothstep(0.0, edgeWidth, dashPosition);
+        float trail = 1.0 - smoothstep(dashLength - edgeWidth, dashLength, dashPosition);
+        float lateral = abs(vReflectionUv.y - 0.5) * 2.0;
+        float softRibbon = 1.0 - smoothstep(0.08, 1.0, lateral);
+        float visibleMask = dashVisibleStart <= 0.0001
+          ? 1.0
+          : smoothstep(dashVisibleStart, dashVisibleStart + 0.004, vReflectionUv.x);
+        float terminalAnchor = dashTerminalAnchorProgress <= 0.000001
+          ? 0.0
+          : smoothstep(
+              1.0 - dashTerminalAnchorProgress,
+              1.0 - dashTerminalAnchorProgress * 0.28,
+              vReflectionUv.x
+            );
+        float reflectedDash = max(min(lead, trail), terminalAnchor) * softRibbon * visibleMask;
+        float glintCenter = trajectoryAccentPhase;
+        float wrappedGlintDistance = abs(
+          fract(vReflectionUv.x - glintCenter + 0.5) - 0.5
+        );
+        float glint = exp(
+          -pow(wrappedGlintDistance / ${trajectoryPlaneReflectionGlintWidth.toFixed(3)}, 2.0)
+        );
+        float glintCross = pow(max(0.0, 1.0 - lateral), 5.0);
+        float glintRay = exp(
+          -pow(
+            wrappedGlintDistance /
+              ${Math.max(0.001, trajectoryPlaneReflectionGlintWidth * 0.22).toFixed(3)},
+            2.0
+          )
+        ) * (1.0 - smoothstep(0.1, 1.0, lateral));
+        float grazingBoost = mix(0.72, 1.28, vReflectionGrazing);
+        float glintMask =
+          (glint * glintCross + glintRay * 0.9)
+          * visibleMask
+          * grazingBoost
+          * trajectoryAccentStrength;
+        float reflectionMask = reflectedDash * mix(0.52, 0.82, vReflectionGrazing);
+        float alpha = reflectionOpacity * (reflectionMask + glintMask * 1.85);
+
+        if (alpha <= 0.004) {
+          discard;
+        }
+
+        vec3 glintColor = mix(reflectionColor, vec3(1.0), clamp(glintMask * 1.4, 0.0, 1.0));
+        gl_FragColor = vec4(glintColor, alpha);
+      }
+    `
+  });
+  material.name = "burn-trajectory-plane-reflection-material";
+  return material;
 }
 
 function getMissileLaunchIgnitionFlash(launchProgress: number): number {
@@ -34170,12 +36210,21 @@ export function getIncomingFireImpactChronology<
   });
 }
 
-function compareMissileThreatsForPresentation(first: ActiveMissile, second: ActiveMissile): number {
+function compareFireArrivalsForPresentation(
+  first: Pick<PendingFireOrder, "impactTurn" | "targetNodeId"> &
+    Partial<Pick<PendingFireOrder, "id">>,
+  second: Pick<PendingFireOrder, "impactTurn" | "targetNodeId"> &
+    Partial<Pick<PendingFireOrder, "id">>
+): number {
   return (
     first.impactTurn - second.impactTurn ||
     first.targetNodeId.localeCompare(second.targetNodeId) ||
-    first.id.localeCompare(second.id)
+    (first.id ?? "").localeCompare(second.id ?? "")
   );
+}
+
+function compareMissileThreatsForPresentation(first: ActiveMissile, second: ActiveMissile): number {
+  return compareFireArrivalsForPresentation(first, second);
 }
 
 function createActiveBurnPickerObject(): THREE.Mesh {
@@ -34239,6 +36288,43 @@ function roundFutureOrbitTimingSampleTurn(turn: number): number {
   return Math.round(turn * 1000) / 1000;
 }
 
+export function getFutureOrbitTimingSampleTurns(
+  visibleStartTurn: number,
+  startTurn: number,
+  targetTurn: number
+): readonly number[] {
+  const clampedVisibleStartTurn = clamp(visibleStartTurn, startTurn, targetTurn);
+  const duration = targetTurn - clampedVisibleStartTurn;
+
+  if (duration <= 0.001) {
+    return [];
+  }
+
+  const sampleTurns = new Set<number>();
+  const fractionalSampleCount = Math.round(clamp(duration * 6, 6, 24));
+
+  for (let index = 1; index < fractionalSampleCount; index += 1) {
+    const sampleTurn = clampedVisibleStartTurn + (duration * index) / fractionalSampleCount;
+
+    if (sampleTurn > clampedVisibleStartTurn + 0.001 && sampleTurn < targetTurn - 0.001) {
+      sampleTurns.add(roundFutureOrbitTimingSampleTurn(sampleTurn));
+    }
+  }
+
+  const firstWholeTurn = Math.max(
+    Math.floor(clampedVisibleStartTurn) + 1,
+    Math.floor(startTurn) + 1
+  );
+
+  for (let sampleTurn = firstWholeTurn; sampleTurn < targetTurn; sampleTurn += 1) {
+    if (sampleTurn > clampedVisibleStartTurn + 0.001) {
+      sampleTurns.add(sampleTurn);
+    }
+  }
+
+  return [...sampleTurns].sort((first, second) => first - second);
+}
+
 function getDisplayNodeRenderDataTrajectorySignature(data: DisplayNodeRenderData): string {
   const departureOrbit = data.departureOrbit;
   return [
@@ -34268,60 +36354,6 @@ function getDisplayNodeRenderDataTrajectorySignature(data: DisplayNodeRenderData
     departureOrbit?.transferAnchor.y ?? "",
     departureOrbit?.transferAnchor.z ?? ""
   ].join(",");
-}
-
-function createFutureFireTargetMarker(
-  destination: DisplayNodeRenderData,
-  color: THREE.ColorRepresentation,
-  opacity: number,
-  screenDiameterPixels: number
-): THREE.Group {
-  const group = new THREE.Group();
-  group.name = `fire-future-target:${destination.node.id}`;
-  const terminalCenter = destination.center.clone().addScaledVector(mapPlaneUp, 0.28);
-  const targetDotMaterial = new THREE.PointsMaterial({
-    color,
-    map: getSolidPointTexture(),
-    size: screenDiameterPixels,
-    sizeAttenuation: false,
-    transparent: true,
-    opacity: clamp(opacity * 1.65, 0.82, 1),
-    alphaTest: 0.2,
-    depthTest: false,
-    depthWrite: false
-  });
-  targetDotMaterial.toneMapped = false;
-  const targetDot = new THREE.Points(getFireImpactTargetPointGeometry(), targetDotMaterial);
-  targetDot.name = "fire-impact-target-dot";
-  targetDot.position.copy(terminalCenter);
-  targetDot.renderOrder = 41;
-  targetDot.userData["usesSharedGeometry"] = true;
-  targetDot.frustumCulled = false;
-  group.add(targetDot);
-  return group;
-}
-
-function syncFutureFireTargetMarker(
-  group: THREE.Group,
-  destination: DisplayNodeRenderData,
-  color: THREE.ColorRepresentation,
-  opacity: number,
-  screenDiameterPixels: number
-): void {
-  group.name = `fire-future-target:${destination.node.id}`;
-  const targetDot = group.getObjectByName("fire-impact-target-dot");
-
-  if (
-    !(targetDot instanceof THREE.Points) ||
-    !(targetDot.material instanceof THREE.PointsMaterial)
-  ) {
-    return;
-  }
-
-  targetDot.position.copy(destination.center).addScaledVector(mapPlaneUp, 0.28);
-  targetDot.material.color.set(color);
-  targetDot.material.opacity = clamp(opacity * 1.65, 0.82, 1);
-  targetDot.material.size = screenDiameterPixels;
 }
 
 function createFutureBodyGhost(
@@ -34422,6 +36454,170 @@ function syncFutureNodeGhost(
   marker.material.userData["extremeZoomBaseOpacity"] = opacity;
 }
 
+function createFutureFireImpactMarker(
+  destination: DisplayNodeRenderData,
+  fireColor: THREE.ColorRepresentation,
+  targetColor: THREE.ColorRepresentation,
+  opacity: number,
+  scale: number,
+  minimumTickOuterRadiusWorld: number,
+  tickThicknessWorld: number
+): THREE.Group {
+  const marker = new THREE.Group();
+  marker.userData["futureFireImpactMarker"] = true;
+  marker.renderOrder = 39.5;
+  marker.userData["extremeZoomUiFade"] = true;
+
+  const ticks = new THREE.Mesh(
+    createFutureFireImpactTicksGeometry(),
+    new THREE.MeshBasicMaterial({
+      color: fireColor,
+      transparent: true,
+      opacity: clamp(opacity * 1.22, 0, 1),
+      depthTest: false,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide
+    })
+  );
+  ticks.material.toneMapped = false;
+  ticks.name = "future-fire-impact-diagonal-ticks";
+  ticks.renderOrder = 39.5;
+  ticks.frustumCulled = false;
+
+  const targetPoint = new THREE.Mesh(
+    new THREE.CircleGeometry(0.11, 16),
+    new THREE.MeshBasicMaterial({
+      color: targetColor,
+      transparent: true,
+      opacity: clamp(opacity * 1.4, 0, 1),
+      depthTest: false,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide
+    })
+  );
+  targetPoint.material.toneMapped = false;
+  targetPoint.name = "future-fire-impact-target-point";
+  targetPoint.rotation.x = -Math.PI / 2;
+  targetPoint.renderOrder = 39.6;
+  marker.add(ticks, targetPoint);
+  syncFutureFireImpactMarker(
+    marker,
+    destination,
+    fireColor,
+    targetColor,
+    opacity,
+    scale,
+    minimumTickOuterRadiusWorld,
+    tickThicknessWorld
+  );
+  return marker;
+}
+
+function syncFutureFireImpactMarker(
+  marker: THREE.Group,
+  destination: DisplayNodeRenderData,
+  fireColor: THREE.ColorRepresentation,
+  targetColor: THREE.ColorRepresentation,
+  opacity: number,
+  scale: number,
+  minimumTickOuterRadiusWorld: number,
+  tickThicknessWorld: number
+): void {
+  marker.name = `future-fire-impact:${destination.node.id}`;
+  marker.position.copy(destination.center);
+  const markerScale = Math.max(0.72, destination.ringRadius * 0.84) * scale;
+  marker.scale.setScalar(markerScale);
+
+  const ticks = marker.getObjectByName("future-fire-impact-diagonal-ticks");
+
+  if (ticks instanceof THREE.Mesh && ticks.material instanceof THREE.MeshBasicMaterial) {
+    const tickLengthScale = Math.max(
+      1,
+      minimumTickOuterRadiusWorld / Math.max(0.001, markerScale * futureFireImpactTickOuterRadius)
+    );
+    const tickHalfWidth = tickThicknessWorld / Math.max(0.001, markerScale * 2);
+    const tickOpacity = clamp(opacity * 1.22, 0, 1);
+    syncFutureFireImpactTicksGeometry(
+      ticks.geometry as THREE.BufferGeometry,
+      tickLengthScale,
+      tickHalfWidth
+    );
+    ticks.material.color.set(fireColor);
+    ticks.material.opacity = tickOpacity;
+    ticks.material.userData["extremeZoomBaseOpacity"] = tickOpacity;
+  }
+
+  const targetPoint = marker.getObjectByName("future-fire-impact-target-point");
+
+  if (
+    targetPoint instanceof THREE.Mesh &&
+    targetPoint.material instanceof THREE.MeshBasicMaterial
+  ) {
+    const targetOpacity = clamp(opacity * 1.4, 0, 1);
+    targetPoint.material.color.set(targetColor);
+    targetPoint.material.opacity = targetOpacity;
+    targetPoint.material.userData["extremeZoomBaseOpacity"] = targetOpacity;
+  }
+}
+
+function createFutureFireImpactTicksGeometry(): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(new Float32Array(4 * 6 * 3), 3)
+  );
+  syncFutureFireImpactTicksGeometry(geometry, 1, 0.085);
+  return geometry;
+}
+
+function syncFutureFireImpactTicksGeometry(
+  geometry: THREE.BufferGeometry,
+  lengthScale: number,
+  dashHalfWidth: number
+): void {
+  const positions = geometry.getAttribute("position");
+
+  if (!(positions instanceof THREE.BufferAttribute)) {
+    return;
+  }
+
+  const dashCenterRadius = futureFireImpactTickCenterRadius * lengthScale;
+  const dashHalfLength = futureFireImpactTickHalfLength * lengthScale;
+  let positionIndex = 0;
+
+  for (let index = 0; index < 4; index += 1) {
+    const angle = Math.PI / 4 + index * (Math.PI / 2);
+    const direction = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
+    const perpendicular = new THREE.Vector3(-direction.z, 0, direction.x);
+    const center = direction.clone().multiplyScalar(dashCenterRadius);
+    const innerLeft = center
+      .clone()
+      .addScaledVector(direction, -dashHalfLength)
+      .addScaledVector(perpendicular, -dashHalfWidth);
+    const innerRight = center
+      .clone()
+      .addScaledVector(direction, -dashHalfLength)
+      .addScaledVector(perpendicular, dashHalfWidth);
+    const outerRight = center
+      .clone()
+      .addScaledVector(direction, dashHalfLength)
+      .addScaledVector(perpendicular, dashHalfWidth);
+    const outerLeft = center
+      .clone()
+      .addScaledVector(direction, dashHalfLength)
+      .addScaledVector(perpendicular, -dashHalfWidth);
+
+    for (const point of [innerLeft, innerRight, outerRight, innerLeft, outerRight, outerLeft]) {
+      positions.setXYZ(positionIndex, point.x, point.y, point.z);
+      positionIndex += 1;
+    }
+  }
+
+  positions.needsUpdate = true;
+}
+
 function createNodeHoverRingPoints(destination: DisplayNodeRenderData): THREE.Vector3[] {
   const points: THREE.Vector3[] = [destination.center.clone()];
 
@@ -34446,14 +36642,18 @@ function createNodeHoverRingPoints(destination: DisplayNodeRenderData): THREE.Ve
 type OrbitTimingSegmentEndpoints = Readonly<{
   start: DisplayNodeRenderData;
   end: DisplayNodeRenderData;
+  endClearanceWorld?: number;
 }>;
+
+type OrbitTimingStyle = "tactical" | "astronomical";
 
 function createOrbitTimingSegment(
   points: readonly THREE.Vector3[],
   color: THREE.ColorRepresentation,
   opacity: number,
   radius = 0.34,
-  endpoints?: OrbitTimingSegmentEndpoints
+  endpoints?: OrbitTimingSegmentEndpoints,
+  style: OrbitTimingStyle = "tactical"
 ): THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial> {
   const line = new THREE.Line(
     new THREE.BufferGeometry(),
@@ -34464,9 +36664,7 @@ function createOrbitTimingSegment(
       blending: THREE.AdditiveBlending
     })
   );
-  syncOrbitTimingSegment(line, points, color, opacity, radius, endpoints);
-  line.name = "future-orbit-timing-filament";
-  line.renderOrder = 37;
+  syncOrbitTimingSegment(line, points, color, opacity, radius, endpoints, style);
   line.frustumCulled = false;
   line.userData["extremeZoomUiFade"] = true;
   return line;
@@ -34478,7 +36676,8 @@ function syncOrbitTimingSegment(
   color: THREE.ColorRepresentation,
   opacity: number,
   radius = 0.34,
-  endpoints?: OrbitTimingSegmentEndpoints
+  endpoints?: OrbitTimingSegmentEndpoints,
+  style: OrbitTimingStyle = "tactical"
 ): void {
   const clippedPoints =
     endpoints === undefined
@@ -34505,42 +36704,41 @@ function syncOrbitTimingSegment(
   }
 
   positions.needsUpdate = true;
-  line.material.color.set(color);
+  line.material.color.copy(getOrbitTimingPresentationColor(color, style));
   line.material.opacity = opacity;
+  line.material.blending = style === "astronomical" ? THREE.NormalBlending : THREE.AdditiveBlending;
   line.material.userData["extremeZoomBaseOpacity"] = opacity;
-  line.material.linewidth = Math.max(1, Math.min(1.35, radius * 2.4));
+  line.material.linewidth =
+    style === "astronomical" ? 1 : Math.max(1, Math.min(1.35, radius * 2.4));
+  line.name =
+    style === "astronomical" ? "astronomical-orbit-ephemeris-arc" : "future-orbit-timing-filament";
+  line.renderOrder = style === "astronomical" ? 28.8 : 37;
+  line.userData["orbitTimingStyle"] = style;
+}
+
+function getOrbitTimingPresentationColor(
+  color: THREE.ColorRepresentation,
+  style: OrbitTimingStyle
+): THREE.Color {
+  const presentationColor = new THREE.Color(color);
+  return style === "astronomical"
+    ? presentationColor.lerp(new THREE.Color(0xa8c4cf), 0.62).multiplyScalar(0.72)
+    : presentationColor;
 }
 
 function clipOrbitTimingSegment(
   points: readonly THREE.Vector3[],
   endpoints: OrbitTimingSegmentEndpoints
 ): THREE.Vector3[] {
-  const clippedPoints = points.map((point) => point.clone());
-
-  if (clippedPoints.length < 2) {
-    return clippedPoints;
-  }
-
-  const firstPoint = clippedPoints[0];
-  const secondPoint = clippedPoints[1];
-  const lastIndex = clippedPoints.length - 1;
-  const lastPoint = clippedPoints[lastIndex];
-  const beforeLastPoint = clippedPoints[lastIndex - 1];
-
-  if (
-    firstPoint === undefined ||
-    secondPoint === undefined ||
-    lastPoint === undefined ||
-    beforeLastPoint === undefined
-  ) {
-    return clippedPoints;
-  }
-
-  clippedPoints[0] = clipOrbitTimingEndpointToBodySurface(firstPoint, secondPoint, endpoints.start);
-  clippedPoints[lastIndex] = clipOrbitTimingEndpointToBodySurface(
-    lastPoint,
-    beforeLastPoint,
-    endpoints.end
+  const startClippedPoints = clipOrbitTimingPolylineStartToClearance(
+    points,
+    endpoints.start.bodyPosition,
+    getOrbitTimingEndpointClearance(endpoints.start)
+  );
+  const clippedPoints = clipOrbitTimingPolylineEndToClearance(
+    startClippedPoints,
+    endpoints.end.bodyPosition,
+    endpoints.endClearanceWorld ?? getOrbitTimingEndpointClearance(endpoints.end)
   );
 
   return clippedPoints.filter((point, index) => {
@@ -34552,33 +36750,227 @@ function clipOrbitTimingSegment(
   });
 }
 
-function clipOrbitTimingEndpointToBodySurface(
-  endpoint: THREE.Vector3,
-  neighbor: THREE.Vector3,
-  node: DisplayNodeRenderData
+export function getOrbitTimingEndpointClearance(
+  node: Readonly<Pick<DisplayNodeRenderData, "bodyRadius" | "ringRadius">>
+): number {
+  const bodyClearance = node.bodyRadius * 1.035;
+  const orbitClearance = node.ringRadius * 1.035;
+  return Math.max(bodyClearance, orbitClearance) + 0.16;
+}
+
+export function clipOrbitTimingPolylineStartToClearance(
+  points: readonly THREE.Vector3[],
+  center: THREE.Vector3,
+  clearance: number
+): THREE.Vector3[] {
+  const clonedPoints = trimOrbitTimingPolylineToClosestPoint(points, center);
+  const safeClearance = Math.max(0, clearance);
+
+  if (clonedPoints.length < 2 || safeClearance <= 0.0001) {
+    return clonedPoints;
+  }
+
+  const clearanceSquared = safeClearance * safeClearance;
+  const firstOutsideIndex = clonedPoints.findIndex((point) => {
+    return getPlanarDistanceSquared(point, center) >= clearanceSquared;
+  });
+
+  if (firstOutsideIndex < 0) {
+    return [];
+  }
+
+  if (firstOutsideIndex === 0) {
+    return clonedPoints;
+  }
+
+  const insidePoint = clonedPoints[firstOutsideIndex - 1];
+  const outsidePoint = clonedPoints[firstOutsideIndex];
+
+  if (insidePoint === undefined || outsidePoint === undefined) {
+    return clonedPoints.slice(firstOutsideIndex);
+  }
+
+  const intersection = intersectPlanarSegmentWithClearance(
+    insidePoint,
+    outsidePoint,
+    center,
+    safeClearance
+  );
+  const remainingPoints = clonedPoints.slice(firstOutsideIndex);
+
+  if (intersection.distanceToSquared(outsidePoint) <= 0.0001) {
+    return remainingPoints;
+  }
+
+  return [intersection, ...remainingPoints];
+}
+
+function trimOrbitTimingPolylineToClosestPoint(
+  points: readonly THREE.Vector3[],
+  center: THREE.Vector3
+): THREE.Vector3[] {
+  if (points.length < 2) {
+    return points.map((point) => point.clone());
+  }
+
+  let closestSegmentIndex = 0;
+  let closestSegmentProgress = 0;
+  let closestDistanceSquared = Number.POSITIVE_INFINITY;
+
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+
+    if (start === undefined || end === undefined) {
+      continue;
+    }
+
+    const deltaX = end.x - start.x;
+    const deltaZ = end.z - start.z;
+    const lengthSquared = deltaX * deltaX + deltaZ * deltaZ;
+    const progress =
+      lengthSquared <= 0.0000001
+        ? 0
+        : clamp(
+            ((center.x - start.x) * deltaX + (center.z - start.z) * deltaZ) / lengthSquared,
+            0,
+            1
+          );
+    const sampleX = start.x + deltaX * progress;
+    const sampleZ = start.z + deltaZ * progress;
+    const distanceX = sampleX - center.x;
+    const distanceZ = sampleZ - center.z;
+    const distanceSquared = distanceX * distanceX + distanceZ * distanceZ;
+
+    if (distanceSquared < closestDistanceSquared) {
+      closestSegmentIndex = index;
+      closestSegmentProgress = progress;
+      closestDistanceSquared = distanceSquared;
+    }
+  }
+
+  const closestStart = points[closestSegmentIndex];
+  const closestEnd = points[closestSegmentIndex + 1];
+
+  if (closestStart === undefined || closestEnd === undefined) {
+    return points.map((point) => point.clone());
+  }
+
+  const closestPoint = closestStart.clone().lerp(closestEnd, closestSegmentProgress);
+  const remainingPoints = points.slice(closestSegmentIndex + 1).map((point) => point.clone());
+  const firstRemainingPoint = remainingPoints[0];
+
+  if (
+    firstRemainingPoint !== undefined &&
+    firstRemainingPoint.distanceToSquared(closestPoint) <= 0.0001
+  ) {
+    return remainingPoints;
+  }
+
+  return [closestPoint, ...remainingPoints];
+}
+
+function clipOrbitTimingPolylineEndToClearance(
+  points: readonly THREE.Vector3[],
+  center: THREE.Vector3,
+  clearance: number
+): THREE.Vector3[] {
+  return clipOrbitTimingPolylineStartToClearance(
+    [...points].reverse(),
+    center,
+    clearance
+  ).reverse();
+}
+
+function getPlanarDistanceSquared(first: THREE.Vector3, second: THREE.Vector3): number {
+  const deltaX = first.x - second.x;
+  const deltaZ = first.z - second.z;
+  return deltaX * deltaX + deltaZ * deltaZ;
+}
+
+function intersectPlanarSegmentWithClearance(
+  insidePoint: THREE.Vector3,
+  outsidePoint: THREE.Vector3,
+  center: THREE.Vector3,
+  clearance: number
 ): THREE.Vector3 {
-  const bodyCenter = node.bodyPosition;
-  const direction = neighbor.clone().sub(bodyCenter);
-  direction.y = 0;
+  const deltaX = outsidePoint.x - insidePoint.x;
+  const deltaZ = outsidePoint.z - insidePoint.z;
+  const offsetX = insidePoint.x - center.x;
+  const offsetZ = insidePoint.z - center.z;
+  const quadraticA = deltaX * deltaX + deltaZ * deltaZ;
 
-  if (direction.lengthSq() <= 0.0001) {
-    direction.copy(neighbor).sub(endpoint);
-    direction.y = 0;
+  if (quadraticA <= 0.0000001) {
+    return outsidePoint.clone();
   }
 
-  if (direction.lengthSq() <= 0.0001) {
-    direction.set(1, 0, 0);
+  const quadraticB = 2 * (offsetX * deltaX + offsetZ * deltaZ);
+  const quadraticC = offsetX * offsetX + offsetZ * offsetZ - clearance * clearance;
+  const discriminant = Math.max(0, quadraticB * quadraticB - 4 * quadraticA * quadraticC);
+  const exitProgress = clamp((-quadraticB + Math.sqrt(discriminant)) / (2 * quadraticA), 0, 1);
+  return insidePoint.clone().lerp(outsidePoint, exitProgress);
+}
+
+function createFirePredictionRulerTicks(
+  points: readonly THREE.Vector3[],
+  color: THREE.ColorRepresentation,
+  opacity: number,
+  tickWorldSize: number,
+  tickCount: number,
+  endpoints: OrbitTimingSegmentEndpoints
+): THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial> {
+  const clippedPoints = clipOrbitTimingSegment(points, endpoints);
+  const tickPoints: THREE.Vector3[] = [];
+  const count = Math.max(2, Math.round(tickCount));
+
+  for (let index = 1; index < count; index += 1) {
+    const progress = index / count;
+    const sample = samplePolylineAtProgress(clippedPoints, progress);
+    const tangent = sample.direction.clone();
+    tangent.y = 0;
+
+    if (tangent.lengthSq() <= 0.0001) {
+      continue;
+    }
+
+    const crossTrack = new THREE.Vector3().crossVectors(mapPlaneUp, tangent.normalize());
+
+    if (crossTrack.lengthSq() <= 0.0001) {
+      continue;
+    }
+
+    const isMajorTick = index % 3 === 0;
+    const halfLength = tickWorldSize * (isMajorTick ? 0.72 : 0.46);
+    const center = sample.position.clone().addScaledVector(mapPlaneUp, 0.145);
+    tickPoints.push(
+      center.clone().addScaledVector(crossTrack.normalize(), -halfLength),
+      center.clone().addScaledVector(crossTrack, halfLength)
+    );
   }
 
-  const distanceToNeighbor = Math.max(0.001, bodyCenter.distanceTo(neighbor));
-  const surfaceRadius = Math.min(node.bodyRadius * 1.035 + 0.16, distanceToNeighbor * 0.42);
-  return bodyCenter.clone().addScaledVector(direction.normalize(), surfaceRadius);
+  const ruler = new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(tickPoints),
+    new THREE.LineBasicMaterial({
+      color,
+      transparent: true,
+      opacity,
+      depthTest: true,
+      depthWrite: false,
+      blending: THREE.NormalBlending
+    })
+  );
+  ruler.renderOrder = 37.2;
+  ruler.frustumCulled = false;
+  ruler.userData["extremeZoomUiFade"] = true;
+  ruler.material.userData["extremeZoomBaseOpacity"] = opacity;
+  return ruler;
 }
 
 function createOrbitTimingDot(
   position: THREE.Vector3,
   color: THREE.ColorRepresentation,
-  opacity: number
+  opacity: number,
+  style: OrbitTimingStyle = "tactical"
 ): THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> {
   const dot = new THREE.Mesh(
     getSharedUnitSphereGeometry(14, 10),
@@ -34591,11 +36983,7 @@ function createOrbitTimingDot(
       blending: THREE.AdditiveBlending
     })
   );
-  dot.name = "future-orbit-turn-dot";
-  dot.position.copy(position);
-  dot.position.y += 0.26;
-  dot.scale.setScalar(1.75);
-  dot.renderOrder = 40;
+  syncOrbitTimingDot(dot, position, color, opacity, style);
   dot.userData["extremeZoomUiFade"] = true;
   dot.userData["usesSharedGeometry"] = true;
   return dot;
@@ -34605,12 +36993,20 @@ function syncOrbitTimingDot(
   dot: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>,
   position: THREE.Vector3,
   color: THREE.ColorRepresentation,
-  opacity: number
+  opacity: number,
+  style: OrbitTimingStyle = "tactical"
 ): void {
-  dot.position.copy(position).addScaledVector(mapPlaneUp, 0.26);
-  dot.material.color.set(color);
+  const isAstronomical = style === "astronomical";
+  dot.position.copy(position).addScaledVector(mapPlaneUp, isAstronomical ? 0.12 : 0.26);
+  dot.material.color.copy(getOrbitTimingPresentationColor(color, style));
   dot.material.opacity = opacity;
+  dot.material.depthTest = isAstronomical;
+  dot.material.blending = isAstronomical ? THREE.NormalBlending : THREE.AdditiveBlending;
   dot.material.userData["extremeZoomBaseOpacity"] = opacity;
+  dot.name = isAstronomical ? "astronomical-orbit-ephemeris-point" : "future-orbit-turn-dot";
+  dot.scale.setScalar(isAstronomical ? 0.72 : 1.75);
+  dot.renderOrder = isAstronomical ? 29 : 40;
+  dot.userData["orbitTimingStyle"] = style;
 }
 
 function createNodeRingBatch(
@@ -35605,7 +38001,11 @@ function createCinematicBloomOverlayMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     uniforms: {
       bloomTexture: { value: null },
-      gain: { value: 1 }
+      gain: { value: 1 },
+      viewportSize: { value: new THREE.Vector2(1, 1) },
+      occlusionMaskCenter: { value: new THREE.Vector2(0, 0) },
+      occlusionMaskRadius: { value: 0 },
+      occlusionMaskEnabled: { value: 0 }
     },
     transparent: true,
     depthTest: false,
@@ -35622,10 +38022,22 @@ function createCinematicBloomOverlayMaterial(): THREE.ShaderMaterial {
     fragmentShader: `
       uniform sampler2D bloomTexture;
       uniform float gain;
+      uniform vec2 viewportSize;
+      uniform vec2 occlusionMaskCenter;
+      uniform float occlusionMaskRadius;
+      uniform float occlusionMaskEnabled;
       varying vec2 vUv;
 
       void main() {
-        vec3 bloom = texture2D(bloomTexture, vUv).rgb * gain;
+        vec2 pixel = vUv * viewportSize;
+        float outsideOccluder =
+          smoothstep(
+            occlusionMaskRadius - 1.0,
+            occlusionMaskRadius + 3.0,
+            length(pixel - occlusionMaskCenter)
+          );
+        float occlusionVisibility = mix(1.0, outsideOccluder, occlusionMaskEnabled);
+        vec3 bloom = texture2D(bloomTexture, vUv).rgb * gain * occlusionVisibility;
         gl_FragColor = vec4(bloom, 1.0);
       }
     `
@@ -35654,6 +38066,133 @@ function createCinematicBloomCacheCopyMaterial(): THREE.ShaderMaterial {
 
       void main() {
         gl_FragColor = texture2D(bloomTexture, vUv);
+      }
+    `
+  });
+}
+
+function createCinematicSolarOcclusionFlareMaterial(): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      viewportSize: { value: new THREE.Vector2(1, 1) },
+      sunCenter: { value: new THREE.Vector2(0.5, 0.5) },
+      occluderCenter: { value: new THREE.Vector2(0.5, 0.5) },
+      sunRadius: { value: 1 },
+      occluderRadius: { value: 1 },
+      coronaStrength: { value: 0 },
+      reemergenceStrength: { value: 0 },
+      ringWidth: { value: 1.2 },
+      flareLength: { value: 120 },
+      flareWidth: { value: 1.5 },
+      flareFade: { value: 0.72 }
+    },
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+    vertexShader: `
+      varying vec2 vUv;
+
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position.xy, 1.0, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec2 viewportSize;
+      uniform vec2 sunCenter;
+      uniform vec2 occluderCenter;
+      uniform float sunRadius;
+      uniform float occluderRadius;
+      uniform float coronaStrength;
+      uniform float reemergenceStrength;
+      uniform float ringWidth;
+      uniform float flareLength;
+      uniform float flareWidth;
+      uniform float flareFade;
+      varying vec2 vUv;
+
+      void main() {
+        vec2 pixel = vUv * viewportSize;
+        vec2 bodyDelta = pixel - occluderCenter;
+        float bodyDistance = length(bodyDelta);
+        float sunDistance = length(pixel - sunCenter);
+        float limbDistance = abs(bodyDistance - occluderRadius);
+        float bodyRing = exp(-pow(limbDistance / max(0.5, ringWidth), 2.0));
+        float solarEnvelope =
+          1.0 -
+          smoothstep(
+            sunRadius * 0.72,
+            sunRadius + max(5.0, sunRadius * 0.82),
+            sunDistance
+          );
+        vec2 bodyToSun = sunCenter - occluderCenter;
+        float centerSeparation = length(bodyToSun);
+        vec2 limbDirection = bodyDelta / max(0.001, bodyDistance);
+        float sunwardLimb =
+          centerSeparation <= 0.001
+            ? 1.0
+            : smoothstep(-0.32, 0.82, dot(limbDirection, bodyToSun / centerSeparation));
+        float concentricBlend =
+          1.0 -
+          smoothstep(
+            sunRadius * 0.06,
+            sunRadius * 0.34,
+            centerSeparation
+          );
+        float corona =
+          bodyRing *
+          solarEnvelope *
+          mix(sunwardLimb, 1.0, concentricBlend) *
+          smoothstep(
+            occluderRadius - ringWidth * 0.35,
+            occluderRadius + ringWidth * 0.75,
+            bodyDistance
+          ) *
+          coronaStrength;
+
+        vec2 flareDelta = pixel - sunCenter;
+        float horizontalFalloff =
+          exp(
+            -abs(flareDelta.x) /
+            max(1.0, flareLength * mix(0.62, 1.0, flareFade))
+          );
+        float verticalCore =
+          exp(-pow(abs(flareDelta.y) / max(0.5, flareWidth), 1.34));
+        float streak = horizontalFalloff * verticalCore;
+        float radial =
+          exp(
+            -pow(
+              length(flareDelta) /
+              max(1.0, sunRadius * mix(1.8, 3.2, flareFade)),
+              2.0
+            )
+          );
+        float hotCore =
+          exp(
+            -pow(
+              length(flareDelta) /
+              max(1.0, sunRadius * 0.44),
+              2.0
+            )
+          );
+        float outsideOccluder =
+          smoothstep(occluderRadius - 1.0, occluderRadius + 3.0, bodyDistance);
+        float flare =
+          (streak * 0.58 + radial * 0.2 + hotCore * 0.16) *
+          reemergenceStrength *
+          outsideOccluder;
+        float energy = corona + flare;
+
+        if (energy <= 0.0005) {
+          discard;
+        }
+
+        vec3 coronaColor = mix(vec3(1.0, 0.42, 0.11), vec3(1.0, 0.86, 0.56), bodyRing);
+        vec3 flareColor =
+          mix(vec3(1.0, 0.47, 0.12), vec3(1.0, 0.96, 0.82), hotCore * 0.78 + radial * 0.22);
+        gl_FragColor = vec4(coronaColor * corona + flareColor * flare, 1.0);
       }
     `
   });
@@ -35912,6 +38451,91 @@ function createFlatSunMaterial(): THREE.MeshBasicMaterial {
     depthTest: true,
     depthWrite: true
   });
+}
+
+function createAtmosphericScatteringMesh(
+  geometry: THREE.SphereGeometry,
+  body: BodySnapshot,
+  profile: AtmosphericScatteringProfile,
+  tuning: Cinematic3dVisualTuning
+): THREE.Mesh {
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      atmosphereColor: { value: new THREE.Color(profile.color) },
+      sunPosition: { value: new THREE.Vector3(0, 0, 0) },
+      intensity: {
+        value: tuning.atmosphericScatteringIntensity * profile.intensityMultiplier
+      },
+      falloff: {
+        value: tuning.atmosphericScatteringFalloff * profile.falloffMultiplier
+      },
+      terminatorBoost: { value: tuning.atmosphericScatteringTerminatorBoost }
+    },
+    transparent: true,
+    depthTest: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+    vertexShader: `
+      varying vec3 vWorldPosition;
+      varying vec3 vWorldNormal;
+
+      void main() {
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPosition.xyz;
+        vWorldNormal = normalize(mat3(modelMatrix) * normal);
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 atmosphereColor;
+      uniform vec3 sunPosition;
+      uniform float intensity;
+      uniform float falloff;
+      uniform float terminatorBoost;
+      varying vec3 vWorldPosition;
+      varying vec3 vWorldNormal;
+
+      void main() {
+        vec3 normal = normalize(vWorldNormal);
+        vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+        vec3 lightDirection = normalize(sunPosition - vWorldPosition);
+        float viewFacing = clamp(dot(normal, viewDirection), 0.0, 1.0);
+        float sunFacing = dot(normal, lightDirection);
+        float limb = pow(1.0 - viewFacing, max(0.5, falloff));
+        float daylight = smoothstep(-0.32, 0.52, sunFacing);
+        float terminator = 1.0 - smoothstep(0.015, 0.42, abs(sunFacing));
+        float forwardScatter =
+          pow(max(dot(viewDirection, -lightDirection), 0.0), 5.0) *
+          smoothstep(-0.2, 0.46, sunFacing);
+        float opticalDepth = limb * (0.12 + daylight * 0.7);
+        opticalDepth += limb * terminator * terminatorBoost;
+        opticalDepth += limb * forwardScatter * 0.32;
+        float alpha = clamp(opticalDepth * intensity, 0.0, 0.78);
+
+        if (alpha <= 0.002) {
+          discard;
+        }
+
+        vec3 sunsetTint = vec3(1.0, 0.58, 0.28);
+        vec3 color = mix(
+          atmosphereColor,
+          mix(atmosphereColor, sunsetTint, 0.32),
+          terminator * 0.46
+        );
+        color = mix(color, vec3(1.0, 0.91, 0.72), forwardScatter * 0.24);
+        gl_FragColor = vec4(color * (0.72 + daylight * 0.38), alpha);
+      }
+    `
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  const shellScale =
+    1 + Math.max(0, tuning.atmosphericScatteringScale - 1) * profile.thicknessMultiplier;
+
+  mesh.name = `atmosphere-scattering-shell:${body.id}`;
+  mesh.scale.setScalar(shellScale);
+  mesh.renderOrder = 2;
+  return mesh;
 }
 
 function createBodyMaterial(
@@ -37063,6 +39687,7 @@ function createSunCorona(tuning: Cinematic3dVisualTuning): THREE.Sprite {
     map: createCoronaTexture(),
     transparent: true,
     opacity: tuning.sunCoronaOpacity,
+    depthTest: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending
   });
@@ -37076,7 +39701,7 @@ function createSunCorona(tuning: Cinematic3dVisualTuning): THREE.Sprite {
 function createSunAnimatedCorona(tuning: Cinematic3dVisualTuning): THREE.Mesh {
   const material = new THREE.ShaderMaterial({
     transparent: true,
-    depthTest: false,
+    depthTest: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     uniforms: {
@@ -37164,7 +39789,7 @@ function createSunSmoothGlare(tuning: Cinematic3dVisualTuning): THREE.Sprite {
     transparent: true,
     opacity: clamp(tuning.sunCoronaOpacity * 0.22, 0, 0.16),
     depthWrite: false,
-    depthTest: false,
+    depthTest: true,
     blending: THREE.AdditiveBlending
   });
   material.toneMapped = false;
@@ -38626,6 +41251,15 @@ function computeRectOverlapArea(first: ScreenRect, second: ScreenRect): number {
   return width * height;
 }
 
+function createCenteredScreenRect(center: Vec2, radius: number): ScreenRect {
+  return {
+    x: center.x - radius,
+    y: center.y - radius,
+    width: radius * 2,
+    height: radius * 2
+  };
+}
+
 function labelsOverlap(first: ScreenRect, second: ScreenRect): boolean {
   return (
     first.x < second.x + second.width + 4 &&
@@ -39067,52 +41701,6 @@ function createSmoothSolarGlareTexture(): THREE.CanvasTexture {
 const radialGlowTextures = new Map<string, THREE.CanvasTexture>();
 const sharpPointTextures = new Map<string, THREE.CanvasTexture>();
 const bokehPointTextures = new Map<string, THREE.CanvasTexture>();
-let solidPointTexture: THREE.CanvasTexture | null = null;
-let fireImpactTargetPointGeometry: THREE.BufferGeometry | null = null;
-
-function getSolidPointTexture(): THREE.CanvasTexture {
-  if (solidPointTexture !== null) {
-    return solidPointTexture;
-  }
-
-  const size = 32;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const context = canvas.getContext("2d");
-
-  if (context === null) {
-    throw new Error("Cannot create solid point texture without a 2D context.");
-  }
-
-  context.clearRect(0, 0, size, size);
-  context.beginPath();
-  context.arc(size / 2, size / 2, size * 0.47, 0, Math.PI * 2);
-  context.fillStyle = "rgba(255, 255, 255, 1)";
-  context.fill();
-
-  solidPointTexture = new THREE.CanvasTexture(canvas);
-  solidPointTexture.name = "solid-point-texture";
-  solidPointTexture.colorSpace = THREE.SRGBColorSpace;
-  solidPointTexture.minFilter = THREE.LinearFilter;
-  solidPointTexture.magFilter = THREE.LinearFilter;
-  solidPointTexture.generateMipmaps = false;
-  solidPointTexture.needsUpdate = true;
-  return solidPointTexture;
-}
-
-function getFireImpactTargetPointGeometry(): THREE.BufferGeometry {
-  if (fireImpactTargetPointGeometry !== null) {
-    return fireImpactTargetPointGeometry;
-  }
-
-  fireImpactTargetPointGeometry = new THREE.BufferGeometry();
-  fireImpactTargetPointGeometry.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute([0, 0, 0], 3)
-  );
-  return fireImpactTargetPointGeometry;
-}
 function getRadialGlowTexture(name: string, color: THREE.ColorRepresentation): THREE.CanvasTexture {
   const cacheKey = `${name}:${new THREE.Color(color).getHexString()}`;
   const existing = radialGlowTextures.get(cacheKey);

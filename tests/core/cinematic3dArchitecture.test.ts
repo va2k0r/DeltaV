@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("Cinematic 3D architecture boundary", () => {
-  it("keeps transfer ribbons camera-facing without CPU geometry rebuilds", () => {
+  it("keeps transfer ribbons camera-facing and refreshes zoom-dependent geometry every frame", () => {
     const source = readFileSync(join(process.cwd(), "src/renderers/cinematic3d/index.ts"), "utf8");
     const methodStart = source.indexOf("  private shouldUpdateTacticalPresentationFrame(");
     const methodEnd = source.indexOf(
@@ -11,12 +11,33 @@ describe("Cinematic 3D architecture boundary", () => {
       methodStart
     );
     const methodSource = source.slice(methodStart, methodEnd);
+    const wheelRefreshStart = source.indexOf("  private refreshDisplayScaleForWheelZoom(");
+    const wheelRefreshEnd = source.indexOf(
+      "  private recenterTrackedFocusTarget(",
+      wheelRefreshStart
+    );
+    const wheelRefreshSource = source.slice(wheelRefreshStart, wheelRefreshEnd);
 
     expect(methodStart).toBeGreaterThanOrEqual(0);
     expect(methodEnd).toBeGreaterThan(methodStart);
+    expect(wheelRefreshStart).toBeGreaterThanOrEqual(0);
+    expect(wheelRefreshEnd).toBeGreaterThan(wheelRefreshStart);
     expect(methodSource).toContain("this.isTrajectoryLabelCameraMotionActive(performance.now())");
     expect(methodSource).toContain("this.tacticalPresentationCameraMotionWasActive = true");
     expect(methodSource).toContain("this.needsContinuousTacticalPresentationRebuild()");
+    expect(wheelRefreshSource).toContain("this.tacticalPresentationDisplayScaleDirty = true");
+    expect(methodSource).toContain("if (this.tacticalPresentationDisplayScaleDirty)");
+    expect(methodSource.indexOf("if (this.tacticalPresentationDisplayScaleDirty)")).toBeLessThan(
+      methodSource.indexOf("if (isCameraMotionActive")
+    );
+    const displayScaleDirtyBranch = methodSource.slice(
+      methodSource.indexOf("if (this.tacticalPresentationDisplayScaleDirty)"),
+      methodSource.indexOf("const isCameraMotionActive")
+    );
+    expect(displayScaleDirtyBranch).not.toContain(
+      "framesSinceLastUpdate < tacticalPresentationMinimumFrameGap"
+    );
+    expect(displayScaleDirtyBranch).toContain("return true;");
     expect(source).toContain("const tacticalPresentationMinimumFrameGap = 2");
     expect(methodSource).toContain("framesSinceLastUpdate < tacticalPresentationMinimumFrameGap");
     expect(methodSource).toContain(
@@ -70,6 +91,8 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(fireArcStart).toBeGreaterThanOrEqual(0);
     expect(fireArcEnd).toBeGreaterThan(fireArcStart);
     expect(fireArcSource).toContain("trajectory.points");
+    expect(fireArcSource).toContain("this.resolveFireTrajectory(plan, activeProgress)");
+    expect(fireArcSource).toContain('const anchorEndDash = !("launchedTurn" in plan)');
     expect(fireArcSource).toContain("trajectory.visibleStartProgress");
     expect(fireArcSource).not.toContain("trajectory.visiblePoints");
     expect(source).not.toContain("sliceActiveMissileTrajectoryAheadOfMissile");
@@ -255,8 +278,10 @@ describe("Cinematic 3D architecture boundary", () => {
 
     expect(uiSource).toContain("new DeltaVMusicEngine()");
     expect(uiSource).toContain("musicButton");
-    expect(uiSource).toContain("let isMusicEnabled = true;");
-    expect(uiSource).toContain('musicButton.textContent = "Music On"');
+    expect(uiSource).toContain("let isMusicEnabled = false;");
+    expect(uiSource).toContain('musicButton.textContent = "Music Off"');
+    expect(uiSource).toContain('musicButton.setAttribute("aria-pressed", "false")');
+    expect(uiSource).toContain('"Music On"');
     expect(uiSource).toContain('"Music Off"');
     expect(uiSource).toContain('"Music Pending"');
     expect(uiSource).toContain("musicButton.addEventListener");
@@ -350,7 +375,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain('header.className = "debug-drawer is-hidden"');
     expect(uiSource).toContain("function toggleDebugDrawer()");
     expect(uiSource).toContain('debugToggleButton.addEventListener("click", toggleDebugDrawer)');
-    expect(uiSource).toContain('new URLSearchParams(window.location.search).get("debug") === "1"');
+    expect(uiSource).toContain('new URLSearchParams(window.location.search).get("debug") !== "0"');
     expect(uiSource).toContain(
       "if (isDebugUiEnabled) {\n    canvasFrame.append(debugToggleButton, header);\n  }"
     );
@@ -363,6 +388,8 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("AI LEVEL 1 · SIMPLE");
     expect(uiSource).toContain("AI LEVEL 2 · RESERVED");
     expect(uiSource).toContain("AI LEVEL 3");
+    expect(uiSource).toContain('aiLevelSelect.value = "0"');
+    expect(uiSource).toContain("let debugAiLevel: AiPlanningLevel = 0");
     expect(uiSource).toContain("getEffectiveDebugAiPlanningOptions");
     expect(uiSource).toContain("getEffectiveAiPlanningOptions");
     expect(uiSource).toContain("tutorialEnemySimpleAiEnabled");
@@ -393,26 +420,40 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain('debugFps.className = "debug-fps"');
     expect(uiSource).toContain("updateDebugFps()");
     expect(uiSource).toContain('createDebugModeButton("PERF OFF")');
+    expect(uiSource).toContain('createDebugModeButton("BURN FX OFF")');
+    expect(uiSource).toContain('let burnPreviewEffectsMode: "on" | "off" = "off";');
+    expect(uiSource).toContain('createDebugModeButton("FIRE FX ON")');
     expect(uiSource).toContain('createDebugModeButton("SOLAR HAZE OFF")');
     expect(uiSource).toContain('let solarHazeMode: "on" | "off" = "off";');
+    expect(uiSource).toContain('createDebugModeButton("OCCLUSION ON")');
+    expect(uiSource).toContain('createDebugModeButton("ATMOSPHERE ON")');
     expect(uiSource).toContain('createDebugModeButton("SUN PASS ON")');
     expect(uiSource).toContain('createDebugModeButton("UI BLOOM ON")');
-    expect(uiSource).toContain('createDebugModeButton("BLOOM HIGH 40%")');
+    expect(uiSource).toContain('createDebugModeButton("BLOOM LOW")');
+    expect(uiSource).toContain('let lowBloomProfileMode: "on" | "off" = "on";');
     expect(uiSource).toContain('createDebugModeButton("HEAT DISTORT ON")');
     expect(uiSource).toContain("solarHazeButton.addEventListener");
+    expect(uiSource).toContain("burnPreviewEffectsButton.addEventListener");
+    expect(uiSource).toContain("firePreviewEffectsButton.addEventListener");
+    expect(uiSource).toContain("solarOcclusionButton.addEventListener");
+    expect(uiSource).toContain("atmosphericScatteringButton.addEventListener");
     expect(uiSource).toContain("compactSunBloomButton.addEventListener");
     expect(uiSource).toContain("uiBloomButton.addEventListener");
-    expect(uiSource).toContain("reducedBloomResolutionButton.addEventListener");
+    expect(uiSource).toContain("lowBloomProfileButton.addEventListener");
     expect(uiSource).toContain("heatDistortionButton.addEventListener");
     expect(uiSource).not.toContain('createDebugModeButton("LOG CRT');
     expect(uiSource).not.toContain("commandLogCrt");
     expect(uiSource).not.toContain('commandConsole.classList.toggle("is-crt-log"');
     expect(uiSource).toContain('setSolarHazeEnabled(solarHazeMode === "on")');
+    expect(uiSource).toContain('setBurnPreviewEffectsEnabled(burnPreviewEffectsMode === "on")');
+    expect(uiSource).toContain('setFirePreviewEffectsEnabled(firePreviewEffectsMode === "on")');
+    expect(uiSource).toContain('setSolarOcclusionEnabled(solarOcclusionMode === "on")');
+    expect(uiSource).toContain(
+      'setAtmosphericScatteringEnabled(atmosphericScatteringMode === "on")'
+    );
     expect(uiSource).toContain('setCompactSunBloomEnabled(compactSunBloomMode === "on")');
     expect(uiSource).toContain('setUiBloomEnabled(uiBloomMode === "on")');
-    expect(uiSource).toContain(
-      'setReducedBloomResolutionEnabled(reducedBloomResolutionMode === "on")'
-    );
+    expect(uiSource).toContain('setLowBloomProfileEnabled(lowBloomProfileMode === "on")');
     expect(uiSource).toContain('setHeatDistortionEnabled(heatDistortionMode === "on")');
     expect(uiSource).toContain('return "BLOOM HIGH"');
     expect(uiSource).toContain('return "BLOOM LOW"');
@@ -781,7 +822,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(styles).not.toContain("@keyframes command-typewriter");
   });
 
-  it("keeps trailer mode removed from the UI, renderer, styles, and assets", () => {
+  it("keeps the session-only trailer mode isolated from camera tooling and persistent startup", () => {
     const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
     const rendererSource = readFileSync(
       join(process.cwd(), "src/renderers/cinematic3d/index.ts"),
@@ -792,6 +833,21 @@ describe("Cinematic 3D architecture boundary", () => {
     const trailerAssetsPath = join(process.cwd(), "public/assets/trailer");
     const trailerExportPath = join(process.cwd(), "public/exports/deltav_trailer_v2_1080p.webm");
 
+    expect(uiSource).toContain('createDebugModeButton("TRAILER MODE")');
+    expect(uiSource).toContain("let isTrailerModeActive = false");
+    expect(uiSource).toContain("function activateTrailerMode(): void");
+    expect(uiSource).toContain('trailerModeButton.addEventListener("click", activateTrailerMode)');
+    expect(uiSource).toContain("header.remove()");
+    expect(uiSource).toContain("debugToggleButton.remove()");
+    expect(uiSource).toContain('planningTimerMode = isTrailerModeActive ? "zero" : "auto"');
+    expect(uiSource).toContain(
+      "planningTimerDurationOverrideMs = isTrailerModeActive ? null : timerDurationMs"
+    );
+    expect(uiSource).toContain("resetNewGameWithAutomaticProceduralMap(mode, isTrailerModeActive)");
+    expect(uiSource).toContain("resetDebugAiMode(mode)");
+    expect(uiSource).toContain('const trailerModePlanningTimerLabel = "9:99"');
+    expect(uiSource).toContain("timerAction.disabled = isTrailerModeActive");
+    expect(uiSource).toContain("function isTrailerAiMatchActive(): boolean");
     expect(uiSource).not.toContain("RUN TRAILER");
     expect(uiSource).not.toContain("TRAILER CAM");
     expect(uiSource).not.toContain('urlSearchParams.get("trailer")');
@@ -799,7 +855,6 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).not.toContain("captureAudioElementStream(trailerAudio");
     expect(uiSource).not.toContain("OPEN TRAILER EDITOR");
     expect(uiSource).not.toContain('urlSearchParams.get("trailerEditor")');
-    expect(uiSource).not.toMatch(/trailer/i);
     expect(uiSource).not.toContain("trailer_project_v1.json");
     expect(rendererSource).not.toContain("setGameplayInputLocked");
     expect(rendererSource).not.toContain("isGameplayInputLocked");
@@ -917,7 +972,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(tutorialRuntimeSource).toContain('"awaitingFirstBurnPreview"');
     expect(tutorialRuntimeSource).toContain('"mandatoryLaunch"');
     expect(tutorialRuntimeSource).toContain('"awaitingBurnOut"');
-    expect(tutorialCommandRowsSource).toContain("Left click to select a ship.");
+    expect(tutorialCommandRowsSource).toContain("Left click on the orbit to select a ship.");
     expect(uiSource).not.toContain("Hover a node to preview burn transfer.");
     expect(tutorialCommandRowsSource).toContain('{ text: "BURN", className: playerClassName }');
     expect(tutorialCommandRowsSource).toContain('{ text: " costs ΔV." }');
@@ -1902,6 +1957,10 @@ describe("Cinematic 3D architecture boundary", () => {
       join(process.cwd(), "src/renderers/cinematic3d/visualTuning.ts"),
       "utf8"
     );
+    const bloomCacheSource = readFileSync(
+      join(process.cwd(), "src/renderers/cinematic3d/bloomCache.ts"),
+      "utf8"
+    );
 
     expect(source).toContain("sun-main-light");
     expect(source).toContain("alpha: false");
@@ -2211,22 +2270,37 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("this.cinematicComposer.renderToScreen = false");
     expect(source).toContain("this.renderer.outputColorSpace = THREE.SRGBColorSpace");
     expect(source).toContain("this.renderer.toneMapping = THREE.ACESFilmicToneMapping");
-    expect(source).toContain("this.renderer.render(this.scene, this.camera)");
+    expect(source).toContain("this.renderer.render(this.cinematicBaseRenderScene, this.camera)");
     expect(source).toContain("this.cinematicComposer.render()");
     expect(source).toContain("this.cinematicBloomOverlay.render(this.renderer)");
     expect(source).toContain("const cinematicBloomRenderScale = 0.4");
-    expect(source).toContain("const reducedCinematicBloomRenderScale = 0.2");
+    expect(source).toContain("const lowCinematicBloomStrengthScale = 0.28");
+    expect(source).toContain("const highCinematicBloomStrengthScale = 0.9");
+    expect(source).toContain("const highCinematicBloomCacheUpdateIntervalMs = 1000 / 30");
+    expect(source).toContain("const lowCinematicBloomCacheUpdateIntervalMs = 1000 / 15");
+    expect(source).toContain("this.bloomStrengthScale = nextBloomStrengthScale");
+    expect(source).not.toContain("reducedCinematicBloomRenderScale");
+    expect(source).not.toContain("syncCinematicBloomBlurSampling");
+    expect(source).toContain("getCinematicBloomRadius");
+    expect(source).toContain("applyCinematicBloomScreenSpaceSourceScale(this.worldBloomScene)");
+    expect(source).toContain("applyCinematicBloomScreenSpaceSourceScale(this.uiBloomScene)");
+    expect(source).toContain("restoreCinematicBloomScreenSpaceSourceScale");
+    expect(source).toContain("computeCinematicBloomScreenSpaceSourceEnergyScale");
+    expect(source).toContain("computeCinematicBloomScreenSpaceSourceScale");
+    expect(source).toContain("material.size *= sourceScale");
+    expect(source).toContain("material.opacity *= energyScale");
     expect(source).not.toContain("cinematicMinimalBloomRenderScale");
     expect(source).toContain("this.cinematicComposer.setPixelRatio(this.bloomRenderScale)");
-    expect(source).toContain("const cinematicBloomOverlayGain = 1.15");
+    expect(source).toContain("const cinematicBloomOverlayGain = 0.78");
     expect(source).not.toContain("const isZoomInMotion =");
-    expect(source).toContain("const worldBloomStrength = computeCinematicBloomStrength");
+    expect(source).toContain("computeCinematicBloomStrength({");
     expect(source).toContain("this.solarHazeEnabled ? undefined : 0");
     expect(source).toContain(
-      "const uiBloomStrength = this.uiBloomEnabled ? Math.max(0, this.tuning.uiBloomIntensity) : 0"
+      "(this.uiBloomEnabled ? Math.max(0, this.tuning.uiBloomIntensity) : 0) *"
     );
-    expect(source).toContain("Math.max(0, this.tuning.uiBloomIntensity)");
-    expect(source).toContain("this.cinematicBloomPass.radius = this.tuning.uiBloomRadius");
+    expect(source).toContain("this.bloomStrengthScale");
+    expect(source).toContain("this.cinematicBloomPass.radius = this.getCinematicBloomRadius(");
+    expect(source).toContain("this.tuning.uiBloomRadius");
     expect(source).toContain("this.cinematicBloomPass.threshold = this.tuning.uiBloomThreshold");
     expect(source).toContain("const cinematicUiBloomRenderLayer = 1");
     expect(source).toContain("setExclusiveObjectRenderLayer(group, cinematicUiBloomRenderLayer);");
@@ -2243,14 +2317,37 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("const renderCompactSunBloom = (): void =>");
     expect(source).toContain("this.compactSunBloomEnabled &&");
     expect(source).toContain("setExclusiveObjectRenderLayer");
-    expect(source).toContain("this.compositeCurrentCinematicBloomTexture()");
+    expect(source).toContain("this.cinematicCompactSunBloomCacheTarget");
+    expect(source).toContain("this.compositeCinematicBloomTexture(");
+    expect(source).toContain("const solarOccluder = this.solarOcclusionFlarePresentation");
+    expect(source).toContain('uniforms["occlusionMaskEnabled"]!.value');
+    expect(source).toContain("float occlusionVisibility = mix(1.0, outsideOccluder");
+    const animatedCoronaBlock = source.slice(
+      source.indexOf("function createSunAnimatedCorona"),
+      source.indexOf("function createSunSmoothGlare")
+    );
+    const smoothGlareBlock = source.slice(
+      source.indexOf("function createSunSmoothGlare"),
+      source.indexOf("function createSaturnRingSystem")
+    );
+    expect(animatedCoronaBlock).toContain("depthTest: true");
+    expect(smoothGlareBlock).toContain("depthTest: true");
     expect(source).toContain("cinematicUiBloomCacheTarget");
     expect(source).toContain("cacheCurrentCinematicBloomTexture");
     expect(source).toContain("getCinematicUiBloomCacheSignature");
-    expect(source).toContain("const cinematicBloomCacheMaximumDeferralMs =");
-    expect(source).toContain("worldBloomCacheAge < cinematicBloomCacheMaximumDeferralMs");
-    expect(source).toContain("uiBloomCacheAge < cinematicBloomCacheMaximumDeferralMs");
-    expect(source).toContain("didRefreshWorldBloomThisFrame ||");
+    expect(source).toContain("getCinematicBloomCameraSignature");
+    expect(source).toContain("shouldRefreshCinematicBloomCache");
+    expect(source).toContain("const bloomCacheMaximumDeferralMs = bloomCacheUpdateIntervalMs * 2");
+    expect(source).toContain("maximumDeferralMs: bloomCacheMaximumDeferralMs");
+    expect(source).toContain("peerPassRefreshedThisFrame: didRefreshWorldBloomThisFrame");
+    expect(source).toContain("this.cinematicWorldBloomCacheCameraSignature");
+    expect(source).toContain("this.cinematicUiBloomCacheCameraSignature");
+    expect(bloomCacheSource).toContain(
+      "input.cachedCameraSignature !== input.currentCameraSignature"
+    );
+    expect(bloomCacheSource.indexOf("input.cachedCameraSignature")).toBeLessThan(
+      bloomCacheSource.indexOf("const canReuseCache")
+    );
     expect(source).toContain("nodeRingCelestialOccludersRenderFrameSerial");
     expect(visualTuningSource).toContain("uiBloomIntensity: 0.11");
     expect(visualTuningSource).toContain("uiBloomRadius: 0");
@@ -2381,11 +2478,16 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("private solarHazeEnabled = defaultSolarHazeEnabled;");
     expect(source).toContain("private compactSunBloomEnabled = true;");
     expect(source).toContain("private uiBloomEnabled = true;");
-    expect(source).toContain("private bloomRenderScale = cinematicBloomRenderScale;");
+    expect(source).toContain("private readonly bloomRenderScale = cinematicBloomRenderScale;");
+    expect(source).toContain("private lowBloomProfileEnabled = true;");
+    expect(source).toContain("private bloomStrengthScale = lowCinematicBloomStrengthScale;");
+    expect(source).toContain("private burnPreviewEffectsEnabled = false;");
     expect(source).toContain("setSolarHazeEnabled(enabled: boolean): void");
+    expect(source).toContain("setBurnPreviewEffectsEnabled(enabled: boolean): void");
+    expect(source).toContain("setFirePreviewEffectsEnabled(enabled: boolean): void");
     expect(source).toContain("setCompactSunBloomEnabled(enabled: boolean): void");
     expect(source).toContain("setUiBloomEnabled(enabled: boolean): void");
-    expect(source).toContain("setReducedBloomResolutionEnabled(enabled: boolean): void");
+    expect(source).toContain("setLowBloomProfileEnabled(enabled: boolean): void");
     expect(source).toContain("if (!this.solarHazeEnabled || !this.tuning.solarDustEnabled)");
     expect(source).toContain("const productiveNodeMarkersEnabled = true");
     expect(source).toContain("setVisualTuning(overrides: Partial<Cinematic3dVisualTuning> = {})");
@@ -2963,7 +3065,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(shipModelsSource).toContain('"shipComplexModelDetail"');
     expect(source).toContain("usesSharedGeometry");
     expect(source).not.toContain("line.geometry.computeBoundingSphere()");
-    expect(uiSource).toContain("deltavPerformanceMode");
+    expect(uiSource).not.toContain("deltavPerformanceMode");
     expect(source).not.toContain("getBeatNudgedAngularSpeed");
     expect(source).not.toContain("getBeatNudgedLinearSpeed");
   });
@@ -3353,9 +3455,12 @@ describe("Cinematic 3D architecture boundary", () => {
     const firePreviewStart = source.indexOf("  private renderFireFutureTargetPreview(");
     const firePreviewEnd = source.indexOf("  private getHoverFirePlan(", firePreviewStart);
     const firePreviewSource = source.slice(firePreviewStart, firePreviewEnd);
-    const fireMarkerStart = source.indexOf("function createFutureFireTargetMarker(");
-    const fireMarkerEnd = source.indexOf("function createFutureBodyGhost(", fireMarkerStart);
-    const fireMarkerSource = source.slice(fireMarkerStart, fireMarkerEnd);
+    const evadePresentationStart = source.indexOf("  private renderEvadedMissilePresentations()");
+    const evadePresentationEnd = source.indexOf(
+      "  private renderMissileSolutionBrokenPresentations()",
+      evadePresentationStart
+    );
+    const evadePresentationSource = source.slice(evadePresentationStart, evadePresentationEnd);
     const trajectoryPreviewSource = readFileSync(
       join(process.cwd(), "src/renderers/cinematic3d/trajectoryPreview.ts"),
       "utf8"
@@ -3367,6 +3472,21 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("getSelectedFireOriginNodeId");
     expect(source).toContain("tryRequestFireOrder");
     expect(source).toContain("firePreviewGroup");
+    expect(source).toContain("confirmedBurnEffectGroup");
+    expect(source).toContain("confirmedFireEffectGroup");
+    expect(source).toContain("syncConfirmedFireSolutionStartTimes");
+    expect(source).toContain("renderConfirmedBurnOrderEffect(order)");
+    expect(source).toContain("renderConfirmedFireOrderEffect(order)");
+    expect(source).toContain("animateConfirmedTrajectoryEffect(");
+    expect(source).toContain('presentation: "confirmed"');
+    expect(source).toContain("fireConfirmedSolutionRevealDurationSeconds");
+    expect(source).toContain("fireConfirmedSolutionFadeDurationSeconds");
+    expect(source).toContain("fireConfirmedSolutionAimAcquireProgress");
+    expect(source).toContain("initialSolutionPoints: initialAimPoints");
+    expect(source).toContain("computeConfirmedFireArcPhase(");
+    expect(source).toContain("initialAimPoints");
+    expect(source).not.toContain("buildConfirmedFireAdjustmentTrajectory(");
+    expect(trajectoryPreviewSource).not.toContain("tactical elbow");
     expect(source).toContain("pendingFireGroup");
     expect(source).toContain("activeMissileGroup");
     expect(source).toContain("buildMissileTrajectoryPreview");
@@ -3389,31 +3509,54 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("groupIncomingMissilesByTarget");
     expect(source).toContain("getEarliestIncomingMissile");
     expect(source).toContain("getIncomingFireImpactChronology");
+    expect(source).toContain("compareFireArrivalsForPresentation");
+    expect(source).toContain("pendingFireOrders].sort(");
+    expect(source).toContain("presentations.sort(compareFireArrivalsForPresentation)");
+    expect(source).toContain("private getFireImpactBillboardAnchor(");
+    expect(source).toContain("private prepareFutureFireImpactLabelAvoidBounds(");
+    expect(source).toContain("futureFireImpactLabelAvoidBounds");
+    expect(source).toContain("futureFireImpactLabelGapPixels = 5");
+    expect(source).toContain("additionalAvoidBounds");
+    expect(source).toContain("createCenteredScreenRect(");
     expect(source).toContain('link.name = "fire-impact-chronology-link"');
     expect(source).toContain("previousImpactTurn ?? impact.issuedTurn");
     expect(source).toContain("this.futureDestinationGroup.add(link, ...timingPreview.timingDots)");
     expect(source).toContain("...snapshot.pendingFireOrders");
     expect(source).toContain("getCurrentDisplayNodeRenderData");
     expect(source).toContain("getDisplayNodeRenderDataFromSnapshot(nodeId, this.snapshot)");
-    expect(source).toContain("createFutureFireTargetMarker");
-    expect(source).toContain('targetDot.name = "fire-impact-target-dot"');
-    expect(source).toContain("targetDotMaterial.toneMapped = false");
-    expect(source).toContain("fireImpactTargetDotZoomOutScreenDiameterPixels");
-    expect(source).toContain("fireImpactTargetDotZoomInScreenDiameterPixels");
-    expect(source).toContain("this.getFireImpactTargetDotScreenDiameter()");
-    expect(fireMarkerSource).toContain("new THREE.Points(");
-    expect(fireMarkerSource).toContain("sizeAttenuation: false");
-    expect(fireMarkerSource).not.toContain("targetDot.onBeforeRender");
-    expect(fireMarkerSource).not.toContain("targetDot.scale");
-    expect(fireMarkerSource).not.toContain('targetDot.userData["extremeZoomUiFade"]');
+    expect(source).toContain("impactMarker.name = `fire-future-impact-marker:");
+    expect(source).toContain("createFutureFireImpactMarker");
+    expect(source).not.toContain("fire-intercept-target-ship");
+    expect(source).not.toContain("fire-intercept-lock-reticle");
     expect(source).not.toContain('terminal.name = "fire-impact-terminal-tick"');
-    expect(incomingPreviewSource).not.toContain("createFutureNodeGhost");
-    expect(firePreviewSource).not.toContain("createFutureNodeGhost");
+    expect(incomingPreviewSource).toContain("this.getCachedFutureFireImpactMarker(");
+    expect(incomingPreviewSource).toContain("const targetColor = this.getFactionColor(");
+    expect(incomingPreviewSource).toMatch(
+      /this\.createFutureOrbitTimingPreview\([\s\S]*?impact\.impactTurn,\s*targetColor,/
+    );
+    expect(incomingPreviewSource).toMatch(
+      /this\.getCachedOrbitTimingSegment\([\s\S]*?timingPreview\.points,\s*targetColor,/
+    );
+    expect(firePreviewSource).toContain("this.getCachedFutureFireImpactMarker(");
+    expect(incomingPreviewSource).not.toContain("this.getCachedFutureNodeGhost(");
+    expect(firePreviewSource).not.toContain("this.getCachedFutureNodeGhost(");
     expect(source).toContain("getFireTargetFactionColor");
     expect(source).toContain("getFirePlanOriginFactionId");
     expect(source).toContain("const originFactionId = this.getFirePlanOriginFactionId(plan)");
     expect(source).toContain("this.getFactionColor(impact.targetFactionId)");
     expect(source).toContain("const targetColor = this.getFireTargetFactionColor(plan)");
+    expect(firePreviewSource).toContain("this.createFutureOrbitTimingPreview(");
+    expect(firePreviewSource).toContain("targetColor,");
+    expect(firePreviewSource).toContain("...timingPreview.timingDots");
+    expect(firePreviewSource).toContain('link.name = "fire-target-prediction-track"');
+    expect(source).toContain("marker.position.copy(destination.center)");
+    expect(firePreviewSource).toContain("end: futureTarget");
+    expect(firePreviewSource).not.toContain("endClearanceWorld");
+    expect(source).toContain("const renderedPoints = trajectory.points");
+    expect(source).toContain("createFirePreviewEffect(trajectory.points");
+    expect(firePreviewSource).not.toContain("getCachedFutureFireOrbitGhost(");
+    expect(firePreviewSource).toContain("createFirePredictionRulerTicks(");
+    expect(firePreviewSource).not.toContain("firePreviewEffectsEnabled");
     expect(source).toContain(
       "(originFactionId === null || occupancy.factionId !== originFactionId)"
     );
@@ -3421,8 +3564,17 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("(originFactionId === null || transit.factionId !== originFactionId)");
     expect(trajectoryPreviewSource).toContain("missileTrajectoryBaseHeightScale");
     expect(trajectoryPreviewSource).toContain("missileTrajectoryExtraLiftScale");
-    expect(source).toMatch(/getCachedFutureFireTargetMarker\([\s\S]*?futureTarget,\s+targetColor/);
-    expect(source).toContain("futureFireTargetMarkerCache");
+    expect(source).toContain('"future-fire-impact-diagonal-ticks"');
+    expect(source).toContain('"future-fire-impact-target-point"');
+    expect(source).toContain("targetPoint.rotation.x = -Math.PI / 2");
+    expect(source).toContain("futureFireImpactTickMinimumOuterRadiusPixels = 4.8");
+    expect(source).toContain("futureFireImpactTickThicknessPixels = 1.35");
+    expect(source).toContain("minimumTickOuterRadiusWorld");
+    expect(source).toContain("const tickHalfWidth = tickThicknessWorld");
+    expect(source).toContain("syncFutureFireImpactTicksGeometry(");
+    expect(source).not.toContain("ticks.scale.setScalar(tickScale)");
+    expect(source).toContain("new THREE.Float32BufferAttribute(positions, 3)");
+    expect(source).toContain("futureGhostCache");
     expect(source).toContain("orbitTimingDotCache");
     expect(source).toContain("createMissileMarkerObject");
     expect(source).toContain("getMissileLaunchPresentation");
@@ -3466,7 +3618,9 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("renderMissileSolutionBrokenPresentations");
     expect(source).toContain("missile-solution-broken-trajectory");
     expect(source).toContain("missileSolutionBrokenTrajectoryWithdrawalDurationSeconds = 0.56");
-    expect(source).toContain("missileCancellationBlinkSpeedMultiplier = 4.8");
+    expect(evadePresentationSource).toContain("disableBlink: true");
+    expect(evadePresentationSource).not.toContain("const blink");
+    expect(evadePresentationSource).not.toContain("* blink");
     expect(source).toContain("missileOverviewBlinkFloor = 0.64");
     expect(source).toContain("context.elapsed * 12.4 * animationSpeedMultiplier");
     expect(source).toContain("const withdrawalProgress = smoothStep(");
@@ -3584,6 +3738,13 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("updateMissileImpactWhiteout(elapsed)");
     expect(source).toContain("getMissileImpactWhiteoutOpacity");
     expect(source).toContain("getMissileVoidBurstWhiteoutOpacity");
+    expect(source).toContain('event.type === "SHIP_DESTROYED"');
+    expect(source).toContain("createsScreenRetinalAfterimage: destroysShip");
+    expect(source).toContain("updateShipDestructionRetinalAfterimages(elapsed)");
+    expect(source).toContain("getShipDestructionRetinalAfterimageViewportPosition");
+    expect(source).toContain('element.className = "cinematic-ship-destruction-retinal-afterimage"');
+    expect(source).toContain("element.style.left = `${(viewportPosition.x * 100).toFixed(3)}%`");
+    expect(source).toContain("element.style.top = `${(viewportPosition.y * 100).toFixed(3)}%`");
     expect(source).not.toContain("getContestedSkirmishVoidBurstWhiteoutOpacity");
     expect(source).toContain("getMissileVoidBurstCloseIntensity");
     expect(source).toContain(
@@ -3596,6 +3757,12 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("THREE.MathUtils.lerp(72, 240, afterimageExpansion)");
     expect(source).not.toContain("const missileImpactAfterglowDurationSeconds = 3.65");
     expect(styles).toContain(".cinematic-impact-whiteout");
+    expect(styles).toContain(".cinematic-ship-destruction-retinal-layer");
+    expect(styles).toContain(".cinematic-ship-destruction-retinal-afterimage");
+    expect(styles).toContain("ellipse 68% 53% at 45% 51%");
+    expect(styles).toContain("filter: blur(clamp(24px, 3.2vmin, 48px))");
+    expect(styles).not.toContain("rgba(255, 255, 248, 0.98)");
+    expect(styles).not.toContain("repeating-conic-gradient");
     expect(styles).toContain("mix-blend-mode: screen");
     expect(styles).toContain("pointer-events: none");
     expect(styles).toContain("transition: opacity 12ms linear");
@@ -3830,7 +3997,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("targetKey: `node:${plan.destinationNodeId}`");
   });
 
-  it("uses a short right click as contextual FIRE without changing drag camera behavior", () => {
+  it("uses a short right click to enter or leave contextual FIRE without confirming it", () => {
     const source = readFileSync(join(process.cwd(), "src/renderers/cinematic3d/index.ts"), "utf8");
     const pointerUpStart = source.indexOf('canvas.addEventListener("pointerup"');
     const pointerLeaveStart = source.indexOf(
@@ -3845,16 +4012,13 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("contextFireClickMaxMs = 320");
     expect(pointerUpSource).toContain("wasContextFireClick");
     expect(pointerUpSource).toContain("this.handleContextFireClickAtScreenPoint");
-    expect(contextSource).toContain("tryRequestFireOrderFromContextClick(targetKey)");
+    expect(contextSource).toContain('if (this.selectedActionMode === "fire")');
+    expect(contextSource).toContain('this.selectedActionMode = "burn"');
     expect(contextSource).toContain("toggleSelectedNodeFireModeFromContextClick()");
     expect(contextSource).toContain("this.canUseFireMode()");
     expect(contextSource).toContain('this.selectedActionMode = "fire"');
-    expect(contextSource).toContain(
-      'this.selectedActionMode = this.selectedActionMode === "fire" ? "burn" : "fire"'
-    );
-    expect(contextSource).toContain("this.setSelectedTarget(`node:${originNodeId}`)");
-    expect(contextSource).toContain("this.getFirePlan?.(originNodeId, targetNodeId)");
-    expect(contextSource).not.toContain("this.isEnemyOccupiedNode(targetNodeId)");
+    expect(contextSource).not.toContain("tryRequestFireOrder");
+    expect(contextSource).not.toContain("this.getFirePlan");
     expect(contextSource).toContain("this.lockedSelectionTargetKey !== null");
     expect(source).toContain('event.button === 2 ? "orbit"');
   });
@@ -4035,7 +4199,10 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("lastTrajectoryLabelCameraMotionAt");
     expect(source).toContain("stabilizeTrajectoryLabelOffsetsForCameraMotion");
     expect(source).toContain("trajectoryLabelOffsetMemory");
-    expect(source).not.toContain("worldAnchor: THREE.Vector3");
+    expect(source).toContain("worldAnchor: THREE.Vector3");
+    expect(source).toContain("private updateTrajectoryLabels(width: number, height: number): void");
+    expect(source).toContain("label.worldAnchor.clone().project(this.camera)");
+    expect(source).toContain("this.updateTrajectoryLabels(width, height)");
     expect(source).not.toContain("? rememberedOffset.worldAnchor");
     expect(source).toContain("const projected = anchor.clone().project(this.camera);");
     expect(source).toContain("private placeTrajectoryLabelWithOffset(");
@@ -4207,19 +4374,15 @@ describe("Cinematic 3D architecture boundary", () => {
   it("adds held arrow-key cinematic camera controls without stealing editable input", () => {
     const source = readFileSync(join(process.cwd(), "src/renderers/cinematic3d/index.ts"), "utf8");
 
-    expect(source).toContain("keyboardFastZoomDistanceRatePerSecond");
-    expect(source).toContain("keyboardSlowZoomDistanceRatePerSecond");
-    expect(source).toContain("keyboardFastOrbitCounterClockwiseRadiansPerSecond");
-    expect(source).toContain("keyboardSlowOrbitCounterClockwiseRadiansPerSecond");
-    expect(source).toContain("keyboardDronePanPixelsPerSecond");
+    expect(source).toContain("keyboardCinematicOrbitRadiansPerSecond");
+    expect(source).toContain("keyboardCinematicPanPixelsPerSecond");
+    expect(source).toContain("keyboardCinematicZoomDistanceRatePerSecond");
     expect(source).toContain("keyboardCameraControls");
-    expect(source).toContain("slowZoomOrbit");
     expect(source).toContain('event.key === "ArrowUp"');
     expect(source).toContain('event.key === "ArrowDown"');
     expect(source).toContain('event.key === "ArrowLeft"');
     expect(source).toContain('event.key === "ArrowRight"');
     expect(source).toContain("event.shiftKey");
-    expect(source).toContain('event.key === "Control"');
     expect(source).toContain("this.isKeyboardCameraArrowKey(event.key)");
     expect(source).toContain("(event.ctrlKey && !isCameraArrowKey)");
     expect(source).toContain("orbitClockwise");
@@ -4242,21 +4405,40 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("target instanceof HTMLInputElement");
     expect(source).toContain("target instanceof HTMLTextAreaElement");
     expect(source).toContain("target instanceof HTMLSelectElement");
-    expect(source).toContain("? keyboardSlowZoomDistanceRatePerSecond");
-    expect(source).toContain(": keyboardFastZoomDistanceRatePerSecond");
-    expect(source).toContain("zoomDirection * zoomRate * deltaSeconds");
-    expect(source).toContain("? keyboardSlowOrbitCounterClockwiseRadiansPerSecond");
-    expect(source).toContain(": keyboardFastOrbitCounterClockwiseRadiansPerSecond");
-    expect(source).toContain("-orbitDirection * orbitRate * deltaSeconds");
+    expect(source).toContain("this.keyboardCameraControls.zoomIn = !isPanKey");
+    expect(source).toContain("this.keyboardCameraControls.zoomOut = !isPanKey");
+    expect(source).toContain("this.keyboardCameraControls.panUp = isPanKey");
+    expect(source).toContain("this.keyboardCameraControls.panDown = isPanKey");
+    expect(source).toContain("this.keyboardCameraControls.orbitClockwise = !isPanKey");
+    expect(source).toContain("this.keyboardCameraControls.panLeft = isPanKey");
+    expect(source).toContain("this.keyboardCameraControls.orbitCounterClockwise = !isPanKey");
+    expect(source).toContain("this.keyboardCameraControls.panRight = isPanKey");
+    expect(source).toContain(
+      "zoomDirection * keyboardCinematicZoomDistanceRatePerSecond * deltaSeconds"
+    );
+    expect(source).toContain("this.refreshDisplayScaleForWheelZoom();");
+    expect(source).toContain(
+      "-orbitDirection * keyboardCinematicOrbitRadiansPerSecond * deltaSeconds"
+    );
     expect(source).toContain("this.yaw += yawDelta");
     expect(source).toContain("this.offsetActiveCameraTransitionRotation(yawDelta, 0)");
     expect(source).toContain("const diagonalScale = panXDirection !== 0 && panYDirection !== 0");
-    expect(source).toContain("keyboardDronePanPixelsPerSecond * deltaSeconds * diagonalScale");
+    expect(source).toContain("keyboardCinematicPanPixelsPerSecond * deltaSeconds * diagonalScale");
     expect(source).toContain("this.panByScreenDelta({");
+    expect(source).toContain("using the current camera distance");
     expect(source).toContain(
       "this.offsetActiveCameraTransitionFocus(this.focus.clone().sub(previousFocus))"
     );
     expect(source).toContain("this.isKeyboardCameraControlActive()");
+  });
+
+  it("keeps physical eclipse shading without rendering shadow volumes in empty space", () => {
+    const source = readFileSync(join(process.cwd(), "src/renderers/cinematic3d/index.ts"), "utf8");
+
+    expect(source).toContain("const physicalShadowConeMeshesEnabled = false");
+    expect(source).toContain("!physicalShadowConeMeshesEnabled ||");
+    expect(source).toContain("computeReceiverShadowVolume");
+    expect(source).toContain("finalShadowVolumeMultiplier");
   });
 
   it("keeps the cinematic camera free of automatic low-angle presentation assists", () => {
@@ -4439,6 +4621,12 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("getOrbitingShipMinimumWorldSize(detailProgress)");
     expect(source).toContain("activeBurnMarkerMinimumWorldSize = 0.9");
     expect(source).toContain("Math.max(markerWorldSize, activeBurnMarkerMinimumWorldSize)");
+    expect(source).toContain("shipStrategicMarkerCoarseCullDetailThreshold");
+    expect(source).toContain("useCoarseShipMarkerCulling &&");
+    expect(source).toContain("const strategicMarkerVisibility =");
+    expect(source).toContain(
+      "const collapsedOccludedOpacity = Math.max(occludedOpacity, strategicMarkerVisibility)"
+    );
     expect(source).not.toContain("clamp(markerWorldSize, 0.9, 2.2)");
   });
 
@@ -4657,7 +4845,7 @@ describe("Cinematic 3D architecture boundary", () => {
       "wake.visible = context.isInTransit === true && wakeVisibility > 0.012"
     );
     expect(source).toContain("child.visible = visibleDrivePower > 0.02");
-    expect(source).toContain("engineBloomPoint.visible = enginePointOpacity > 0.012");
+    expect(source).toContain("syncShipEngineBloomPointPresentation(engineBloomPoint");
     expect(source).toContain("writeShipDriveWakeTubeGeometry(wakeTube, {");
     expect(source).toContain('component === "plasma-tube-core"');
     expect(source).toContain("const markerScale = Math.max(0.001, context.markerScale ?? 1)");
@@ -4704,8 +4892,11 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("const enginePointPulse =");
     expect(source).toContain("mandatoryLaunchEngineBlinkBoost");
     expect(source).toContain("const enginePointOpacity =");
-    expect(source).toContain("engineBloomPoint.visible = enginePointOpacity > 0.012");
-    expect(source).toContain("setObjectOpacity(engineBloomPoint, enginePointOpacity)");
+    expect(source).toContain("syncShipEngineBloomPointPresentation(engineBloomPoint");
+    expect(source).toContain('"shipEngineDirectGlowConfigured"');
+    expect(source).toContain(
+      "setExclusiveObjectRenderLayer(engineBloomPoint, cinematicDirectUiRenderLayer)"
+    );
     expect(source).toContain(
       'const shouldPreserveHdrEngineSource = child.userData["shipEngineHdrBloomPoint"] === true'
     );
@@ -5310,6 +5501,27 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).not.toContain("SHIPYARD_PROGRESS");
   });
 
+  it("re-arms tutorial FIRE after cancellation and advances only with a queued solution", () => {
+    const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
+    const cancelStart = uiSource.indexOf("      onFireOrderCancelled(originNodeId: string) {");
+    const cancelEnd = uiSource.indexOf("      onInvalidAction(reason: string) {", cancelStart);
+    const cancelSource = uiSource.slice(cancelStart, cancelEnd);
+    const executeStart = uiSource.indexOf("  async function executeCurrentTurn(): Promise<void> {");
+    const executeEnd = uiSource.indexOf("  async function resolveCurrentTurn(", executeStart);
+    const executeSource = uiSource.slice(executeStart, executeEnd);
+
+    expect(cancelStart).toBeGreaterThanOrEqual(0);
+    expect(cancelEnd).toBeGreaterThan(cancelStart);
+    expect(cancelSource).toContain("const queuedTutorialOrder = getTutorialQueuedFireOrder();");
+    expect(cancelSource).toContain("handleTutorialFireOrderCancelled(cancelledTutorialOrder);");
+    expect(uiSource).toContain("recoverTutorialQueuedFireLessonAfterCancellation(");
+    expect(executeStart).toBeGreaterThanOrEqual(0);
+    expect(executeEnd).toBeGreaterThan(executeStart);
+    expect(executeSource).toContain('tutorialState?.phase === "shipyardFireQueued"');
+    expect(executeSource).toContain('tutorialState?.phase === "shipyardContestedFireQueued"');
+    expect(executeSource.match(/getTutorialQueuedFireOrder\(\) !== undefined/g)).toHaveLength(2);
+  });
+
   it("keeps mandatory launch selection locked until a burn destination is chosen", () => {
     const rendererSource = readFileSync(
       join(process.cwd(), "src/renderers/cinematic3d/index.ts"),
@@ -5496,17 +5708,37 @@ describe("Cinematic 3D architecture boundary", () => {
 
   it("runs the menu background conflict with the competitive AI planner", () => {
     const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
+    const rendererSource = readFileSync(
+      join(process.cwd(), "src/renderers/cinematic3d/index.ts"),
+      "utf8"
+    );
     const startDemoStart = uiSource.indexOf("  function startGameMenuDemo(): void {");
     const createDemoStateStart = uiSource.indexOf(
       "  function createGameMenuDemoInitialState(): GameState {",
       startDemoStart
     );
     const startDemoSource = uiSource.slice(startDemoStart, createDemoStateStart);
+    const clearEffectsStart = rendererSource.indexOf("  clearPresentationEffects(): void {");
+    const clearEffectsEnd = rendererSource.indexOf(
+      "  freezeTimelineReviewCamera(): void {",
+      clearEffectsStart
+    );
+    const clearEffectsSource = rendererSource.slice(clearEffectsStart, clearEffectsEnd);
 
     expect(startDemoStart).toBeGreaterThanOrEqual(0);
     expect(createDemoStateStart).toBeGreaterThan(startDemoStart);
     expect(startDemoSource).toContain("setDebugAiLevel(3);");
     expect(startDemoSource).not.toContain("setDebugAiLevel(1);");
+    expect(startDemoSource).toContain("scheduleGameMenuDemoTurn(0);");
+    expect(uiSource).toContain(
+      "cinematicRenderer.setTrajectoryReflectionMode(trajectoryReflectionMode);"
+    );
+    expect(clearEffectsSource).not.toContain("burnPreviewGroup");
+    expect(clearEffectsSource).not.toContain("pendingBurnGroup");
+    expect(clearEffectsSource).not.toContain("activeBurnGroup");
+    expect(clearEffectsSource).not.toContain("firePreviewGroup");
+    expect(clearEffectsSource).not.toContain("pendingFireGroup");
+    expect(clearEffectsSource).not.toContain("activeMissileGroup");
   });
 
   it("flickers isolated menu glyphs without glitching the whole menu", () => {
@@ -5524,6 +5756,8 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain('glyph.classList.add("is-crt-flickering")');
     expect(uiSource).not.toContain('gameMenu.classList.add("is-crt-flicker")');
     expect(uiSource).toContain('window.matchMedia("(prefers-reduced-motion: reduce)").matches');
+    expect(uiSource).toContain("const gameMenuCrtFlickerMinDelayMs = 1_200;");
+    expect(uiSource).toContain("const gameMenuCrtFlickerMaxDelayMs = 3_400;");
     expect(styleSource).toContain(".game-menu__glyph.is-crt-flickering");
     expect(styleSource).toContain("@keyframes game-menu-crt-phosphor-flicker");
     expect(styleSource).toContain("--game-menu-crt-flicker-duration");
@@ -5539,19 +5773,23 @@ describe("Cinematic 3D architecture boundary", () => {
     const modeResolverStart = uiSource.indexOf(
       "  function getCinematicPerformanceMode(): CinematicPerformanceMode {"
     );
+    const modeResolverEnd = uiSource.indexOf(
+      "  function getStoredTrajectoryReflectionMode(): CinematicTrajectoryReflectionMode {",
+      modeResolverStart
+    );
     const resolverStart = uiSource.indexOf(
       "  function getCinematicRendererPerformanceMode(): CinematicPerformanceMode {"
     );
     const resolverEnd = uiSource.indexOf("  function playSelectionChangedSfx", resolverStart);
-    const modeResolverSource = uiSource.slice(modeResolverStart, resolverStart);
+    const modeResolverSource = uiSource.slice(modeResolverStart, modeResolverEnd);
     const resolverSource = uiSource.slice(resolverStart, resolverEnd);
 
     expect(modeResolverStart).toBeGreaterThanOrEqual(0);
+    expect(modeResolverEnd).toBeGreaterThan(modeResolverStart);
     expect(resolverStart).toBeGreaterThanOrEqual(0);
     expect(resolverEnd).toBeGreaterThan(resolverStart);
-    expect(modeResolverSource).toContain(
-      'return storedMode === "reduced" || storedMode === "minimal" ? storedMode : "full";'
-    );
+    expect(modeResolverSource).toContain('return "full";');
+    expect(modeResolverSource).not.toContain("localStorage");
     expect(resolverSource).toContain("return getCinematicPerformanceMode();");
     expect(resolverSource).not.toContain('"auto"');
     expect(uiSource).toContain("return getCinematicRendererPerformanceMode();");
@@ -5559,6 +5797,7 @@ describe("Cinematic 3D architecture boundary", () => {
 
   it("keeps audio controls in the Options submenu", () => {
     const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
+    const styleSource = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
     const mainActionsStart = uiSource.indexOf(
       '      const mainActions = document.createElement("div");'
     );
@@ -5579,9 +5818,44 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(mainActionsSource).not.toContain("getGameMenuSfxLabel()");
     expect(optionsSource).toContain("getGameMenuMusicLabel()");
     expect(optionsSource).toContain("getGameMenuSfxLabel()");
-    expect(optionsSource).toContain("getGameMenuPerformanceLabel()");
+    expect(optionsSource).toContain("getGameMenuReflectionsLabel()");
+    expect(optionsSource).not.toContain("getGameMenuPerformanceLabel()");
+    expect(optionsSource).not.toContain("performanceAction");
     expect(optionsSource).toContain(
-      "actions.append(musicAction, sfxAction, bloomAction, performanceAction);"
+      "actions.append(musicAction, sfxAction, bloomAction, reflectionsAction, brightnessControl);"
+    );
+    expect(optionsSource).toContain("createGameMenuBrightnessControl(typingTargets)");
+    expect(optionsSource).toContain(
+      'reflectionsAction.classList.add("game-menu__action--nowrap");'
+    );
+    expect(uiSource).toContain('const displayBrightnessStorageKey = "deltav.displayBrightness.v1"');
+    expect(uiSource).toContain(
+      'canvasFrame.style.setProperty("--display-brightness", String(value))'
+    );
+    expect(styleSource).toContain("filter: brightness(var(--display-brightness));");
+    expect(styleSource).toContain(".game-menu__brightness-slider");
+    expect(styleSource).toContain(
+      '.game-menu__submenu-actions[data-screen="options"] {\n' +
+        "  --game-menu-tone-bright: #d9dfb8;\n" +
+        "  --game-menu-tone-regular: #bec89c;\n" +
+        "  --game-menu-tone-soft: #a0aa80;\n" +
+        "  --game-menu-tone-dim: #798263;\n" +
+        "  top: calc(100% - 4px - 2.72em);"
+    );
+    expect(styleSource).toContain(
+      '.game-menu__submenu-actions[data-screen="quit"] {\n' +
+        "  --game-menu-tone-bright: #d8d7b0;\n" +
+        "  --game-menu-tone-regular: #c1bf98;\n" +
+        "  --game-menu-tone-soft: #a5a37f;\n" +
+        "  --game-menu-tone-dim: #7f7d62;\n" +
+        "  top: calc(100% - 4px - 1.36em);"
+    );
+    expect(uiSource).toContain(
+      'return storedMode === "on" || storedMode === "off" ? storedMode : "hover";'
+    );
+    expect(styleSource).toContain(".game-menu__action--nowrap {\n  white-space: nowrap;\n}");
+    expect(uiSource).toContain(
+      "cinematicRenderer.setTrajectoryReflectionMode(trajectoryReflectionMode);"
     );
   });
 
@@ -5646,6 +5920,40 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(focusWithoutZoomSource).toContain("cinematicRenderer?.focusTargetWithoutZoom(target)");
     expect(focusWithoutZoomSource).toContain("center: focused");
     expect(focusWithoutZoomSource).not.toContain("zoom: Math.max");
+  });
+
+  it("pans to an orbit before targeted rewind and leaves turn headers camera-free", () => {
+    const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
+    const animateStart = uiSource.indexOf(
+      "  async function animateCommandLogTimeReviewToPosition("
+    );
+    const playbackStart = uiSource.indexOf(
+      "  async function playCommandLogReviewForwardToPosition(",
+      animateStart
+    );
+    const animateSource = uiSource.slice(animateStart, playbackStart);
+    const renderStart = uiSource.indexOf("  function renderCommandLogReviewPosition(");
+    const cancelStart = uiSource.indexOf(
+      "  function cancelCommandLogTimeReviewAnimation(",
+      renderStart
+    );
+    const renderSource = uiSource.slice(renderStart, cancelStart);
+
+    expect(animateStart).toBeGreaterThanOrEqual(0);
+    expect(playbackStart).toBeGreaterThan(animateStart);
+    expect(animateSource).toContain("if (focusTargetKeys.length === 0)");
+    expect(animateSource).toContain("cinematicRenderer?.freezeTimelineReviewCamera()");
+    expect(animateSource).toContain("syncLogReviewStaticFocusTargetKeys(focusTargetKeys)");
+    expect(animateSource).toContain("await waitForCommandLogReplayFocusBeforePlayback()");
+    expect(
+      animateSource.indexOf("await waitForCommandLogReplayFocusBeforePlayback()")
+    ).toBeLessThan(animateSource.indexOf("const clampedTarget"));
+    expect(uiSource).toContain(
+      'const orbitTargetKeys = targetKeys.filter((targetKey) => targetKey.startsWith("node:"))'
+    );
+    expect(renderSource).toContain(
+      "followTrackedFocus: (commandLogTimeReviewState?.focusTargetKeys.length ?? 0) > 0"
+    );
   });
 
   it("keeps tutorial command log wheel inert while rewind is disabled", () => {
@@ -5816,7 +6124,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("getReplayTransitionFocusTargetKeys");
     expect(uiSource).toContain("focusReplayCameraForTransition");
     expect(uiSource).toContain("focusFirstAvailableTargetWithoutZoom");
-    expect(uiSource).toContain("focusFirstAvailableTargetWithoutTracking");
+    expect(uiSource).toContain("preferCommandLogOrbitFocusTargetKeys");
     expect(uiSource).toContain("freezeTimelineReviewCamera");
     expect(uiSource).toContain("restoreCommandLogTimeReviewToLive");
     expect(rendererSource).toContain("transientTargetLastKnownPositions");
@@ -5832,9 +6140,12 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("getCommandLogEventIdNearReviewPosition");
     expect(uiSource).toContain("showTutorialFirstEnemyKillReplayFollowupHint(tutorial)");
     expect(uiSource).toContain("isTutorialFirstEnemyKillReplayCueInputPending");
-    expect(uiSource).toContain("waitForTutorialFirstEnemyKillReplayCueFocusBeforeRewind");
+    expect(uiSource).toContain("waitForCommandLogReplayFocusBeforePlayback");
     expect(uiSource).toContain("focusCommandScrollbackLineTarget(line)");
     expect(uiSource).toContain("rewindCommandLogToEvent(targetId, focusTargetKeys, commandRowKey)");
+    expect(uiSource).toContain(
+      "followTrackedFocus: (commandLogTimeReviewState?.focusTargetKeys.length ?? 0) > 0"
+    );
     expect(uiSource).toContain("preserveCurrentFocus: true");
     expect(uiSource).toContain(
       "showTutorialFirstEnemyKillReplayFollowupHint(tutorial);\n    updateInteractionLocks();"
@@ -5949,7 +6260,9 @@ describe("Cinematic 3D architecture boundary", () => {
     const maybeReportStart = uiSource.indexOf("function maybeShowPostMatchReport(): void");
     const maybeReportEnd = uiSource.indexOf("async function playReplay", maybeReportStart);
     const maybeReportSource = uiSource.slice(maybeReportStart, maybeReportEnd);
-    const victoryAuditStart = uiSource.indexOf("lastVictoryAudit = createVictoryAudit");
+    const victoryAuditStart = uiSource.indexOf(
+      "workerEvaluation?.victoryAudit ?? createVictoryAudit"
+    );
     const victoryEventStart = uiSource.indexOf("const victoryEvent = createVictoryResolutionEvent");
 
     expect(uiSource).toContain("postMatchReportText = createPostMatchReport(");
@@ -5968,7 +6281,7 @@ describe("Cinematic 3D architecture boundary", () => {
     );
     expect(uiSource).toContain('console.info("VICTORY_CONFIRMED"');
     expect(uiSource).toContain("createMapOutcomeAudit(");
-    expect(uiSource).toContain('console.info("VICTORY_AUDIT", lastVictoryAudit)');
+    expect(uiSource).toContain('console.info("VICTORY_AUDIT", victoryAudit)');
     expect(uiSource).toContain('console.info("MAP_OUTCOME_AUDIT", lastMapOutcomeAudit)');
     expect(uiSource).toContain("victoryAudit: lastVictoryAudit");
     expect(uiSource).toContain("mapOutcomeAudit: lastMapOutcomeAudit");
@@ -6140,7 +6453,8 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain('"STARTING NEXT AI MATCH..."');
     expect(uiSource).toContain("hasConsumedZeroTimerInitialCountdown = true;");
     expect(uiSource).toContain("pendingCinematicCameraRestore");
-    expect(uiSource).toContain("resetRuntimeAfterGameReset({ preserveCamera: true })");
+    expect(uiSource).toContain("resetRuntimeAfterGameReset({ preserveCamera: true");
+    expect(uiSource).toContain("preserveCinematicScene: true");
     expect(uiSource).toContain("restoreCameraState(pendingCinematicCameraRestore)");
     expect(uiSource).toContain("withControllerOverrides(");
     expect(uiSource).toContain('await resolveCurrentTurn("manual");');
@@ -6976,6 +7290,26 @@ describe("Cinematic 3D architecture boundary", () => {
       "  private renderFutureBodyPreview(",
       renderActiveBurnMarkerStart
     );
+    const createFutureOrbitTimingPreviewStart = source.indexOf(
+      "  private createFutureOrbitTimingPreview(",
+      renderFutureBodyPreviewStart
+    );
+    const renderFutureBodyPreviewSource = source.slice(
+      renderFutureBodyPreviewStart,
+      createFutureOrbitTimingPreviewStart
+    );
+    const renderTransferDeltaHintStart = source.indexOf(
+      "  private renderTransferDeltaHint(",
+      createFutureOrbitTimingPreviewStart
+    );
+    const getDisplayNodeRenderDataAtTurnStart = source.indexOf(
+      "  private getDisplayNodeRenderDataAtTurn(",
+      renderTransferDeltaHintStart
+    );
+    const renderTransferDeltaHintSource = source.slice(
+      renderTransferDeltaHintStart,
+      getDisplayNodeRenderDataAtTurnStart
+    );
     const renderActiveBurnMarkerSource = source.slice(
       renderActiveBurnMarkerStart,
       renderFutureBodyPreviewStart
@@ -7098,6 +7432,35 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("createBurnTrajectoryDash");
     expect(source).toContain("createBurnTrajectoryDashLayer");
     expect(source).toContain("createBurnTrajectoryDashMaterial");
+    expect(source).toContain("createBurnTrajectoryPlaneReflectionMaterial");
+    expect(source).toContain('"burn-trajectory-plane-reflection"');
+    expect(source).toContain("trajectoryPlaneReflectionVerticalScale");
+    expect(source).toContain("reflection.scale.set(1, -trajectoryPlaneReflectionVerticalScale, 1)");
+    expect(source).toContain("trajectoryPlaneReflectionDistanceDepthRatio");
+    expect(source).toContain("reflection.position.set(0, -reflectionDepth, 0)");
+    expect(source).toContain("trajectoryPlaneReflectionScreenOffsetY");
+    expect(source).toContain("A small refractive split keeps the reflection legible");
+    expect(source).toContain('reflection.userData["usesSharedGeometry"] = true');
+    expect(source).toContain("float glintCenter = trajectoryAccentPhase");
+    expect(source).toContain('"trajectoryAccentSpeed"');
+    expect(source).toContain("trajectoryAccentStrength");
+    expect(source).toContain("planeReflection.showAnimatedAccent ? 1.2 : 0");
+    expect(source).toContain("showAnimatedAccent: isPreview");
+    expect(source).toContain("showAnimatedAccent: group === this.burnPreviewGroup");
+    expect(source).toContain("showAnimatedAccent: false");
+    expect(source).toContain("* trajectoryAccentStrength;");
+    expect(source).toContain("this.tuning.firePreviewEffectFlowSpeed");
+    expect(source).toContain("this.tuning.burnPreviewEffectFlowSpeed");
+    expect(source).toContain("enabled: this.shouldRenderTrajectoryPlaneReflection(group)");
+    expect(source).toContain("enabled: hasPlaneReflection");
+    expect(source).toContain(
+      'private trajectoryReflectionMode: CinematicTrajectoryReflectionMode = "hover"'
+    );
+    expect(source).toContain("group === this.activeBurnGroup");
+    expect(source).toContain("group === this.activeMissileGroup");
+    expect(source).toContain(
+      "Keep one ribbon,\n      // reflection, and accent phase across that boundary"
+    );
     expect(source).toContain("createBurnTrajectoryRibbonGeometry");
     expect(source).toContain('"ribbonTangent"');
     expect(source).toContain('"ribbonSideSign"');
@@ -7136,8 +7499,16 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("getTransitionDepartingBurnTransits(from, to)");
     expect(source).toContain("getTransitionLaunchedMissiles(from, to)");
     expect(source).toContain("!this.isMandatoryLaunchTransit(transit)");
-    expect(source).toContain("includeDestinationGhosts = true");
-    expect(source).toContain("if (includeDestinationGhosts)");
+    expect(source).toContain("includeDestinationNodeGhost = true");
+    expect(source).toContain("if (includeDestinationNodeGhost)");
+    expect(renderFutureBodyPreviewSource).toContain("this.getCachedFutureNodeGhost(");
+    expect(renderFutureBodyPreviewSource).toMatch(
+      /if \(isHoverPreview\) \{[\s\S]*?this\.getCachedFutureBodyGhost\(/
+    );
+    expect(renderFutureBodyPreviewSource.match(/this\.getCachedFutureBodyGhost\(/g)).toHaveLength(
+      1
+    );
+    expect(renderTransferDeltaHintSource).toContain("this.getCachedFutureBodyGhost(");
     expect(source).toContain("activeBurnLaunchPositions");
     expect(source).toContain("activeBurnLaunchAngles");
     expect(trajectoryPreviewSource).toContain("DepartureOrbitRenderData");
@@ -7172,8 +7543,13 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(createPreviewFireLaunchOriginSource).toContain(
       "capturedLaunchPosition: renderedLaunchPosition"
     );
+    expect(createPreviewFireLaunchOriginSource).toContain("destination: baseTarget");
+    expect(createPreviewFireLaunchOriginSource).not.toContain("this.getFireTargetRenderData(");
     expect(getFireTargetRenderDataSource).toContain(
       "const lockedTargetOrbitAngle = this.getFirePlanTargetOrbitAngle(plan);"
+    );
+    expect(getFireTargetRenderDataSource).toContain(
+      'if (!("id" in plan)) {\n      return target;\n    }'
     );
     expect(source).toContain(
       "private getFirePlanTargetOrbitAngle(plan: RenderableFirePlan): number | undefined"
@@ -7181,7 +7557,22 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain(
       'if ("launchedTurn" in plan) {\n      return this.getActiveMissileTargetOrbitAngle(plan);\n    }'
     );
-    expect(source).toContain("Preview targets keep moving with their ship's orbital phase.");
+    expect(resolveFireTrajectorySource).toContain(
+      'targetMode ?? ("launchedTurn" in plan ? "tracked-ship" : "orbit-center")'
+    );
+    expect(resolveFireTrajectorySource).toContain('resolvedTargetMode === "orbit-center"');
+    expect(resolveFireTrajectorySource).toContain(
+      "`${this.getFirePlanPresentationKey(plan)}:${resolvedTargetMode}`"
+    );
+    expect(source).toContain('this.resolveFireTrajectory(plan, undefined, "orbit-center")');
+    expect(source).not.toContain("private getFirePreviewRenderedPoints(");
+    expect(source).toContain("dashTerminalAnchorProgress");
+    expect(source).toContain("max(min(lead, trail), terminalAnchor)");
+    expect(source).not.toContain("clipFirePreviewToImpactMarker");
+    expect(source).not.toContain("getFutureFireImpactMarkerClearanceWorld");
+    expect(source).toContain("showTerminalLock: false");
+    expect(source).toContain('rulerTicks.name = "fire-target-prediction-ruler-ticks"');
+    expect(source).toContain("function createFutureFireImpactTicksGeometry()");
     expect(source).toContain("plan.originPosition");
     expect(source).toContain(
       "this.getDisplayNodeRenderDataAtTurn(plan.originNodeId, plan.issuedTurn) ??"
@@ -7204,7 +7595,15 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("this.arrivalOrbitHandoffs.clear();");
     expect(source).toContain("getActiveBurnVisualProgress");
     expect(source).toContain("computeActiveBurnVisualTiming");
-    expect(source).toContain("activeBurnVisualLaunchWindow");
+    expect(source).toContain("computeFusionIgnitionPresentationTiming(transit.etaTurns, seed)");
+    expect(source).not.toContain("applyFusionIgnitionMotionKick(");
+    expect(source).not.toContain("getFusionIgnitionGlowTexture()");
+    expect(source).not.toContain("active-burn-fusion-ignition");
+    expect(source).not.toContain("ignitionWorldPosition");
+    expect(source).not.toContain("sampleFusionIgnitionFlash(");
+    expect(source).not.toContain("FusionIgnitionStarburst");
+    expect(source).not.toContain("active-burn-fusion-ignition-shockwave");
+    expect(source).not.toContain("active-burn-fusion-ignition-halo");
     expect(source).toContain("activeBurnVisualMinimumTravelWindow");
     expect(source).toContain("hashStringToUnitInterval(transit.id)");
     expect(source).toContain("getShipMarkerTimelineElapsed");
@@ -7296,13 +7695,14 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).not.toContain("sample.originPosition");
     expect(source).not.toContain("this.onBurnOrderRequested(selectedTransit.destinationNodeId");
     expect(source).toContain("this.getBurnTrajectoryColor(transit)");
-    expect(source).toContain("getTrajectoryLabelAnchor(trajectory.points)");
+    expect(source).toContain("getTrajectoryLabelAnchor(renderedPoints)");
     expect(source).toContain("getBurnFutureLabelAnchor");
     expect(source).toContain("getFutureBurnDestinationLineRadius");
     expect(source).toContain("type OrbitTimingSegmentEndpoints");
     expect(source).toContain("clipOrbitTimingSegment(points, endpoints)");
-    expect(source).toContain("clipOrbitTimingEndpointToBodySurface");
-    expect(source).toContain("node.bodyRadius * 1.035");
+    expect(source).toContain("clipOrbitTimingPolylineStartToClearance");
+    expect(source).toContain("getOrbitTimingEndpointClearance");
+    expect(source).toContain("Math.max(bodyClearance, orbitClearance)");
     expect(source).toContain("getBurnTrajectoryLabelAnchor(points)");
     expect(source).toContain("burnPreviewHoverZones.push");
     expect(source).toContain("new THREE.CircleGeometry");
@@ -7346,6 +7746,14 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(renderBurnArcSource).toContain("this.getPresentationBeatPulse()");
     expect(renderBurnArcSource).toContain("this.camera.position");
     expect(renderBurnArcSource).toContain("trajectoryData.activeCoreRadiusLimit");
+    expect(renderBurnArcSource).toContain(
+      "showFutureMarker && isAffordable && group !== this.burnPreviewGroup"
+    );
+    expect(source).toContain("this.hoveredTargetKey === `node:${sample.plan.destinationNodeId}`");
+    expect(source).not.toContain("private renderBurnFutureOrbitEffect(");
+    expect(source).not.toContain("burn-preview-future-orbit-flow:");
+    expect(source).toContain('const isHoverPreview = !("id" in plan)');
+    expect(source).toContain("`burn-preview-node:${presentationKey}`");
     expect(renderPendingBurnFutureDestinationLinkStart).toBeGreaterThan(renderBurnArcStart);
     expect(getBurnTrajectoryZoomOutThicknessMultiplierStart).toBeGreaterThan(
       renderPendingBurnFutureDestinationLinkStart
@@ -7364,6 +7772,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(renderPendingBurnFutureDestinationLinkSource).toContain("timingPreview.points");
     expect(renderPendingBurnFutureDestinationLinkSource).toContain("timingPreview.start");
     expect(renderPendingBurnFutureDestinationLinkSource).toContain("timingPreview.target");
+    expect(renderPendingBurnFutureDestinationLinkSource).toContain('"astronomical"');
     expect(renderPendingBurnFutureDestinationLinkSource).not.toContain(
       "[currentDestination.center, futureDestination.center]"
     );
@@ -7373,9 +7782,15 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(createOrbitTimingSegmentStart).toBeGreaterThanOrEqual(0);
     expect(createOrbitTimingDotStart).toBeGreaterThan(createOrbitTimingSegmentStart);
     expect(orbitTimingSegmentSource).toContain("new THREE.Line(");
-    expect(orbitTimingSegmentSource).toContain('line.name = "future-orbit-timing-filament"');
+    expect(orbitTimingSegmentSource).toContain('"future-orbit-timing-filament"');
+    expect(orbitTimingSegmentSource).toContain('"astronomical-orbit-ephemeris-arc"');
+    expect(orbitTimingSegmentSource).toContain("THREE.NormalBlending");
+    expect(orbitTimingSegmentSource).toContain("new THREE.Color(0xa8c4cf)");
     expect(orbitTimingSegmentSource).toContain('line.userData["extremeZoomUiFade"] = true');
     expect(orbitTimingDotSource).toContain('dot.userData["extremeZoomUiFade"] = true');
+    expect(orbitTimingDotSource).toContain('"astronomical-orbit-ephemeris-point"');
+    expect(orbitTimingDotSource).toContain("isAstronomical ? 0.72 : 1.75");
+    expect(orbitTimingDotSource).toContain("dot.material.depthTest = isAstronomical");
     expect(source).toContain('ghost.userData["extremeZoomUiFade"] = true');
     expect(source).toContain('ghost.userData["extremeZoomCelestialGhostFade"] = true');
     expect(source).toContain("getExtremeZoomCelestialGhostOpacityMultiplier");

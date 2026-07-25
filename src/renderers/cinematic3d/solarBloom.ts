@@ -11,6 +11,22 @@ export type CinematicBloomStrengthInput = Readonly<{
   globalIntensity: number;
 }>;
 
+export type CinematicBloomRadiusInput = Readonly<{
+  radius: number;
+  intensityScale: number;
+}>;
+
+export type CinematicBloomScreenSpaceSourceScaleInput = Readonly<{
+  bloomRenderScale: number;
+  rendererPixelRatio: number;
+}>;
+
+export type CinematicBloomScreenSpaceSourceEnergyInput = Readonly<{
+  bloomRenderScale: number;
+  pointSize: number;
+  referenceRenderScale: number;
+}>;
+
 export type ApparentBodyBloomSourceGainInput = Readonly<{
   baseGain: number;
   minimumGain: number;
@@ -51,6 +67,29 @@ export function computeLocalizedSunBloomStrength(input: SolarBloomViewportInput)
 
 export function computeCinematicBloomStrength(input: CinematicBloomStrengthInput): number {
   return Math.max(0, input.globalIntensity);
+}
+
+export function computeCinematicBloomRadius(input: CinematicBloomRadiusInput): number {
+  return Math.max(0, input.radius) * clamp(input.intensityScale, 0, 1);
+}
+
+export function computeCinematicBloomScreenSpaceSourceScale(
+  input: CinematicBloomScreenSpaceSourceScaleInput
+): number {
+  const bloomRenderScale = Math.max(0, input.bloomRenderScale);
+  const rendererPixelRatio = Math.max(0.01, input.rendererPixelRatio);
+  return clamp(bloomRenderScale / rendererPixelRatio, 0, 1);
+}
+
+export function computeCinematicBloomScreenSpaceSourceEnergyScale(
+  input: CinematicBloomScreenSpaceSourceEnergyInput
+): number {
+  const bloomRenderScale = Math.max(0.01, input.bloomRenderScale);
+  const referenceRenderScale = Math.max(0.01, input.referenceRenderScale);
+  const pointSize = Math.max(0, input.pointSize);
+  const renderedDiameter = Math.max(1, pointSize * bloomRenderScale) / bloomRenderScale;
+  const referenceDiameter = Math.max(1, pointSize * referenceRenderScale) / referenceRenderScale;
+  return clamp((referenceDiameter / renderedDiameter) ** 2, 0, 1);
 }
 
 export function computeApparentBodyBloomSourceGain(

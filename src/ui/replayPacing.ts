@@ -1,6 +1,6 @@
-const shortRewindDurationMs = 720;
-const rewindDistanceGrowthMs = 260;
-const maximumRewindDurationMs = 2200;
+const shortRewindDurationMs = 640;
+const rewindDistanceGrowthMs = 190;
+const maximumRewindDurationMs = 1800;
 
 export function getAdaptiveRewindDurationMs(distanceTurns: number): number {
   if (!Number.isFinite(distanceTurns) || distanceTurns <= 0) {
@@ -15,5 +15,10 @@ export function getAdaptiveRewindDurationMs(distanceTurns: number): number {
 
 export function easeAdaptiveRewindProgress(progress: number): number {
   const clampedProgress = Math.min(1, Math.max(0, progress));
-  return clampedProgress * clampedProgress;
+  return (
+    clampedProgress *
+    clampedProgress *
+    clampedProgress *
+    (clampedProgress * (clampedProgress * 6 - 15) + 10)
+  );
 }

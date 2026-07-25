@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   computeApparentBodyBloomSourceGain,
+  computeCinematicBloomRadius,
+  computeCinematicBloomScreenSpaceSourceEnergyScale,
+  computeCinematicBloomScreenSpaceSourceScale,
   computeCinematicBloomStrength,
   computeLocalizedSunBloomStrength
 } from "../../src/renderers/cinematic3d/solarBloom";
@@ -73,6 +76,50 @@ describe("cinematic 3D solar bloom", () => {
   it("keeps global bloom at a stable configured strength", () => {
     expect(computeCinematicBloomStrength({ globalIntensity: 0.23 })).toBeCloseTo(0.23);
     expect(computeCinematicBloomStrength({ globalIntensity: -1 })).toBe(0);
+  });
+
+  it("reduces bloom radius proportionally with the low-intensity profile", () => {
+    expect(computeCinematicBloomRadius({ radius: 0.1, intensityScale: 1 })).toBeCloseTo(0.1);
+    expect(computeCinematicBloomRadius({ radius: 0.1, intensityScale: 0.5 })).toBeCloseTo(0.05);
+    expect(computeCinematicBloomRadius({ radius: 0.1, intensityScale: -1 })).toBe(0);
+  });
+
+  it("keeps screen-space bloom sources stable across bloom buffer scales", () => {
+    const rendererPixelRatio = 1.14;
+    const highScale = computeCinematicBloomScreenSpaceSourceScale({
+      bloomRenderScale: 0.4,
+      rendererPixelRatio
+    });
+    const lowScale = computeCinematicBloomScreenSpaceSourceScale({
+      bloomRenderScale: 0.2,
+      rendererPixelRatio
+    });
+
+    expect((highScale * rendererPixelRatio) / 0.4).toBeCloseTo(1);
+    expect((lowScale * rendererPixelRatio) / 0.2).toBeCloseTo(1);
+    expect(lowScale).toBeCloseTo(highScale * 0.5);
+  });
+
+  it("does not let unresolved low-resolution points carry more bloom energy than high", () => {
+    const highEnergy = computeCinematicBloomScreenSpaceSourceEnergyScale({
+      bloomRenderScale: 0.4,
+      pointSize: 2,
+      referenceRenderScale: 0.4
+    });
+    const lowEnergy = computeCinematicBloomScreenSpaceSourceEnergyScale({
+      bloomRenderScale: 0.2,
+      pointSize: 2,
+      referenceRenderScale: 0.4
+    });
+    const resolvedLowEnergy = computeCinematicBloomScreenSpaceSourceEnergyScale({
+      bloomRenderScale: 0.2,
+      pointSize: 20,
+      referenceRenderScale: 0.4
+    });
+
+    expect(highEnergy).toBe(1);
+    expect(lowEnergy).toBeCloseTo(0.25);
+    expect(resolvedLowEnergy).toBe(1);
   });
 
   it("reduces body bloom as the apparent disk grows", () => {

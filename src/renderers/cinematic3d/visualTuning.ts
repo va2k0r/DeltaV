@@ -142,6 +142,11 @@ export type Cinematic3dVisualTuning = Readonly<{
   burnPreviewColor: number;
   burnPreviewOpacity: number;
   burnPreviewThicknessMultiplier: number;
+  burnPreviewEffectOpacity: number;
+  burnPreviewEffectParticleCount: number;
+  burnPreviewEffectParticleSizePixels: number;
+  burnPreviewEffectApertureSizePixels: number;
+  burnPreviewEffectFlowSpeed: number;
   burnTrajectoryZoomOutThicknessBoost: number;
   burnTrajectoryZoomOutThicknessDetailThreshold: number;
   pendingBurnOpacity: number;
@@ -150,6 +155,17 @@ export type Cinematic3dVisualTuning = Readonly<{
   fireMarkerColor: number;
   fireTargetDimOpacity: number;
   firePreviewOpacity: number;
+  firePreviewEffectOpacity: number;
+  firePreviewEffectParticleCount: number;
+  firePreviewEffectParticleSizePixels: number;
+  firePreviewEffectReticleSizePixels: number;
+  firePreviewEffectFlowSpeed: number;
+  confirmedOrderEffectOpacityMultiplier: number;
+  confirmedOrderEffectParticleMultiplier: number;
+  confirmedOrderEffectSizeMultiplier: number;
+  fireConfirmedSolutionRevealDurationSeconds: number;
+  fireConfirmedSolutionFadeDurationSeconds: number;
+  fireConfirmedSolutionAimAcquireProgress: number;
   pendingFireOpacity: number;
   activeMissileOpacity: number;
   missileMarkerScreenPixels: number;
@@ -230,6 +246,16 @@ export type Cinematic3dVisualTuning = Readonly<{
   solarOcclusionMinBodyRadius: number;
   solarOcclusionZoomFadeStart: number;
   solarOcclusionZoomFadeEnd: number;
+  solarOcclusionCoronaIntensity: number;
+  solarOcclusionExposureCompression: number;
+  solarOcclusionReemergenceIntensity: number;
+  solarOcclusionReemergenceDurationSeconds: number;
+  solarOcclusionReemergenceArmCoverage: number;
+  solarOcclusionReemergenceReleaseCoverage: number;
+  atmosphericScatteringIntensity: number;
+  atmosphericScatteringScale: number;
+  atmosphericScatteringFalloff: number;
+  atmosphericScatteringTerminatorBoost: number;
   heliocentricScaleBase: number;
   heliocentricScaleZoomOutCompression: number;
   heliocentricScaleZoomMultiplier: number;
@@ -466,6 +492,11 @@ export const defaultCinematic3dVisualTuning: Cinematic3dVisualTuning = {
   burnPreviewColor: 0x9fe8ff,
   burnPreviewOpacity: 0.74,
   burnPreviewThicknessMultiplier: 2.25,
+  burnPreviewEffectOpacity: 0.9,
+  burnPreviewEffectParticleCount: 36,
+  burnPreviewEffectParticleSizePixels: 6.8,
+  burnPreviewEffectApertureSizePixels: 38,
+  burnPreviewEffectFlowSpeed: 0.24,
   burnTrajectoryZoomOutThicknessBoost: 1.58,
   burnTrajectoryZoomOutThicknessDetailThreshold: 0.22,
   pendingBurnOpacity: 0.84,
@@ -474,6 +505,17 @@ export const defaultCinematic3dVisualTuning: Cinematic3dVisualTuning = {
   fireMarkerColor: 0xff2638,
   fireTargetDimOpacity: 0.2,
   firePreviewOpacity: 0.82,
+  firePreviewEffectOpacity: 0.96,
+  firePreviewEffectParticleCount: 42,
+  firePreviewEffectParticleSizePixels: 8.2,
+  firePreviewEffectReticleSizePixels: 48,
+  firePreviewEffectFlowSpeed: 0.42,
+  confirmedOrderEffectOpacityMultiplier: 0.56,
+  confirmedOrderEffectParticleMultiplier: 0.54,
+  confirmedOrderEffectSizeMultiplier: 0.82,
+  fireConfirmedSolutionRevealDurationSeconds: 0.82,
+  fireConfirmedSolutionFadeDurationSeconds: 0.18,
+  fireConfirmedSolutionAimAcquireProgress: 0.58,
   pendingFireOpacity: 0.74,
   activeMissileOpacity: 0.96,
   missileMarkerScreenPixels: 8.6,
@@ -547,13 +589,23 @@ export const defaultCinematic3dVisualTuning: Cinematic3dVisualTuning = {
   solarDustMaxBrightness: 0.18,
   solarOcclusionEnabled: true,
   solarOcclusionOpacity: 0.95,
-  solarOcclusionLength: 12,
-  solarOcclusionWidth: 0.58,
-  solarOcclusionFade: 0.72,
+  solarOcclusionLength: 7.5,
+  solarOcclusionWidth: 0.4,
+  solarOcclusionFade: 0.58,
   solarOcclusionBodyRadiusMultiplier: 1,
   solarOcclusionMinBodyRadius: 1.5,
   solarOcclusionZoomFadeStart: 1200,
   solarOcclusionZoomFadeEnd: 2600,
+  solarOcclusionCoronaIntensity: 0.34,
+  solarOcclusionExposureCompression: 0.18,
+  solarOcclusionReemergenceIntensity: 0.28,
+  solarOcclusionReemergenceDurationSeconds: 0.48,
+  solarOcclusionReemergenceArmCoverage: 0.82,
+  solarOcclusionReemergenceReleaseCoverage: 0.68,
+  atmosphericScatteringIntensity: 0.62,
+  atmosphericScatteringScale: 1.035,
+  atmosphericScatteringFalloff: 3.6,
+  atmosphericScatteringTerminatorBoost: 0.48,
   heliocentricScaleBase: 1.72,
   heliocentricScaleZoomOutCompression: 0.68,
   heliocentricScaleZoomMultiplier: 3.3,

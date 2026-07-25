@@ -11030,7 +11030,8 @@ function planAiForcedEconomicEndgame(
   if (
     aiPlanningOptions.enableForcedEconomicEndgame === false ||
     !isAiTryhardProfileActive(state, factionId) ||
-    isSimplifiedAiPlanning(aiPlanningOptions)
+    isSimplifiedAiPlanning(aiPlanningOptions) ||
+    isAiFirePlanningDisabled(aiPlanningOptions)
   ) {
     return { state, debugEvents: [], handled: false };
   }
@@ -14719,6 +14720,10 @@ function planAiContestedFireCombos(
   turn: number,
   aiPlanningOptions: AiPlanningOptions = {}
 ): Readonly<{ state: GameState; debugEvents: readonly TurnDebugEvent[] }> {
+  if (isAiFirePlanningDisabled(aiPlanningOptions)) {
+    return { state, debugEvents: [] };
+  }
+
   let plannedState = state;
   const debugEvents: TurnDebugEvent[] = [];
   const targets = content.nodes
@@ -16495,6 +16500,10 @@ function isTrailerAiPlanning(options: AiPlanningOptions = {}): boolean {
   return getEffectiveAiPlanningLevel(options) === 0;
 }
 
+function isAiFirePlanningDisabled(options: AiPlanningOptions = {}): boolean {
+  return getEffectiveAiPlanningLevel(options) === 0;
+}
+
 function isSimplifiedAiPlanning(options: AiPlanningOptions = {}): boolean {
   return getEffectiveAiPlanningLevel(options) === 1;
 }
@@ -17110,6 +17119,10 @@ function getNoFireProfileRejectionReason(
   factionId: FactionId,
   aiPlanningOptions: AiPlanningOptions
 ): string | null {
+  if (isAiFirePlanningDisabled(aiPlanningOptions)) {
+    return "ai-level-0:fire-disabled";
+  }
+
   if (getAiStrategyProfile(aiPlanningOptions, factionId) !== "NOFIRE") {
     return null;
   }

@@ -249,7 +249,9 @@ export function createTutorialPostVictoryAutomaticBehaviorRows(
   ];
 }
 
-export function createTutorialShipyardContestedRuleRows(): readonly TutorialCommandTimelineRow[] {
+export function createTutorialShipyardContestedRuleRows(
+  playerClassName: string
+): readonly TutorialCommandTimelineRow[] {
   return [
     {
       parts: [
@@ -274,6 +276,14 @@ export function createTutorialShipyardContestedRuleRows(): readonly TutorialComm
         {
           text: "Shipyard progress will not reset, the faction holding the orbit at 5/5 will launch a new ship."
         }
+      ],
+      className: tutorialLineClassName
+    },
+    {
+      parts: [
+        { text: "To disengage, " },
+        { text: "BURN", className: playerClassName },
+        { text: " to any other orbit." }
       ],
       className: tutorialLineClassName
     }

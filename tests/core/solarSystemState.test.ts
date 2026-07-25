@@ -2377,6 +2377,49 @@ describe("Solar System deterministic core state", () => {
     );
   });
 
+  it("keeps AI level 0 limited to BURN and WORK without alpha-strike FIRE exceptions", () => {
+    const content = loadContent();
+    const state = createInitialGameState({
+      factionDv: { player: 0, opponent: 4 },
+      nodeOccupancies: [
+        { nodeId: "mars_node", factionId: "player", shipCount: 1 },
+        { nodeId: "mercury_node", factionId: "opponent", shipCount: 1 },
+        { nodeId: "venus_node", factionId: "opponent", shipCount: 1 }
+      ]
+    });
+    const next = advanceTurn(state, content, ["opponent"], { aiLevel: 0 });
+
+    expect(next.activeMissiles).not.toContainEqual(
+      expect.objectContaining({ factionId: "opponent" })
+    );
+    expect(next.pendingFireOrders).not.toContainEqual(
+      expect.objectContaining({ factionId: "opponent" })
+    );
+    expect(next.debugEvents).not.toContainEqual(
+      expect.objectContaining({
+        type: "FIRE_LAUNCHED",
+        factionId: "opponent"
+      })
+    );
+    expect(next.debugEvents).toContainEqual(
+      expect.objectContaining({
+        type: "AI_REJECTED_ACTION",
+        factionId: "opponent",
+        action: "FIRE",
+        reason: "ai-level-0:fire-disabled"
+      })
+    );
+    expect(
+      next.activeBurnTransits.some((transit) => transit.factionId === "opponent") ||
+        next.shipyardProgress.some(
+          (progress) =>
+            progress.nodeId === "mercury_node" &&
+            progress.workerFactionId === "opponent" &&
+            progress.progress > 0
+        )
+    ).toBe(true);
+  });
+
   it("enemy can FIRE at critical dV because FIRE has no dV cost", () => {
     const content = loadContent();
     const next = applyCommand(
@@ -3178,6 +3221,35 @@ describe("Solar System deterministic core state", () => {
         factionId: "opponent",
         targetNodeId: "mars_node",
         reason: "existing-contested-lock"
+      })
+    );
+  });
+
+  it("does not let AI level 0 FIRE through an otherwise valid alpha strike", () => {
+    const content = loadContent();
+    const state = createInitialGameState({
+      factionDv: { player: 10, opponent: 10 },
+      nodeOccupancies: [
+        { nodeId: "mars_node", factionId: "player", shipCount: 1 },
+        { nodeId: "mars_node", factionId: "opponent", shipCount: 1 },
+        { nodeId: "venus_node", factionId: "opponent", shipCount: 1 }
+      ]
+    });
+    const next = advanceTurn(state, content, ["opponent"], { aiLevel: 0 });
+
+    expect(next.activeMissiles).not.toContainEqual(
+      expect.objectContaining({ factionId: "opponent" })
+    );
+    expect(next.debugEvents).not.toContainEqual(
+      expect.objectContaining({
+        type: "AI_COMBO_EXECUTED",
+        factionId: "opponent"
+      })
+    );
+    expect(next.debugEvents).not.toContainEqual(
+      expect.objectContaining({
+        type: "FIRE_LAUNCHED",
+        factionId: "opponent"
       })
     );
   });
