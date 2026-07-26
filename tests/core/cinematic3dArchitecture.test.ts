@@ -4646,11 +4646,28 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("this.isKeyboardCameraControlActive()");
   });
 
-  it("keeps physical eclipse shading without rendering shadow volumes in empty space", () => {
+  it("uses analytic per-fragment solar visibility without rendering shadow volumes in space", () => {
     const source = readFileSync(join(process.cwd(), "src/renderers/cinematic3d/index.ts"), "utf8");
+    const dynamicLightingSource = readFileSync(
+      join(process.cwd(), "src/renderers/cinematic3d/dynamicSolarLighting.ts"),
+      "utf8"
+    );
 
     expect(source).toContain("const physicalShadowConeMeshesEnabled = false");
     expect(source).toContain("!physicalShadowConeMeshesEnabled ||");
+    expect(source).toContain(
+      "this.syncDynamicSolarLighting(bodyObject, body, position, bodiesById)"
+    );
+    expect(source).toContain("getDynamicSolarVisibility(vWorldPosition, sunPosition)");
+    expect(source).toContain("solarDayMask = dayMask * solarVisibility");
+    expect(source).toContain("sunFacing * solarVisibility * 0.62");
+    expect(source).toContain("opticalDepth *= mix(0.08, 1.0, solarVisibility)");
+    expect(source).toContain("!dynamicSolarLightingEnabled && this.tuning.receiverEclipseStrength");
+    expect(source).toContain("!dynamicSolarLightingEnabled && this.tuning.shadowVolumeStrength");
+    expect(dynamicLightingSource).toContain("export const dynamicSolarLightingEnabled = true");
+    expect(dynamicLightingSource).toContain("float dynamicSolarDiscCoverage(");
+    expect(dynamicLightingSource).toContain("float getDynamicSolarVisibility(");
+    expect(dynamicLightingSource).toContain("uniform vec4 dynamicSolarOccluders[");
     expect(source).toContain("computeReceiverShadowVolume");
     expect(source).toContain("finalShadowVolumeMultiplier");
   });

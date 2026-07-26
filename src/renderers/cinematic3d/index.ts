@@ -58,6 +58,15 @@ import {
   type AtmosphericScatteringProfile
 } from "./atmosphericScattering";
 import {
+  createDynamicSolarLightingUniforms,
+  dynamicSolarLightingEnabled,
+  dynamicSolarLightingShaderFunctions,
+  maxDynamicSolarOccluders,
+  selectDynamicSolarOccluders,
+  type DynamicSolarBody,
+  type DynamicSolarOccluder
+} from "./dynamicSolarLighting";
+import {
   alignMissileFlightProgressToImpactPresentation,
   createReversibleReplaySnapshot,
   createOrbitalTransitionSnapshot,
@@ -2356,6 +2365,8 @@ export class CinematicSolarSystemRenderer {
   private cinematicCompactSunBloomCacheLastUpdatedAt = Number.NEGATIVE_INFINITY;
   private hasAnimatedUiBloomSource = false;
   private snapshotBodiesById = new Map<string, BodySnapshot>();
+  private dynamicSolarBodiesDisplayState: CinematicDisplayState | null = null;
+  private dynamicSolarBodies: readonly DynamicSolarBody[] = [];
   private snapshotNodesByBodyId = new Map<string, NodeSnapshot>();
   private snapshotNodesById = new Map<string, NodeSnapshot>();
   private snapshotNodeOccupanciesById = new Map<
@@ -9821,17 +9832,18 @@ export class CinematicSolarSystemRenderer {
     if (bodyObject.atmosphereMesh !== null) {
       setShaderUniformVector(bodyObject.atmosphereMesh.material, "sunPosition", this.sunPosition);
     }
+    this.syncDynamicSolarLighting(bodyObject, body, position, bodiesById);
     const sunDazzleStrength = solarGlareAndDazzleEnabled
       ? this.computeSunDazzleStrength(body, position, bodiesById)
       : 0;
     setShaderUniformNumber(bodyObject.mesh.material, "sunDazzleStrength", sunDazzleStrength);
     const bodyRadius = this.getDisplayBodyRadius(body);
     const eclipse =
-      this.tuning.receiverEclipseStrength > 0
+      !dynamicSolarLightingEnabled && this.tuning.receiverEclipseStrength > 0
         ? this.computeProjectedEclipseShadow(body, position, bodyRadius, bodiesById)
         : null;
     const shadowVolume =
-      this.tuning.shadowVolumeStrength > 0
+      !dynamicSolarLightingEnabled && this.tuning.shadowVolumeStrength > 0
         ? this.computeReceiverShadowVolume(body, position, bodyRadius, bodiesById)
         : null;
 
@@ -9946,6 +9958,87 @@ export class CinematicSolarSystemRenderer {
       bodiesById
     );
     bodyObject.industrialLights.rotation.copy(bodyObject.mesh.rotation);
+  }
+
+  private syncDynamicSolarLighting(
+    bodyObject: BodyObject,
+    body: BodySnapshot,
+    position: THREE.Vector3,
+    bodiesById: ReadonlyMap<string, BodySnapshot>
+  ): void {
+    const sunBody = bodiesById.get("sun");
+    const enabled =
+      dynamicSolarLightingEnabled && body.visualClass !== "star" && sunBody !== undefined;
+    const sunRadius = sunBody === undefined ? 0 : this.getDisplayBodyRadius(sunBody);
+    const bodyRadius = this.getDisplayBodyRadius(body);
+    const occluders = enabled
+      ? selectDynamicSolarOccluders({
+          receiverId: body.id,
+          receiverPosition: position,
+          receiverRadius: bodyRadius * 4,
+          sunPosition: this.sunPosition,
+          sunRadius,
+          bodies: this.getDynamicSolarBodies(bodiesById)
+        })
+      : [];
+
+    syncDynamicSolarLightingMaterial(bodyObject.mesh.material, enabled, sunRadius, occluders);
+    if (bodyObject.cloudMesh !== null) {
+      syncDynamicSolarLightingMaterial(
+        bodyObject.cloudMesh.material,
+        enabled,
+        sunRadius,
+        occluders
+      );
+    }
+    if (bodyObject.atmosphereMesh !== null) {
+      syncDynamicSolarLightingMaterial(
+        bodyObject.atmosphereMesh.material,
+        enabled,
+        sunRadius,
+        occluders
+      );
+    }
+
+    for (const ringSystemName of [
+      "jupiter-ring-system",
+      "neptune-ring-system",
+      "saturn-ring-system",
+      "uranus-ring-system"
+    ]) {
+      const ringSystem = bodyObject.group.getObjectByName(ringSystemName);
+
+      if (ringSystem === undefined || !ringSystem.visible) {
+        continue;
+      }
+
+      ringSystem.traverse((child) => {
+        if (!isDisposableRenderable(child)) {
+          return;
+        }
+
+        syncDynamicSolarLightingMaterial(child.material, enabled, sunRadius, occluders);
+      });
+    }
+  }
+
+  private getDynamicSolarBodies(
+    bodiesById: ReadonlyMap<string, BodySnapshot>
+  ): readonly DynamicSolarBody[] {
+    if (
+      this.dynamicSolarBodiesDisplayState === this.displayState &&
+      this.dynamicSolarBodies.length === bodiesById.size
+    ) {
+      return this.dynamicSolarBodies;
+    }
+
+    this.dynamicSolarBodies = Array.from(bodiesById.values(), (candidate) => ({
+      id: candidate.id,
+      position: this.getDisplayBodyPosition(candidate),
+      radius: this.getDisplayBodyRadius(candidate)
+    }));
+    this.dynamicSolarBodiesDisplayState = this.displayState;
+    return this.dynamicSolarBodies;
   }
 
   private computeSunDazzleStrength(
@@ -39803,7 +39896,8 @@ function createAtmosphericScatteringMesh(
       falloff: {
         value: tuning.atmosphericScatteringFalloff * profile.falloffMultiplier
       },
-      terminatorBoost: { value: tuning.atmosphericScatteringTerminatorBoost }
+      terminatorBoost: { value: tuning.atmosphericScatteringTerminatorBoost },
+      ...createDynamicSolarLightingUniforms()
     },
     transparent: true,
     depthTest: true,
@@ -39829,22 +39923,26 @@ function createAtmosphericScatteringMesh(
       uniform float terminatorBoost;
       varying vec3 vWorldPosition;
       varying vec3 vWorldNormal;
+      ${dynamicSolarLightingShaderFunctions}
 
       void main() {
         vec3 normal = normalize(vWorldNormal);
         vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
         vec3 lightDirection = normalize(sunPosition - vWorldPosition);
+        float solarVisibility = getDynamicSolarVisibility(vWorldPosition, sunPosition);
         float viewFacing = clamp(dot(normal, viewDirection), 0.0, 1.0);
         float sunFacing = dot(normal, lightDirection);
         float limb = pow(1.0 - viewFacing, max(0.5, falloff));
-        float daylight = smoothstep(-0.32, 0.52, sunFacing);
+        float daylight = smoothstep(-0.32, 0.52, sunFacing) * solarVisibility;
         float terminator = 1.0 - smoothstep(0.015, 0.42, abs(sunFacing));
         float forwardScatter =
           pow(max(dot(viewDirection, -lightDirection), 0.0), 5.0) *
-          smoothstep(-0.2, 0.46, sunFacing);
+          smoothstep(-0.2, 0.46, sunFacing) *
+          solarVisibility;
         float opticalDepth = limb * (0.12 + daylight * 0.7);
-        opticalDepth += limb * terminator * terminatorBoost;
+        opticalDepth += limb * terminator * terminatorBoost * solarVisibility;
         opticalDepth += limb * forwardScatter * 0.32;
+        opticalDepth *= mix(0.08, 1.0, solarVisibility);
         float alpha = clamp(opticalDepth * intensity, 0.0, 0.78);
 
         if (alpha <= 0.002) {
@@ -39951,7 +40049,8 @@ function createBodyMaterial(
       tritiumExtractionGlowIntensity: { value: 0 },
       tritiumExtractionGlowRadius: { value: 1 },
       bloomSourceGain: { value: 1 },
-      bloomSourcePass: { value: 0 }
+      bloomSourcePass: { value: 0 },
+      ...createDynamicSolarLightingUniforms()
     },
     vertexShader: `
       varying vec3 vWorldPosition;
@@ -40021,6 +40120,7 @@ function createBodyMaterial(
       varying vec3 vWorldPosition;
       varying vec3 vWorldNormal;
       varying vec3 vLocalPosition;
+      ${dynamicSolarLightingShaderFunctions}
 
       float beatSynchronizedBodyAngle(float angularFrequency) {
         float safeFrequency = max(0.000001, abs(angularFrequency));
@@ -40575,6 +40675,7 @@ function createBodyMaterial(
         vec3 lightDirection = normalize(sunPosition - vWorldPosition);
         vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
         float nDotL = dot(normal, lightDirection);
+        float solarVisibility = getDynamicSolarVisibility(vWorldPosition, sunPosition);
         vec3 missileFlashLight = vec3(0.0);
         for (int flashIndex = 0; flashIndex < ${maxMissileBodyFlashLights}; flashIndex++) {
           float flashIntensity = missileFlashIntensities[flashIndex];
@@ -40819,7 +40920,8 @@ function createBodyMaterial(
             bodySeed,
             beatSynchronizedBodyAngle(1.0)
           );
-          float dayCloudVisibility = smoothstep(-0.08, 0.34, nDotL);
+          float dayCloudVisibility =
+            smoothstep(-0.08, 0.34, nDotL) * solarVisibility;
           vec3 cloudColor = mix(
             vec3(0.66, 0.78, 0.88),
             vec3(0.94, 0.97, 1.0),
@@ -40836,7 +40938,7 @@ function createBodyMaterial(
             mix(0.18, 1.0, dayCloudVisibility);
           earthCloudLayerColor =
             cloudColor *
-            (0.07 + direct * bodyDaySideBrightness * 0.58);
+            (0.035 + direct * bodyDaySideBrightness * 0.58 * solarVisibility);
         }
 
         float eclipseDisk = 0.0;
@@ -40886,12 +40988,19 @@ function createBodyMaterial(
         float sunDazzlePlate = smoothstep(0.02, 0.72, nDotL);
         float sunDazzleLobe = sunDazzleFacing * 0.68 + sunDazzlePlate * 0.32;
         dayColor +=
-          sunDazzleColor * sunDazzleStrength * sunPlanetDazzleSurfaceGain * sunDazzleLobe;
-        vec3 color = mix(nightColor, dayColor, dayMask);
+          sunDazzleColor *
+          sunDazzleStrength *
+          sunPlanetDazzleSurfaceGain *
+          sunDazzleLobe *
+          solarVisibility;
+        float solarDayMask = dayMask * solarVisibility;
+        vec3 color = mix(nightColor, dayColor, solarDayMask);
         color *= 1.0 - terminatorBand * clamp(0.34 * terminatorContrast, 0.0, 0.86);
 
         if (earthAdornmentStrength > 0.001) {
-          float earthNightMask = earthNightReadabilityMask(nDotL);
+          float earthNightMask = earthNightReadabilityMask(
+            mix(-0.2, nDotL, solarVisibility)
+          );
           float earthNightLongitude = atan(localDirection.z, localDirection.x);
           float earthNightLatitude = asin(clamp(localDirection.y, -1.0, 1.0));
           float earthNightLand = earthLandMask(
@@ -40932,7 +41041,7 @@ function createBodyMaterial(
         }
 
         if (moonSurfaceFeatureStrength > 0.001) {
-          float moonNightGlow = mix(0.08, 0.34, 1.0 - dayMask);
+          float moonNightGlow = mix(0.08, 0.34, 1.0 - solarDayMask);
           vec3 moonInfrastructureEmission = vec3(0.62);
           color +=
             moonInfrastructureEmission *
@@ -40942,8 +41051,10 @@ function createBodyMaterial(
         }
 
         float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.0);
-        color += surface * rim * bodyRimLightIntensity * dayMask;
-        float darkRim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.4) * (1.0 - dayMask);
+        color += surface * rim * bodyRimLightIntensity * solarDayMask;
+        float darkRim =
+          pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.4) *
+          (1.0 - solarDayMask);
         float sunBehindViewer = smoothstep(0.24, 0.9, -dot(viewDirection, lightDirection));
         vec3 backlightColor = mix(surface, vec3(1.0, 0.74, 0.42), 0.38);
         color += backlightColor * darkRim * bodyDarkSilhouetteRimIntensity * (0.35 + sunBehindViewer);
@@ -40951,7 +41062,9 @@ function createBodyMaterial(
         float finalShadowVolumeMultiplier = mix(1.0, shadowVolumeDarkness, shadowVolumeFactor);
         color *= finalBodyEclipseMultiplier * finalShadowVolumeMultiplier;
         if (earthAdornmentStrength > 0.001) {
-          float earthNightMask = earthNightReadabilityMask(nDotL);
+          float earthNightMask = earthNightReadabilityMask(
+            mix(-0.2, nDotL, solarVisibility)
+          );
           float earthNightLongitude = atan(localDirection.z, localDirection.x);
           float earthNightLatitude = asin(clamp(localDirection.y, -1.0, 1.0));
           float earthNightLand = earthLandMask(
@@ -40972,7 +41085,7 @@ function createBodyMaterial(
           }
           float bloomViewFacing = max(dot(normal, viewDirection), 0.0);
           float bloomRim = smoothstep(0.22, 0.86, 1.0 - bloomViewFacing);
-          float bloomIllumination = smoothstep(0.0, 0.12, nDotL);
+          float bloomIllumination = smoothstep(0.0, 0.12, nDotL) * solarVisibility;
           vec3 bloomTint = mix(baseColor, accentColor, 0.5);
           gl_FragColor = vec4(
             bloomTint * bloomIllumination * bloomRim * bloomSourceGain,
@@ -41484,7 +41597,8 @@ function createSaturnRingMaterial(
       sunFacingExponent: { value: sunFacingExponent },
       glintExponent: { value: glintExponent },
       glintBoost: { value: glintBoost },
-      glintPresentationBoost: { value: 1 }
+      glintPresentationBoost: { value: 1 },
+      ...createDynamicSolarLightingUniforms()
     },
     vertexShader: `
       varying vec3 vLocalPosition;
@@ -41521,6 +41635,7 @@ function createSaturnRingMaterial(
       varying vec3 vLocalPosition;
       varying vec3 vWorldPosition;
       varying vec3 vWorldNormal;
+      ${dynamicSolarLightingShaderFunctions}
 
       float beatSynchronizedAngle(float angularFrequency) {
         float safeFrequency = max(0.000001, abs(angularFrequency));
@@ -41541,6 +41656,7 @@ function createSaturnRingMaterial(
         vec3 normal = normalize(vWorldNormal);
         vec3 lightDirection = normalize(sunPosition - vWorldPosition);
         vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+        float solarVisibility = getDynamicSolarVisibility(vWorldPosition, sunPosition);
         float radial = length(vLocalPosition.xz);
         float radialProgress =
           clamp((radial - innerRadius) / max(0.001, outerRadius - innerRadius), 0.0, 1.0);
@@ -41572,18 +41688,25 @@ function createSaturnRingMaterial(
           shimmer *
           viewProfile *
           (0.42 + bandStructure * 0.72) *
-          (0.62 + sunFacing * 0.82 + grazing * 0.28);
+          (0.62 + sunFacing * solarVisibility * 0.82 + grazing * 0.28);
         vec3 solarGold = vec3(1.0, 0.73, 0.42);
-        vec3 color = ringColor * (0.48 + ambientLightBoost + sunFacing * 0.62 + grazing * 0.18);
+        vec3 color = ringColor * (
+          0.48 +
+          ambientLightBoost +
+          sunFacing * solarVisibility * 0.62 +
+          grazing * 0.18
+        );
         color +=
           solarGold *
           glint *
+          solarVisibility *
           glintBreath *
           (0.85 + bloomBoost * 1.25) *
           glintBoost *
           glintPresentationBoost;
         alpha +=
           glint *
+          solarVisibility *
           glintBreath *
           opacity *
           softEdge *
@@ -42056,6 +42179,54 @@ function setShaderUniformVector(
 
     if (uniform !== undefined && uniform.value instanceof THREE.Vector3) {
       uniform.value.copy(value);
+    }
+  }
+}
+
+function syncDynamicSolarLightingMaterial(
+  material: THREE.Material | THREE.Material[],
+  enabled: boolean,
+  sunRadius: number,
+  occluders: readonly DynamicSolarOccluder[]
+): void {
+  for (const shaderMaterial of getShaderMaterials(material)) {
+    const strengthUniform = shaderMaterial.uniforms["dynamicSolarLightingStrength"];
+    const sunRadiusUniform = shaderMaterial.uniforms["dynamicSolarSunRadius"];
+    const countUniform = shaderMaterial.uniforms["dynamicSolarOccluderCount"];
+    const occludersUniform = shaderMaterial.uniforms["dynamicSolarOccluders"];
+
+    if (
+      strengthUniform === undefined ||
+      sunRadiusUniform === undefined ||
+      countUniform === undefined ||
+      occludersUniform === undefined ||
+      !Array.isArray(occludersUniform.value)
+    ) {
+      continue;
+    }
+
+    strengthUniform.value = enabled ? 1 : 0;
+    sunRadiusUniform.value = Math.max(0, sunRadius);
+    countUniform.value = Math.min(maxDynamicSolarOccluders, occluders.length);
+
+    for (let index = 0; index < maxDynamicSolarOccluders; index += 1) {
+      const uniformValue: unknown = occludersUniform.value[index];
+
+      if (!(uniformValue instanceof THREE.Vector4)) {
+        continue;
+      }
+
+      const occluder = occluders[index];
+      if (occluder === undefined) {
+        uniformValue.set(0, 0, 0, 0);
+      } else {
+        uniformValue.set(
+          occluder.position.x,
+          occluder.position.y,
+          occluder.position.z,
+          occluder.radius
+        );
+      }
     }
   }
 }
