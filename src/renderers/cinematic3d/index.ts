@@ -118,6 +118,7 @@ import {
   setRingHexShipRadiatorClockRotation,
   setRingHexShipRadiatorExtension,
   setShipDriveWakeTubePresentation,
+  shouldForceStrategicShipMarkerLod,
   writeShipDriveWakeTubeGeometry,
   type ShipModelVariant
 } from "./shipModels";
@@ -16462,7 +16463,10 @@ export class CinematicSolarSystemRenderer {
           sunPosition: this.sunPosition,
           allowDriveWakeDetail: !this.isMinimalPerformanceMode(),
           allowComplexModelDetail: !this.isReducedPerformanceMode(),
-          forceMinimalLod: this.isMinimalPerformanceMode(),
+          forceMinimalLod: shouldForceStrategicShipMarkerLod(
+            detailProgress,
+            this.isMinimalPerformanceMode()
+          ),
           suppressZoomOutDotGlow:
             node.type === "tritium" &&
             node.isWorking &&
@@ -26554,7 +26558,10 @@ export class CinematicSolarSystemRenderer {
       beatSyncEnabled,
       sunPosition: this.sunPosition,
       allowComplexModelDetail: !this.isReducedPerformanceMode(),
-      forceMinimalLod: this.isMinimalPerformanceMode(),
+      forceMinimalLod: shouldForceStrategicShipMarkerLod(
+        detailProgress,
+        this.isMinimalPerformanceMode()
+      ),
       allowDriveWakeDetail: true,
       tuning: this.tuning
     });

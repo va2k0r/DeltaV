@@ -3095,6 +3095,8 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("allowComplexModelDetail");
     expect(source).toContain("forceMinimalLod");
     expect(source).toContain("if (forceMinimalLod)");
+    expect(source.match(/shouldForceStrategicShipMarkerLod\(/g)?.length).toBe(2);
+    expect(source).not.toContain("forceMinimalLod: this.isMinimalPerformanceMode()");
     expect(source).toContain("allowComplexModelDetail: !this.isReducedPerformanceMode()");
     expect(source).toContain("syncShipComplexModelDetailVisibility");
     expect(source).toContain("setShipModelOpacity(model, modelOpacity, allowComplexModelDetail)");

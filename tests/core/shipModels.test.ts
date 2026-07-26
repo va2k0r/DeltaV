@@ -2,11 +2,20 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import {
   createShipMarkerObject,
-  setRingHexShipRadiatorExtension
+  setRingHexShipRadiatorExtension,
+  shouldForceStrategicShipMarkerLod
 } from "../../src/renderers/cinematic3d/shipModels";
 import { defaultCinematic3dVisualTuning } from "../../src/renderers/cinematic3d/visualTuning";
 
 describe("ring-hex ship model", () => {
+  it("never replaces a close-up hull with the strategic dot when performance mode changes", () => {
+    expect(shouldForceStrategicShipMarkerLod(0, true)).toBe(true);
+    expect(shouldForceStrategicShipMarkerLod(0.16, true)).toBe(true);
+    expect(shouldForceStrategicShipMarkerLod(0.17, true)).toBe(false);
+    expect(shouldForceStrategicShipMarkerLod(1, true)).toBe(false);
+    expect(shouldForceStrategicShipMarkerLod(0, false)).toBe(false);
+  });
+
   it("batches the radiator lattice without removing its close-up geometry", () => {
     const marker = createShipMarkerObject(
       defaultCinematic3dVisualTuning,
