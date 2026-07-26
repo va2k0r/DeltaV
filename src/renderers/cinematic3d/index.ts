@@ -236,8 +236,6 @@ type BodyObject = Readonly<{
   atmosphereMesh: THREE.Mesh | null;
   picker: THREE.Mesh;
   industrialLights: THREE.Group;
-  shadowCone: THREE.Mesh;
-  shadowConeContrast: THREE.Mesh;
 }>;
 
 type EclipseShadowPresentation = Readonly<{
@@ -275,25 +273,6 @@ type PhysicalShadowConeHit = Readonly<{
   bodyId: string;
   length: number;
   farRadius: number;
-}>;
-
-type PhysicalShadowConeStyle = Readonly<{
-  coreOpacityMultiplier: number;
-  contrastOpacityMultiplier: number;
-  contrastColor: THREE.ColorRepresentation;
-  renderOrderOffset: number;
-}>;
-
-type PhysicalShadowConePresentation = Readonly<{
-  nearRadius: number;
-  farRadius: number;
-  zoomInProgress: number;
-  distanceOpacityMultiplier: number;
-  coreOpacityMultiplier: number;
-  contrastOpacityMultiplier: number;
-  coreTailFadeStart: number;
-  contrastTailFadeStart: number;
-  tailFadeEnd: number;
 }>;
 
 type ApparentDiameterTarget = Readonly<{
@@ -1199,10 +1178,6 @@ const cinematicPlanetBloomFalloffExponent = 1.25;
 // Keep close disks above the HDR extraction threshold. The cap is still far below the
 // zoomed-out source gain, so a focused planet cannot turn into a full-screen glare.
 const cinematicPlanetBloomMinimumSourceGain = 1.15;
-// A shadow is not visible in vacuum. Receiver-body eclipse shading remains active, but drawing
-// the empty volume itself creates large geometric wedges during fast turn/mandatory-launch
-// transitions and makes them look like exhaust or light emitted by the departing ship.
-const physicalShadowConeMeshesEnabled = false;
 const rendererLargeViewportPixels = 1_600_000;
 const rendererHugeViewportPixels = 3_300_000;
 const tutorialAttentionNodeColorNeutralMix = 0.34;
@@ -9333,248 +9308,6 @@ export class CinematicSolarSystemRenderer {
     return strongest;
   }
 
-  private syncPhysicalShadowCone(
-    shadowCone: THREE.Mesh,
-    shadowConeContrast: THREE.Mesh,
-    body: BodySnapshot,
-    position: THREE.Vector3,
-    bodyRadius: number,
-    bodiesById: ReadonlyMap<string, BodySnapshot>
-  ): void {
-    if (
-      !physicalShadowConeMeshesEnabled ||
-      body.visualClass === "star" ||
-      bodyRadius <= 0 ||
-      (this.tuning.physicalShadowConeOpacity <= 0 &&
-        this.tuning.physicalShadowConeContrastOpacity <= 0)
-    ) {
-      shadowCone.visible = false;
-      shadowConeContrast.visible = false;
-      return;
-    }
-
-    const awayFromSun = position.clone().sub(this.sunPosition);
-
-    if (awayFromSun.lengthSq() <= 0.001) {
-      shadowCone.visible = false;
-      shadowConeContrast.visible = false;
-      return;
-    }
-
-    awayFromSun.normalize();
-    const lengthMultiplier = getProjectedShadowLengthMultiplier(body);
-    const maxLengthWorld =
-      this.estimatePhysicalShadowConeLength(body, bodyRadius, bodiesById) * lengthMultiplier;
-    const lengthWorld = maxLengthWorld;
-    const lengthLocal = clamp(
-      lengthWorld / Math.max(0.001, bodyRadius),
-      3.2 * lengthMultiplier,
-      28 * lengthMultiplier
-    );
-    const shadowPresentation = this.getPhysicalShadowConePresentation(position, bodyRadius);
-    updatePhysicalShadowConeGeometry(
-      shadowCone,
-      shadowPresentation.nearRadius,
-      shadowPresentation.farRadius
-    );
-    updatePhysicalShadowConeGeometry(
-      shadowConeContrast,
-      shadowPresentation.nearRadius,
-      shadowPresentation.farRadius
-    );
-    const shadowStyle = this.getPhysicalShadowConeStyle(body);
-    shadowCone.position.set(0, 0, 0);
-    shadowConeContrast.position.set(0, 0, 0);
-    shadowCone.parent?.updateWorldMatrix(true, false);
-    const localAwayFromSun =
-      shadowCone.parent === null
-        ? awayFromSun.clone()
-        : getMeshLocalDirection(shadowCone.parent, awayFromSun);
-    shadowCone.quaternion.setFromUnitVectors(positiveZAxis, localAwayFromSun);
-    shadowConeContrast.quaternion.setFromUnitVectors(positiveZAxis, localAwayFromSun);
-    shadowCone.scale.set(1, 1, lengthLocal);
-    shadowConeContrast.scale.set(1, 1, lengthLocal);
-    shadowCone.renderOrder = 24 + shadowStyle.renderOrderOffset;
-    shadowConeContrast.renderOrder = 25 + shadowStyle.renderOrderOffset;
-    this.updatePhysicalShadowConeOpacity(shadowCone, shadowConeContrast, body, shadowPresentation);
-  }
-
-  private updatePhysicalShadowConeOpacity(
-    shadowCone: THREE.Mesh,
-    shadowConeContrast: THREE.Mesh,
-    body: BodySnapshot,
-    presentation: PhysicalShadowConePresentation
-  ): void {
-    const shadowStyle = this.getPhysicalShadowConeStyle(body);
-    const shadowConeOpacity =
-      this.getZoomAdjustedPhysicalShadowConeOpacity() *
-      shadowStyle.coreOpacityMultiplier *
-      presentation.coreOpacityMultiplier *
-      presentation.distanceOpacityMultiplier;
-    const shadowConeContrastOpacity =
-      this.getZoomAdjustedPhysicalShadowConeContrastOpacity() *
-      shadowStyle.contrastOpacityMultiplier *
-      presentation.contrastOpacityMultiplier *
-      presentation.distanceOpacityMultiplier;
-
-    shadowCone.visible = shadowConeOpacity > 0;
-    shadowConeContrast.visible = shadowConeContrastOpacity > 0 && shadowCone.visible;
-    setShaderUniformNumber(shadowCone.material, "shadowCoreOpacity", shadowConeOpacity);
-    setShaderUniformNumber(
-      shadowCone.material,
-      "shadowTailFadeStart",
-      presentation.coreTailFadeStart
-    );
-    setShaderUniformNumber(shadowCone.material, "shadowTailFadeEnd", presentation.tailFadeEnd);
-    setShaderUniformNumber(
-      shadowConeContrast.material,
-      "shadowContrastOpacity",
-      shadowConeContrastOpacity
-    );
-    setShaderUniformNumber(
-      shadowConeContrast.material,
-      "shadowTailFadeStart",
-      presentation.contrastTailFadeStart
-    );
-    setShaderUniformNumber(
-      shadowConeContrast.material,
-      "shadowTailFadeEnd",
-      presentation.tailFadeEnd
-    );
-    setShaderUniformColor(
-      shadowConeContrast.material,
-      "shadowContrastColor",
-      shadowStyle.contrastColor
-    );
-  }
-
-  private getPhysicalShadowConePresentation(
-    position: THREE.Vector3,
-    bodyRadius: number
-  ): PhysicalShadowConePresentation {
-    const zoomInProgress = this.getPhysicalShadowConeZoomInProgress();
-    const nearRadius = Math.max(0.001, this.tuning.physicalShadowConeNearRadius);
-    const farRadius = clamp(
-      THREE.MathUtils.lerp(
-        this.tuning.physicalShadowConeFarRadius,
-        this.tuning.physicalShadowConeZoomInFarRadius,
-        zoomInProgress
-      ),
-      0,
-      nearRadius
-    );
-    const tailFadeEnd = Math.max(
-      0.001,
-      THREE.MathUtils.lerp(
-        legacyPhysicalShadowConeVisualTuning.tailFadeEnd,
-        this.tuning.physicalShadowConeZoomInTailFadeEnd,
-        zoomInProgress
-      )
-    );
-    const coreTailFadeStart = clamp(
-      THREE.MathUtils.lerp(
-        legacyPhysicalShadowConeVisualTuning.coreTailFadeStart,
-        this.tuning.physicalShadowConeZoomInCoreTailFadeStart,
-        zoomInProgress
-      ),
-      0,
-      tailFadeEnd - 0.001
-    );
-    const contrastTailFadeStart = clamp(
-      THREE.MathUtils.lerp(
-        legacyPhysicalShadowConeVisualTuning.contrastTailFadeStart,
-        this.tuning.physicalShadowConeZoomInContrastTailFadeStart,
-        zoomInProgress
-      ),
-      0,
-      tailFadeEnd - 0.001
-    );
-
-    return {
-      nearRadius,
-      farRadius,
-      zoomInProgress,
-      distanceOpacityMultiplier: this.getPhysicalShadowConeDistanceOpacityMultiplier(
-        position,
-        bodyRadius,
-        zoomInProgress
-      ),
-      coreOpacityMultiplier: THREE.MathUtils.lerp(
-        1,
-        this.tuning.physicalShadowConeZoomInOpacityMultiplier,
-        zoomInProgress
-      ),
-      contrastOpacityMultiplier: THREE.MathUtils.lerp(
-        1,
-        this.tuning.physicalShadowConeZoomInContrastOpacityMultiplier,
-        zoomInProgress
-      ),
-      coreTailFadeStart,
-      contrastTailFadeStart,
-      tailFadeEnd
-    };
-  }
-
-  private getPhysicalShadowConeZoomInProgress(): number {
-    const detailProgress = getShipDetailProgress(this.distance, this.tuning);
-    return smootherStep(
-      this.tuning.physicalShadowConeZoomInStartDetail,
-      this.tuning.physicalShadowConeZoomInEndDetail,
-      detailProgress
-    );
-  }
-
-  private getPhysicalShadowConeDistanceOpacityMultiplier(
-    position: THREE.Vector3,
-    bodyRadius: number,
-    zoomInProgress: number
-  ): number {
-    if (zoomInProgress <= 0) {
-      return 1;
-    }
-
-    const distanceFromFocus = position.distanceTo(this.focus);
-    const fadeStart = Math.max(bodyRadius * 10, this.distance * 0.75);
-    const fadeEnd = Math.max(fadeStart + bodyRadius * 14, this.distance * 2.25);
-    const distanceOpacity = 1 - smootherStep(fadeStart, fadeEnd, distanceFromFocus);
-    return THREE.MathUtils.lerp(1, clamp(distanceOpacity, 0, 1), zoomInProgress);
-  }
-
-  private getPhysicalShadowConeStyle(body: BodySnapshot): PhysicalShadowConeStyle {
-    if (body.kind !== "moon") {
-      return {
-        coreOpacityMultiplier: 0.92,
-        contrastOpacityMultiplier: 0.9,
-        contrastColor: this.tuning.physicalShadowConeContrastColor,
-        renderOrderOffset: 0
-      };
-    }
-
-    return {
-      coreOpacityMultiplier: 1.08,
-      contrastOpacityMultiplier: 1.08,
-      contrastColor: 0x0a0a0a,
-      renderOrderOffset: 0.2
-    };
-  }
-
-  private getZoomAdjustedPhysicalShadowConeOpacity(): number {
-    const detailProgress = getShipDetailProgress(this.distance, this.tuning);
-    const extremeZoomOutProgress = 1 - smoothStep(0, 0.12, detailProgress);
-    return (
-      this.tuning.physicalShadowConeOpacity * THREE.MathUtils.lerp(1, 0.72, extremeZoomOutProgress)
-    );
-  }
-
-  private getZoomAdjustedPhysicalShadowConeContrastOpacity(): number {
-    const detailProgress = getShipDetailProgress(this.distance, this.tuning);
-    const extremeZoomOutProgress = 1 - smoothStep(0, 0.12, detailProgress);
-    return (
-      this.tuning.physicalShadowConeContrastOpacity *
-      THREE.MathUtils.lerp(1, 1.25, extremeZoomOutProgress)
-    );
-  }
-
   private estimatePhysicalShadowConeLength(
     body: BodySnapshot,
     bodyRadius: number,
@@ -9949,14 +9682,6 @@ export class CinematicSolarSystemRenderer {
       }
     }
 
-    this.syncPhysicalShadowCone(
-      bodyObject.shadowCone,
-      bodyObject.shadowConeContrast,
-      body,
-      position,
-      bodyRadius,
-      bodiesById
-    );
     bodyObject.industrialLights.rotation.copy(bodyObject.mesh.rotation);
   }
 
@@ -10214,14 +9939,6 @@ export class CinematicSolarSystemRenderer {
     const industrialLights = new THREE.Group();
     group.add(industrialLights);
 
-    const shadowCone = createPhysicalShadowCone(this.tuning);
-    shadowCone.visible = false;
-    group.add(shadowCone);
-
-    const shadowConeContrast = createPhysicalShadowConeContrast(this.tuning);
-    shadowConeContrast.visible = false;
-    group.add(shadowConeContrast);
-
     this.scene.add(group);
     const bodyObject = {
       group,
@@ -10229,9 +9946,7 @@ export class CinematicSolarSystemRenderer {
       cloudMesh,
       atmosphereMesh,
       picker,
-      industrialLights,
-      shadowCone,
-      shadowConeContrast
+      industrialLights
     };
     this.bodyObjects.set(body.id, bodyObject);
     this.syncBodyPickTarget(bodyObject, body, node);
@@ -39233,187 +38948,6 @@ function syncViewportStarfield(
     starfield.material.size = tuning.starSizeMax;
     starfield.material.opacity = 0.92;
   }
-}
-
-function createPhysicalShadowCone(tuning: Cinematic3dVisualTuning): THREE.Mesh {
-  const geometry = createPhysicalShadowConeGeometry(
-    tuning.physicalShadowConeNearRadius,
-    tuning.physicalShadowConeFarRadius
-  );
-  const material = new THREE.ShaderMaterial({
-    uniforms: {
-      shadowCoreColor: { value: new THREE.Color(0x02050b) },
-      shadowCoreOpacity: { value: tuning.physicalShadowConeOpacity },
-      shadowTailFadeStart: { value: legacyPhysicalShadowConeVisualTuning.coreTailFadeStart },
-      shadowTailFadeEnd: { value: legacyPhysicalShadowConeVisualTuning.tailFadeEnd }
-    },
-    vertexShader: `
-      varying float vConeDepth;
-
-      void main() {
-        vConeDepth = clamp(position.z, 0.0, 1.0);
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform vec3 shadowCoreColor;
-      uniform float shadowCoreOpacity;
-      uniform float shadowTailFadeStart;
-      uniform float shadowTailFadeEnd;
-      varying float vConeDepth;
-
-      void main() {
-        float startFade = smoothstep(0.0, 0.08, vConeDepth);
-        float tailFade = 1.0 - smoothstep(shadowTailFadeStart, shadowTailFadeEnd, vConeDepth);
-        float alpha = shadowCoreOpacity * startFade * tailFade;
-
-        if (alpha <= 0.003) {
-          discard;
-        }
-
-        gl_FragColor = vec4(shadowCoreColor, alpha);
-      }
-    `,
-    transparent: true,
-    depthWrite: false,
-    depthTest: true,
-    side: THREE.DoubleSide,
-    blending: THREE.NormalBlending
-  });
-  const cone = new THREE.Mesh(geometry, material);
-  cone.name = "physical-shadow-cone";
-  cone.renderOrder = 24;
-  return cone;
-}
-
-function createPhysicalShadowConeContrast(tuning: Cinematic3dVisualTuning): THREE.Mesh {
-  const geometry = createPhysicalShadowConeGeometry(
-    tuning.physicalShadowConeNearRadius,
-    tuning.physicalShadowConeFarRadius
-  );
-  const material = new THREE.ShaderMaterial({
-    uniforms: {
-      shadowContrastColor: { value: new THREE.Color(tuning.physicalShadowConeContrastColor) },
-      shadowContrastOpacity: { value: tuning.physicalShadowConeContrastOpacity },
-      shadowTailFadeStart: { value: legacyPhysicalShadowConeVisualTuning.contrastTailFadeStart },
-      shadowTailFadeEnd: { value: legacyPhysicalShadowConeVisualTuning.tailFadeEnd }
-    },
-    vertexShader: `
-      varying vec3 vWorldPosition;
-      varying vec3 vWorldNormal;
-      varying float vConeDepth;
-
-      void main() {
-        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-        vWorldPosition = worldPosition.xyz;
-        vWorldNormal = normalize(mat3(modelMatrix) * normal);
-        vConeDepth = clamp(position.z, 0.0, 1.0);
-        gl_Position = projectionMatrix * viewMatrix * worldPosition;
-      }
-    `,
-    fragmentShader: `
-      uniform vec3 shadowContrastColor;
-      uniform float shadowContrastOpacity;
-      uniform float shadowTailFadeStart;
-      uniform float shadowTailFadeEnd;
-      varying vec3 vWorldPosition;
-      varying vec3 vWorldNormal;
-      varying float vConeDepth;
-
-      void main() {
-        vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
-        float surfaceFacing = abs(dot(normalize(vWorldNormal), viewDirection));
-        float silhouette = pow(1.0 - clamp(surfaceFacing, 0.0, 1.0), 1.45);
-        float startFade = smoothstep(0.03, 0.18, vConeDepth);
-        float tailFade = 1.0 - smoothstep(shadowTailFadeStart, shadowTailFadeEnd, vConeDepth);
-        float penumbra = clamp(0.12 + silhouette * 1.28, 0.0, 1.0);
-        float alpha = shadowContrastOpacity * penumbra * startFade * tailFade;
-
-        if (alpha <= 0.003) {
-          discard;
-        }
-
-        gl_FragColor = vec4(shadowContrastColor, alpha);
-      }
-    `,
-    transparent: true,
-    depthWrite: false,
-    depthTest: true,
-    side: THREE.DoubleSide,
-    blending: THREE.NormalBlending
-  });
-  const cone = new THREE.Mesh(geometry, material);
-  cone.name = "physical-shadow-cone-contrast";
-  cone.renderOrder = 25;
-  return cone;
-}
-
-function createPhysicalShadowConeGeometry(
-  nearRadius: number,
-  farRadius: number
-): THREE.BufferGeometry {
-  const radialSegments = 96;
-  const positions: number[] = [];
-  const indices: number[] = [];
-
-  for (let index = 0; index < radialSegments; index += 1) {
-    const angle = (index / radialSegments) * Math.PI * 2;
-    const x = Math.cos(angle);
-    const y = Math.sin(angle);
-    positions.push(x * nearRadius, y * nearRadius, 0);
-  }
-
-  const farRingStart = positions.length / 3;
-  for (let index = 0; index < radialSegments; index += 1) {
-    const angle = (index / radialSegments) * Math.PI * 2;
-    const x = Math.cos(angle);
-    const y = Math.sin(angle);
-    positions.push(x * farRadius, y * farRadius, 1);
-  }
-
-  for (let index = 0; index < radialSegments; index += 1) {
-    const nextIndex = (index + 1) % radialSegments;
-    const nearCurrent = index;
-    const nearNext = nextIndex;
-    const farCurrent = farRingStart + index;
-    const farNext = farRingStart + nextIndex;
-
-    indices.push(nearCurrent, nearNext, farNext);
-    indices.push(nearCurrent, farNext, farCurrent);
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.userData["radialSegments"] = radialSegments;
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-function updatePhysicalShadowConeGeometry(
-  shadowCone: THREE.Mesh,
-  nearRadius: number,
-  farRadius: number
-): void {
-  const geometry = shadowCone.geometry;
-  const radialSegments = Number(geometry.userData["radialSegments"] ?? 0);
-  const positionAttribute = geometry.getAttribute("position");
-
-  if (!(positionAttribute instanceof THREE.BufferAttribute) || radialSegments <= 0) {
-    return;
-  }
-
-  for (let index = 0; index < radialSegments; index += 1) {
-    const angle = (index / radialSegments) * Math.PI * 2;
-    const x = Math.cos(angle);
-    const y = Math.sin(angle);
-    positionAttribute.setXYZ(index, x * nearRadius, y * nearRadius, 0);
-    positionAttribute.setXYZ(radialSegments + index, x * farRadius, y * farRadius, 1);
-  }
-
-  positionAttribute.needsUpdate = true;
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
 }
 
 function computePhysicalShadowConeRadiusAtDistance(
