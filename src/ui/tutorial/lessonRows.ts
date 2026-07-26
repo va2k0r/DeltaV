@@ -101,11 +101,6 @@ export function createTutorialShipyardProductionRows(
       ],
       className: tutorialLineClassName
     },
-    createTutorialSpacerRow(),
-    {
-      parts: [{ text: "Right click and drag to orbit." }],
-      className: tutorialLineClassName
-    },
     createTutorialSpacerRow()
   ];
 }

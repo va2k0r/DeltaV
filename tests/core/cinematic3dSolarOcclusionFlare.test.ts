@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   advanceSolarOcclusionTransientState,
   computeSolarDiscOcclusionCoverage,
+  computeSolarLimbGlintStrength,
   computeSolarOcclusionDistanceVisibility,
   computeSolarReemergencePulse,
   createInitialSolarOcclusionTransientState
@@ -43,6 +44,14 @@ describe("cinematic 3D solar occlusion flare", () => {
 
     expect(coverage).toBeGreaterThan(0.35);
     expect(coverage).toBeLessThan(0.45);
+  });
+
+  it("keeps a visible limb glint while the sun peeks out from behind a body", () => {
+    expect(computeSolarLimbGlintStrength(0)).toBe(0);
+    expect(computeSolarLimbGlintStrength(0.01)).toBe(0);
+    expect(computeSolarLimbGlintStrength(0.7)).toBeGreaterThan(0.9);
+    expect(computeSolarLimbGlintStrength(0.96)).toBeGreaterThan(0);
+    expect(computeSolarLimbGlintStrength(1)).toBe(0);
   });
 
   it("arms on a deep eclipse and emits the flare while the sun is still mostly covered", () => {

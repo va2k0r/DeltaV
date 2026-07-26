@@ -18,6 +18,7 @@ export type { ProceduralMapGeneratorId } from "./proceduralMapConfig";
 
 export const CURRENT_MAP_PRESET_ID = "current";
 export const STRATEGIC_MAP_PRESET_ID = "strategic";
+export const TRAILER_CAPTURE_MAP_PRESET_ID = "trailer-capture";
 export const PROCEDURAL_MAP_PRESET_ID = "procedural";
 export const CLASSIC_PROCEDURAL_MAP_PRESET_ID = "procedural-classic";
 export const DEFAULT_MAP_PRESET_ID = PROCEDURAL_MAP_PRESET_ID;
@@ -25,6 +26,7 @@ export const DEFAULT_MAP_PRESET_ID = PROCEDURAL_MAP_PRESET_ID;
 export type MapPresetId =
   | typeof CURRENT_MAP_PRESET_ID
   | typeof STRATEGIC_MAP_PRESET_ID
+  | typeof TRAILER_CAPTURE_MAP_PRESET_ID
   | typeof PROCEDURAL_MAP_PRESET_ID
   | typeof CLASSIC_PROCEDURAL_MAP_PRESET_ID;
 
@@ -352,6 +354,13 @@ const STRATEGIC_MAP_CONTENT = parseSolarSystemData({
   nodes: STRATEGIC_NODES
 });
 
+const TRAILER_CAPTURE_MAP_CONTENT = parseSolarSystemData({
+  ...STRATEGIC_MAP_CONTENT,
+  nodes: STRATEGIC_MAP_CONTENT.nodes.map((node) => {
+    return node.id === "mars_node" ? setNodeRole(node, "shipyard") : node;
+  })
+});
+
 export const MAP_PRESETS = [
   {
     id: CURRENT_MAP_PRESET_ID,
@@ -379,6 +388,13 @@ export const MAP_PRESETS = [
     label: "Curated Map",
     statusLabel: "Curated Map",
     content: STRATEGIC_MAP_CONTENT,
+    initialOccupancies: STRATEGIC_INITIAL_OCCUPANCIES
+  },
+  {
+    id: TRAILER_CAPTURE_MAP_PRESET_ID,
+    label: "Trailer Capture",
+    statusLabel: "Trailer Capture",
+    content: TRAILER_CAPTURE_MAP_CONTENT,
     initialOccupancies: STRATEGIC_INITIAL_OCCUPANCIES
   }
 ] as const satisfies readonly MapPreset[];

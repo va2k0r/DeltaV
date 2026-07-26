@@ -304,7 +304,8 @@ Bad alignment may increase dV cost, duration, or both
 Forced burn may reduce duration at high dV cost
 ```
 
-The player must see current and near-future transfer cost/duration for actionable decisions.
+Transfer previews show only the currently executable plan: cost, duration, arrival, and route
+geometry. DeltaV's planning cadence favors immediate, decision-relevant information.
 
 ## 14. Current map hypothesis
 

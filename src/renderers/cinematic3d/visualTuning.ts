@@ -247,6 +247,7 @@ export type Cinematic3dVisualTuning = Readonly<{
   solarOcclusionZoomFadeStart: number;
   solarOcclusionZoomFadeEnd: number;
   solarOcclusionCoronaIntensity: number;
+  solarOcclusionLimbGlintIntensity: number;
   solarOcclusionExposureCompression: number;
   solarOcclusionReemergenceIntensity: number;
   solarOcclusionReemergenceDurationSeconds: number;
@@ -597,6 +598,7 @@ export const defaultCinematic3dVisualTuning: Cinematic3dVisualTuning = {
   solarOcclusionZoomFadeStart: 1200,
   solarOcclusionZoomFadeEnd: 2600,
   solarOcclusionCoronaIntensity: 0.34,
+  solarOcclusionLimbGlintIntensity: 0.62,
   solarOcclusionExposureCompression: 0.18,
   solarOcclusionReemergenceIntensity: 0.28,
   solarOcclusionReemergenceDurationSeconds: 0.48,

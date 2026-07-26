@@ -18,6 +18,13 @@ export type WheelZoomStep = Readonly<{
   isDistanceNoop: boolean;
 }>;
 
+export type ArrivalOrbitHandoffDistanceInput = Readonly<{
+  shipDetailProgress: number;
+  minimumShipDetailProgress: number;
+  closeDistance: number;
+  wideDistance: number;
+}>;
+
 export function resolveWheelZoomStep(input: WheelZoomStepInput): WheelZoomStep {
   const isZoomingInAtMinimumDistance =
     input.factor < 1 &&
@@ -58,6 +65,30 @@ export function constrainChaseDistanceByWheelTarget(
   }
 
   return nextDistance;
+}
+
+export function resolveArrivalOrbitHandoffProgress(elapsedMs: number, durationMs: number): number {
+  const progress = clamp(elapsedMs / Math.max(1, durationMs), 0, 1);
+  return progress * progress * progress * (progress * (progress * 6 - 15) + 10);
+}
+
+export function resolveArrivalOrbitHandoffDistance(
+  input: ArrivalOrbitHandoffDistanceInput
+): number {
+  const closeDistance = Math.max(0, input.closeDistance);
+  const wideDistance = Math.max(closeDistance, input.wideDistance);
+  const detailRange = Math.max(0.001, 1 - input.minimumShipDetailProgress);
+  const normalizedDetail = clamp(
+    (input.shipDetailProgress - input.minimumShipDetailProgress) / detailRange,
+    0,
+    1
+  );
+  const easedDetail =
+    normalizedDetail *
+    normalizedDetail *
+    normalizedDetail *
+    (normalizedDetail * (normalizedDetail * 6 - 15) + 10);
+  return wideDistance + (closeDistance - wideDistance) * easedDetail;
 }
 
 function clamp(value: number, min: number, max: number): number {

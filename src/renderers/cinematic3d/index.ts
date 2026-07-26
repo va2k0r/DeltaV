@@ -23,7 +23,20 @@ import {
   mergeCinematic3dTuning,
   type Cinematic3dVisualTuning
 } from "./visualTuning";
-import { constrainChaseDistanceByWheelTarget, resolveWheelZoomStep } from "./cameraZoom";
+import {
+  constrainChaseDistanceByWheelTarget,
+  resolveArrivalOrbitHandoffDistance,
+  resolveArrivalOrbitHandoffProgress,
+  resolveWheelZoomStep
+} from "./cameraZoom";
+import {
+  buildFirePreviewGeometry,
+  buildTrajectoryPlaneReflectionPoints,
+  canonicalFirePreviewGeometryEnabled,
+  canonicalFirePreviewTargetMode,
+  firePreviewImpactGapPixels,
+  trimFirePreviewPathBeforeImpact
+} from "./firePreviewGeometry";
 import {
   computeApparentBodyBloomSourceGain,
   computeCinematicBloomRadius,
@@ -35,6 +48,7 @@ import { shouldRefreshCinematicBloomCache } from "./bloomCache";
 import {
   advanceSolarOcclusionTransientState,
   computeSolarDiscOcclusionCoverage,
+  computeSolarLimbGlintStrength,
   computeSolarOcclusionDistanceVisibility,
   createInitialSolarOcclusionTransientState,
   type SolarOcclusionTransientState
@@ -45,11 +59,22 @@ import {
 } from "./atmosphericScattering";
 import {
   alignMissileFlightProgressToImpactPresentation,
+  createReversibleReplaySnapshot,
   createOrbitalTransitionSnapshot,
+  contestedUpkeepImpactVisualProgress,
   getTransitionDepartingBurnTransits,
   getTransitionLaunchedMissiles,
-  missileImpactVisualProgress
+  missileImpactVisualProgress,
+  replayMandatoryLaunchVisualProgress,
+  replayMissileDefenseVisualProgress,
+  replayWorkVisualProgress
 } from "./orbitInterpolation";
+import {
+  createReplayShipDestructionTimeline,
+  getReplayShipDestructionFrames,
+  replayDestructionSecondsPerTurn,
+  type ReplayDestructionTransition
+} from "./replayDestructionTimeline";
 import {
   SYSTEM_PRESENTATION_FOCUS_TARGET_KEY,
   createCinematicDisplayState,
@@ -133,12 +158,6 @@ export type CinematicSelection = Readonly<{
   label: string;
 }>;
 
-export type CinematicTransferDeltaHint = Readonly<{
-  label: string;
-  departureOffsetTurns: 1 | 2;
-  arrivalTurn: number;
-}>;
-
 export type CinematicVisualPulse = Readonly<{
   phase: number;
   intensity: number;
@@ -175,6 +194,8 @@ export type Cinematic3dRendererOptions = Readonly<{
   tuning?: Partial<Cinematic3dVisualTuning>;
   onSelectionChange?: (selection: CinematicSelection | null) => void;
   isTargetInputAllowed?: (targetKey: string) => boolean;
+  getHoverTextEnabled?: () => boolean;
+  onHoverInterestChange?: (targetKey: string | null) => void;
   onInputGesture?: (gesture: CinematicInputGesture) => void;
   getTutorialAttentionPulse?: () => CinematicTutorialAttentionPulse | null;
   getMusicVisualPulse?: () => CinematicVisualPulse | null;
@@ -189,14 +210,6 @@ export type Cinematic3dRendererOptions = Readonly<{
   isFireModeAllowed?: () => boolean;
   getBurnPlanFailureReason?: (originNodeId: string, destinationNodeId: string) => string | null;
   getFirePlanFailureReason?: (originNodeId: string, targetNodeId: string) => string | null;
-  getBurnTransferDeltaHint?: (
-    originNodeId: string,
-    destinationNodeId: string
-  ) => CinematicTransferDeltaHint | null;
-  getFireTransferDeltaHint?: (
-    originNodeId: string,
-    targetNodeId: string
-  ) => CinematicTransferDeltaHint | null;
   getSnapshotAtTurn?: (turn: number) => SolarSystemSnapshot;
   onBurnOrderRequested?: (originNodeId: string, destinationNodeId: string) => void;
   onFireOrderRequested?: (originNodeId: string, targetNodeId: string) => void;
@@ -361,11 +374,14 @@ type TrajectoryLabelPlacement = Readonly<{
   bounds: ScreenRect;
 }>;
 
+type TrajectoryLabelScope = "tactical" | "missile-transient";
+
 type TrajectoryLabelObject = Readonly<{
   element: HTMLDivElement;
   worldAnchor: THREE.Vector3;
   screenOffset: Vec2;
   size: TrajectoryLabelSize;
+  scope: TrajectoryLabelScope;
 }>;
 
 type TrajectoryLabelOffsetMemory = Readonly<{
@@ -420,6 +436,16 @@ type TurnTransition = Readonly<{
 type ReplayPreviewOptions = Readonly<{
   followTrackedFocus?: boolean;
   includePresentationEffects?: boolean;
+  destructionTimeline?: Readonly<{
+    transitions: readonly ReplayDestructionTransition[];
+    position: number;
+  }>;
+}>;
+
+type ReplayPreviewContext = Readonly<{
+  from: SolarSystemSnapshot;
+  to: SolarSystemSnapshot;
+  progress: number;
 }>;
 
 type CinematicCameraSnapshot = Readonly<{
@@ -554,10 +580,19 @@ type ArrivalChaseCamera = {
   destinationTargetKey: string;
   destinationNodeId: string;
   destinationBodyId: string;
-  phase: "approach" | "orbit";
+  phase: "approach" | "orbit-handoff";
   startedAt: number;
   lastUpdatedAt: number;
   zoomOutWheelDelta: number;
+  preserveFraming: boolean;
+  framingDistance: number;
+  framingYaw: number;
+  framingPitch: number;
+  initialShipDetailProgress: number;
+  handoffStartedAt: number | null;
+  handoffFromFocus: THREE.Vector3 | null;
+  handoffFromDistance: number | null;
+  handoffToDistance: number | null;
   releaseFocusTargetKey?: string | undefined;
   releaseTargetKeys?: readonly string[] | undefined;
   releasePadding?: number | undefined;
@@ -635,6 +670,8 @@ type TrajectoryPlaneReflectionOptions = Readonly<{
   accentSpeed: number;
   enabled: boolean;
   elapsed: number;
+  points?: readonly THREE.Vector3[];
+  readability?: number;
   showAnimatedAccent: boolean;
 }>;
 
@@ -664,6 +701,12 @@ type BurnTransferFieldEtaPresentation = Readonly<{
   representative: BurnTransferFieldSample;
   samples: readonly BurnTransferFieldSample[];
   labelAnchor: THREE.Vector3;
+}>;
+
+type ScreenStableBurnTransferFieldConnector = Readonly<{
+  connector: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
+  origin: DisplayNodeRenderData;
+  sample: BurnTransferFieldSample;
 }>;
 
 type FutureOrbitTimingPreview = Readonly<{
@@ -708,6 +751,8 @@ type ResolvedBurnTrajectory = Readonly<{
   trajectoryArcDirection: -1 | 1;
   flightPath: ActiveBurnFlightPath | null;
   points: readonly THREE.Vector3[];
+  presentationPoints: readonly THREE.Vector3[];
+  reflectionPoints: readonly THREE.Vector3[];
   visiblePoints: readonly THREE.Vector3[];
   activeCoreRadiusLimit?: number;
 }>;
@@ -716,6 +761,7 @@ type ResolvedFireTrajectory = Readonly<{
   origin: DisplayNodeRenderData;
   target: DisplayNodeRenderData;
   points: readonly THREE.Vector3[];
+  reflectionPoints?: readonly THREE.Vector3[];
   visibleStartProgress: number;
 }>;
 
@@ -724,6 +770,7 @@ type CachedFireTrajectoryPath = Readonly<{
   origin: DisplayNodeRenderData;
   target: DisplayNodeRenderData;
   points: readonly THREE.Vector3[];
+  reflectionPoints?: readonly THREE.Vector3[];
 }>;
 
 type NodeShipFormation = Readonly<{
@@ -747,6 +794,8 @@ type MissileImpactPresentation = Readonly<{
   seed: number;
   anchorTurn?: number;
   planeSign?: -1 | 1;
+  timelineControlled?: boolean;
+  timelineImpactPosition?: number;
 }>;
 
 type ShipDestructionRetinalAfterimage = Readonly<{
@@ -1025,9 +1074,10 @@ const smoothWheelZoomMaxNormalizedDelta = 150;
 const smoothWheelZoomResponseExponent = 0.86;
 const smoothWheelZoomSmallDeltaBoost = 2.05;
 const smoothWheelZoomSnapEpsilon = 0.025;
-const keyboardCinematicZoomDistanceRatePerSecond = 0.56;
-const keyboardCinematicOrbitRadiansPerSecond = 0.12;
-const keyboardCinematicPanPixelsPerSecond = 42;
+// Keyboard movement is tuned for deliberate, dynamic camera takes while held.
+const keyboardCinematicZoomDistanceRatePerSecond = 1.1;
+const keyboardCinematicOrbitRadiansPerSecond = 0.36;
+const keyboardCinematicPanPixelsPerSecond = 120;
 const trajectoryLabelCameraSettleMs = 150;
 // Drawing-buffer reallocations are substantially more expensive than ordinary presentation work.
 // Keep them outside the short settling tail of a camera gesture so an adaptive-mode change cannot
@@ -1042,12 +1092,25 @@ const activeBurnMandatoryLaunchBlinkWindow = 0.22;
 const missileLaunchTransitionMinDurationMs = 2200;
 const missileLaunchDriftScreenPixels = 36;
 const activeMissileTrajectoryLeadScreenPixels = 12;
-const futureFireImpactTickCenterRadius = 0.62;
-const futureFireImpactTickHalfLength = 0.24;
-const futureFireImpactTickOuterRadius =
-  futureFireImpactTickCenterRadius + futureFireImpactTickHalfLength;
-const futureFireImpactTickMinimumOuterRadiusPixels = 4.8;
+const futureFireImpactTickOuterRadius = 0.86;
+const futureFireImpactTickInitialInnerRadius = futureFireImpactTickOuterRadius * 0.3;
+const futureFireImpactTargetPointMinimumScale = 0.72;
+const futureFireImpactTargetPointGeometryRadius = 0.11;
+const futureFireImpactTargetPointCoreRadiusRatio = 0.84;
+const futureFireImpactTargetPointStrokeRadiusMultiplier = 0.82;
+const futureFireImpactTargetPointMinimumOuterRadiusRatio = 0.16;
+const futureFireImpactTargetPointMaximumOuterRadiusRatio = 0.25;
+const futureFireImpactArmGapStrokeMultiplier = 0.38;
+const futureFireImpactArmGapMinimumOuterRadiusRatio = 0.06;
+const futureFireImpactArmGapMaximumOuterRadiusRatio = 0.12;
+const futureFireImpactArmMinimumLengthOuterRadiusRatio = 0.42;
+const futureFireImpactArmMaximumLengthOuterRadiusRatio = 0.54;
+const futureFireImpactFallbackSmallestOrbitRadius = 7;
+const futureFireImpactArmLengthScale = 0.9;
+const futureFireImpactTickMinimumOuterRadiusPixels = 7.2;
 const futureFireImpactTickThicknessPixels = 1.35;
+const futureFireImpactArmDashCycle = 1;
+const futureFireImpactArmDashLength = futureFireImpactArmDashCycle * 0.58;
 const futureFireImpactLabelGapPixels = 5;
 const missileLaunchDriftEndProgress = 0.37;
 const missileLaunchIgnitionStartProgress = 0.31;
@@ -1377,9 +1440,10 @@ const arrivalChasePitch = 0.38;
 const arrivalChaseLargeBodyPitch = 0.52;
 const arrivalChaseYawTimeConstantMs = 110;
 const arrivalChaseDistanceTimeConstantMs = 145;
-const arrivalChaseOrbitRadiansPerSecond = 0.18;
 const arrivalChaseWheelReleaseDeadZone = 18;
 const arrivalChaseBodyFrameDurationMs = 720;
+const arrivalChaseOrbitHandoffDurationMs = 920;
+const arrivalChaseOrbitHandoffWideDistanceMultiplier = 1.65;
 const arrivalChaseSunLeftScreenRatio = 0.16;
 const arrivalChaseShipDistanceMultiplier = 2.55;
 const arrivalChaseLargeBodyScreenScale = 1.35;
@@ -1417,7 +1481,6 @@ const tutorialAttentionFutureLinkOpacityBoost = 0.24;
 const tutorialAttentionFutureLinkMaxOpacity = 0.66;
 const tutorialAttentionFutureLinkRadiusBoost = 0.18;
 const arrivalTransitionHoldMs = 220;
-const contestedUpkeepImpactVisualProgress = 0.08;
 const constructionCargoOrbitAngularSpeed = -0.34;
 const constructionCargoRingLaunchDurationSeconds = 3.72;
 const constructionCargoLaunchDurationSeconds = 3.38;
@@ -1589,6 +1652,10 @@ const trajectoryPlaneReflectionWidthMultiplier = 2.15;
 const trajectoryPlaneReflectionGlintWidth = 0.052;
 const trajectoryPlaneReflectionScreenOffsetX = 0.0025;
 const trajectoryPlaneReflectionScreenOffsetY = -0.011;
+const firePreviewReflectionOpacityBoost = 1.42;
+const firePreviewReflectionWidthBoost = 1.16;
+const firePreviewReflectionAccentBoost = 1.28;
+const firePreviewReflectionScreenOffsetBoost = 1.18;
 
 type ShipRadiatorPoseIndex = 0 | 1 | 2;
 type ShipRadiatorStepDirection = -1 | 1;
@@ -1737,11 +1804,18 @@ export {
 };
 export {
   alignMissileFlightProgressToImpactPresentation,
+  contestedUpkeepImpactVisualProgress,
+  createReversibleReplaySnapshot,
   createOrbitalTransitionSnapshot,
   getTransitionDepartingBurnTransits,
   getTransitionLaunchedMissiles,
   interpolateOrbitAngle,
-  missileImpactVisualProgress
+  missileImpactVisualProgress,
+  replayBurnArrivalVisualProgress,
+  replayMandatoryLaunchVisualProgress,
+  replayMissileDefenseVisualProgress,
+  replayOrderLaunchVisualProgress,
+  replayWorkVisualProgress
 } from "./orbitInterpolation";
 export { SYSTEM_PRESENTATION_FOCUS_TARGET_KEY, createCinematicDisplayState };
 export {
@@ -2012,6 +2086,8 @@ export class CinematicSolarSystemRenderer {
   private tuning: Cinematic3dVisualTuning;
   private readonly onSelectionChange: ((selection: CinematicSelection | null) => void) | undefined;
   private readonly isTargetInputAllowed: ((targetKey: string) => boolean) | undefined;
+  private readonly getHoverTextEnabled: (() => boolean) | undefined;
+  private readonly onHoverInterestChange: ((targetKey: string | null) => void) | undefined;
   private readonly onInputGesture: ((gesture: CinematicInputGesture) => void) | undefined;
   private readonly getTutorialAttentionPulse:
     | (() => CinematicTutorialAttentionPulse | null)
@@ -2039,12 +2115,6 @@ export class CinematicSolarSystemRenderer {
     | undefined;
   private readonly getFirePlanFailureReason:
     | ((originNodeId: string, targetNodeId: string) => string | null)
-    | undefined;
-  private readonly getBurnTransferDeltaHint:
-    | ((originNodeId: string, destinationNodeId: string) => CinematicTransferDeltaHint | null)
-    | undefined;
-  private readonly getFireTransferDeltaHint:
-    | ((originNodeId: string, targetNodeId: string) => CinematicTransferDeltaHint | null)
     | undefined;
   private readonly getSnapshotAtTurn: ((turn: number) => SolarSystemSnapshot) | undefined;
   private readonly onBurnOrderRequested:
@@ -2074,6 +2144,8 @@ export class CinematicSolarSystemRenderer {
   private readonly pendingFireGroup = new THREE.Group();
   private readonly activeMissileGroup = new THREE.Group();
   private readonly missileTransientGroup = new THREE.Group();
+  private readonly screenStableBurnTransferFieldConnectors: ScreenStableBurnTransferFieldConnector[] =
+    [];
   private readonly activeMissileMarkerCache = new Map<string, THREE.Group>();
   private readonly missileTransientTrajectoryCache = new Map<string, THREE.Group>();
   private readonly missileTransientMarkerCache = new Map<string, THREE.Group>();
@@ -2085,9 +2157,10 @@ export class CinematicSolarSystemRenderer {
   private readonly futureDestinationGroup = new THREE.Group();
   private readonly orbitTimingSegmentCache = new Map<
     string,
-    THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>
+    THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>
   >();
   private readonly orbitTimingSegmentKeysInUse = new Set<string>();
+  private orbitTimingProtectedOrbitInterruptions: OrbitTimingPathInterruption[] = [];
   private readonly orbitTimingDotCache = new Map<
     string,
     THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
@@ -2215,6 +2288,7 @@ export class CinematicSolarSystemRenderer {
   private trajectoryLabelRenderIndex = 0;
   private visualTurn = 0;
   private isTimelinePreviewActive = false;
+  private replayPreviewContext: ReplayPreviewContext | null = null;
   private presentationElapsed = 0;
   private lastRenderFrameAt: number | null = null;
   private smoothedFrameIntervalMs = 16.7;
@@ -2373,6 +2447,8 @@ export class CinematicSolarSystemRenderer {
     this.tuning = mergeCinematic3dTuning(options.tuning);
     this.onSelectionChange = options.onSelectionChange;
     this.isTargetInputAllowed = options.isTargetInputAllowed;
+    this.getHoverTextEnabled = options.getHoverTextEnabled;
+    this.onHoverInterestChange = options.onHoverInterestChange;
     this.onInputGesture = options.onInputGesture;
     this.getTutorialAttentionPulse = options.getTutorialAttentionPulse;
     this.getMusicVisualPulse = options.getMusicVisualPulse;
@@ -2387,8 +2463,6 @@ export class CinematicSolarSystemRenderer {
     this.isFireModeAllowed = options.isFireModeAllowed;
     this.getBurnPlanFailureReason = options.getBurnPlanFailureReason;
     this.getFirePlanFailureReason = options.getFirePlanFailureReason;
-    this.getBurnTransferDeltaHint = options.getBurnTransferDeltaHint;
-    this.getFireTransferDeltaHint = options.getFireTransferDeltaHint;
     this.getSnapshotAtTurn = options.getSnapshotAtTurn;
     this.onBurnOrderRequested = options.onBurnOrderRequested;
     this.onFireOrderRequested = options.onFireOrderRequested;
@@ -2567,6 +2641,7 @@ export class CinematicSolarSystemRenderer {
     }
 
     this.trajectoryReflectionMode = mode;
+    this.tacticalPresentationLastSignature = "";
     this.invalidateCinematicUiBloomCache();
 
     if (this.snapshot !== null) {
@@ -2621,6 +2696,11 @@ export class CinematicSolarSystemRenderer {
   }
 
   setCameraInputEnabled(enabled: boolean): void {
+    if (!enabled) {
+      this.lastPointerCanvasPoint = null;
+      this.setHoveredTarget(null);
+    }
+
     if (this.cameraInputEnabled === enabled) {
       return;
     }
@@ -2696,6 +2776,7 @@ export class CinematicSolarSystemRenderer {
     this.snapshot = snapshot;
     this.visualTurn = snapshot.turn;
     this.isTimelinePreviewActive = false;
+    this.replayPreviewContext = null;
     this.clearSmoothWheelZoomTarget();
     this.clearArrivalChaseCamera();
     this.clearShipyardAssemblyChaseCamera();
@@ -2855,13 +2936,25 @@ export class CinematicSolarSystemRenderer {
     this.clearArrivalChaseCamera();
     this.clearShipyardAssemblyChaseCamera();
     const clampedProgress = clamp(progress, 0, 1);
-    const visualSnapshot = createOrbitalTransitionSnapshot(from, to, clampedProgress);
+    this.replayPreviewContext = {
+      from,
+      to,
+      progress: clampedProgress
+    };
+    this.clearReplayTransientPresentations();
+    const visualSnapshot = createReversibleReplaySnapshot(from, to, clampedProgress);
     this.snapshot = visualSnapshot;
     this.visualTurn = from.turn + (to.turn - from.turn) * clampedProgress;
     this.isTimelinePreviewActive = true;
     this.syncScene(visualSnapshot);
     if (options.includePresentationEffects !== false) {
       this.registerMissileImpactPresentations({ from, to }, clampedProgress);
+    }
+    if (options.destructionTimeline !== undefined) {
+      this.syncReplayDestructionTimeline(
+        options.destructionTimeline.transitions,
+        options.destructionTimeline.position
+      );
     }
     if (options.followTrackedFocus !== false) {
       this.recenterTrackedFocusTarget();
@@ -3566,10 +3659,104 @@ export class CinematicSolarSystemRenderer {
     this.registeredTransitionImpactKeys.clear();
     this.missileImpactPresentationLastUpdatedAt = Number.NEGATIVE_INFINITY;
     this.clearCachedMissileTransientObjects();
+    this.clearTrajectoryLabelsByScope("missile-transient");
     clearGroup(this.missileImpactGroup);
     clearGroup(this.missileWreckageGroup);
     this.clearShipDestructionRetinalAfterimages();
     this.updateMissileImpactWhiteout(0);
+  }
+
+  private clearReplayTransientPresentations(): void {
+    this.missileImpactPresentations.length = 0;
+    this.missileEvadePresentations.length = 0;
+    this.missileSolutionBrokenPresentations.length = 0;
+    this.missileVoidBurstPresentations.length = 0;
+    this.registeredTransitionImpactKeys.clear();
+    this.missileImpactPresentationLastUpdatedAt = Number.NEGATIVE_INFINITY;
+    this.clearCachedMissileTransientObjects();
+    this.clearTrajectoryLabelsByScope("missile-transient");
+    clearGroup(this.missileImpactGroup);
+    this.updateMissileImpactWhiteout(0);
+  }
+
+  syncReplayDestructionTimeline(
+    transitions: readonly ReplayDestructionTransition[],
+    timelinePosition: number
+  ): void {
+    const destructions = createReplayShipDestructionTimeline(transitions);
+    const frames = getReplayShipDestructionFrames(destructions, timelinePosition);
+    const allTimelineIds = new Set(destructions.map((destruction) => destruction.id));
+    const activeTimelineIds = new Set(frames.map(({ destruction }) => destruction.id));
+    const now = this.presentationElapsed;
+    const timelinePresentations = frames.map(({ destruction, ageSeconds }) => {
+      const id = destruction.id;
+      const presentation: MissileImpactPresentation = {
+        id,
+        nodeId: destruction.nodeId,
+        factionId: destruction.factionId,
+        source: destruction.source,
+        createsScreenRetinalAfterimage: true,
+        startedAt: now - ageSeconds,
+        seed: hashBodySeed(id),
+        anchorTurn: destruction.anchorTurn,
+        planeSign: hashStringToUnitInterval(`${id}:plane`) >= 0.5 ? 1 : -1,
+        timelineControlled: true,
+        timelineImpactPosition: destruction.impactTimelinePosition
+      };
+      return { presentation, ageSeconds };
+    });
+
+    for (const id of this.missileWreckagePresentations.keys()) {
+      if (!allTimelineIds.has(id) || activeTimelineIds.has(id)) {
+        continue;
+      }
+
+      this.missileWreckagePresentations.delete(id);
+      const wreckageRoot = this.missileWreckageObjects.get(id);
+
+      if (wreckageRoot !== undefined) {
+        wreckageRoot.removeFromParent();
+        disposeObject(wreckageRoot);
+        this.missileWreckageObjects.delete(id);
+      }
+    }
+
+    for (const { presentation } of timelinePresentations) {
+      this.missileWreckagePresentations.set(presentation.id, presentation);
+      const afterimage = this.shipDestructionRetinalAfterimages.get(presentation.id);
+
+      if (afterimage !== undefined) {
+        this.shipDestructionRetinalAfterimages.set(presentation.id, {
+          element: afterimage.element,
+          startedAt: presentation.startedAt
+        });
+      }
+    }
+
+    for (const id of allTimelineIds) {
+      if (activeTimelineIds.has(id)) {
+        continue;
+      }
+
+      const afterimage = this.shipDestructionRetinalAfterimages.get(id);
+      afterimage?.element.remove();
+      this.shipDestructionRetinalAfterimages.delete(id);
+    }
+
+    const retainedImpactPresentations = this.missileImpactPresentations.filter((presentation) => {
+      return !presentation.timelineControlled && !allTimelineIds.has(presentation.id);
+    });
+    const activeImpactPresentations = timelinePresentations
+      .filter(({ ageSeconds }) => ageSeconds <= missileImpactAfterglowDurationSeconds)
+      .map(({ presentation }) => presentation);
+    this.missileImpactPresentations.splice(
+      0,
+      this.missileImpactPresentations.length,
+      ...retainedImpactPresentations,
+      ...activeImpactPresentations
+    );
+    this.missileImpactPresentationLastUpdatedAt = Number.NEGATIVE_INFINITY;
+    this.updateMissileImpactPresentation(now);
   }
 
   freezeTimelineReviewCamera(): void {
@@ -3675,6 +3862,7 @@ export class CinematicSolarSystemRenderer {
     this.snapshot = from;
     this.visualTurn = from.turn;
     this.isTimelinePreviewActive = false;
+    this.replayPreviewContext = null;
     this.syncScene(from);
     this.animatePresentationOnly(this.presentationElapsed);
     const hasTutorialCameraAssist = this.hasTutorialCameraAssist();
@@ -4170,6 +4358,15 @@ export class CinematicSolarSystemRenderer {
       this.getMinimumCameraDistance(),
       this.getZoomOutLimit()
     );
+    if (this.arrivalChaseCamera !== null) {
+      this.arrivalChaseCamera.framingDistance = this.distance;
+      this.arrivalChaseCamera.framingYaw = this.yaw;
+      this.arrivalChaseCamera.framingPitch = this.pitch;
+      this.arrivalChaseCamera.initialShipDetailProgress = getShipDetailProgress(
+        this.distance,
+        this.tuning
+      );
+    }
     this.clearSmoothWheelZoomTarget();
     this.refreshDisplayScale();
     this.renderFrame();
@@ -4571,9 +4768,21 @@ export class CinematicSolarSystemRenderer {
       return false;
     }
 
+    const previousFocusedTargetKey = this.focusedTargetKey;
+    const previousTrackedFocusTargetKey = this.trackedFocusTargetKey;
+    const previousFocus = this.focus.clone();
+    this.focusedTargetKey =
+      focusTargetKey === "body:sun"
+        ? this.focusedTargetKey
+        : this.getPresentationFocusTargetKey(focusTargetKey);
+    this.trackedFocusTargetKey = focusTargetKey;
+    this.refreshDisplayScale();
     const focusPosition = this.findTargetPosition(focusTargetKey);
 
     if (focusPosition === null) {
+      this.focusedTargetKey = previousFocusedTargetKey;
+      this.trackedFocusTargetKey = previousTrackedFocusTargetKey;
+      this.refreshDisplayScale();
       return false;
     }
 
@@ -4582,6 +4791,9 @@ export class CinematicSolarSystemRenderer {
       .filter((position): position is THREE.Vector3 => position !== null);
 
     if (targetPositions.length === 0) {
+      this.focusedTargetKey = previousFocusedTargetKey;
+      this.trackedFocusTargetKey = previousTrackedFocusTargetKey;
+      this.refreshDisplayScale();
       return false;
     }
 
@@ -4608,13 +4820,8 @@ export class CinematicSolarSystemRenderer {
     );
     const targetYaw = options.yaw ?? this.getBacklitFocusYaw(focusPosition, this.yaw);
 
-    this.focusedTargetKey =
-      focusTargetKey === "body:sun"
-        ? this.focusedTargetKey
-        : this.getPresentationFocusTargetKey(focusTargetKey);
-    this.trackedFocusTargetKey = focusTargetKey;
     this.focusPanTransition = {
-      from: this.focus.clone(),
+      from: previousFocus,
       to: focusPosition.clone(),
       fromDistance: this.distance,
       toDistance: targetDistance,
@@ -4646,9 +4853,20 @@ export class CinematicSolarSystemRenderer {
       return false;
     }
 
+    const previousFocusedTargetKey = this.focusedTargetKey;
+    const previousTrackedFocusTargetKey = this.trackedFocusTargetKey;
+    this.focusedTargetKey =
+      focusTargetKey === "body:sun"
+        ? this.focusedTargetKey
+        : this.getPresentationFocusTargetKey(focusTargetKey);
+    this.trackedFocusTargetKey = focusTargetKey;
+    this.refreshDisplayScale();
     const focusPosition = this.findTargetPosition(focusTargetKey);
 
     if (focusPosition === null) {
+      this.focusedTargetKey = previousFocusedTargetKey;
+      this.trackedFocusTargetKey = previousTrackedFocusTargetKey;
+      this.refreshDisplayScale();
       return this.frameTargetsInstant(targetKeys, options.padding ?? 1.28);
     }
 
@@ -4657,6 +4875,9 @@ export class CinematicSolarSystemRenderer {
       .filter((position): position is THREE.Vector3 => position !== null);
 
     if (targetPositions.length === 0) {
+      this.focusedTargetKey = previousFocusedTargetKey;
+      this.trackedFocusTargetKey = previousTrackedFocusTargetKey;
+      this.refreshDisplayScale();
       return false;
     }
 
@@ -4679,8 +4900,6 @@ export class CinematicSolarSystemRenderer {
     const obliqueDistance = topDownDistance / Math.max(0.42, Math.sin(pitch));
 
     this.clearManualPanDisplayScaleContext();
-    this.focusedTargetKey = null;
-    this.trackedFocusTargetKey = null;
     this.focusPanTransition = null;
     this.clearSmoothWheelZoomTarget();
     this.focus.copy(focusPosition);
@@ -4688,6 +4907,7 @@ export class CinematicSolarSystemRenderer {
     this.pitch = pitch;
     this.distance = clamp(obliqueDistance, this.getMinimumCameraDistance(), this.getZoomOutLimit());
     this.refreshDisplayScale();
+    this.recenterTrackedFocusTarget();
     this.updateCamera();
     this.renderFrame();
     return true;
@@ -4992,6 +5212,26 @@ export class CinematicSolarSystemRenderer {
     this.setSelectedTarget(targetKey);
   }
 
+  previewBurnRoute(originNodeId: string, destinationNodeId: string): boolean {
+    const plan = this.getBurnPlan?.(originNodeId, destinationNodeId);
+
+    if (this.snapshot === null || plan === null || plan === undefined) {
+      return false;
+    }
+
+    const originTargetKey = `node:${originNodeId}`;
+    const destinationTargetKey = `node:${destinationNodeId}`;
+    this.selectedActionMode = "burn";
+    this.setSelectedTarget(originTargetKey);
+    this.setHoveredTarget(destinationTargetKey);
+    this.renderFrame();
+    return true;
+  }
+
+  clearRoutePreview(): void {
+    this.setHoveredTarget(null);
+  }
+
   clearFocus(): void {
     if (this.lockedSelectionTargetKey !== null) {
       this.setSelectedTarget(this.lockedSelectionTargetKey);
@@ -5004,6 +5244,7 @@ export class CinematicSolarSystemRenderer {
 
   dispose(): void {
     this.isDisposed = true;
+    this.onHoverInterestChange?.(null);
     this.clearTrajectoryLabels();
     this.clearMissileThreatIndicators();
     cancelAnimationFrame(this.animationFrame);
@@ -6491,6 +6732,8 @@ export class CinematicSolarSystemRenderer {
     const constructionCargo = nodeObject.constructionCargo;
     const isTransitionAssembly = this.isShipyardAssemblyAnimating(node.id);
     const hasMandatoryLaunch = this.isShipyardMandatoryLaunchReady(node.id);
+    const cargoElapsed = this.getGameplayPresentationElapsed();
+    const replayAssemblyAge = this.getReplayShipyardAssemblyAge(node.id);
     let existingCargoCount = getNumericUserData(constructionCargo, "cargoCount");
     const existingAssembly = Boolean(constructionCargo.userData["isAssembly"]);
     const existingLaunchReadyAssembly = Boolean(
@@ -6501,9 +6744,10 @@ export class CinematicSolarSystemRenderer {
       "constructionAssemblyStartedAt"
     );
     const isPresentationAssemblyActive =
+      this.replayPreviewContext === null &&
       existingAssembly &&
       existingCargoCount === 5 &&
-      this.presentationElapsed - existingAssemblyStartedAt <
+      cargoElapsed - existingAssemblyStartedAt <
         getConstructionCargoAssemblyReadyAge(existingCargoCount);
     const isLiveAssemblyPresentation = isTransitionAssembly || isPresentationAssemblyActive;
     const isLaunchReadyAssembly = hasMandatoryLaunch && !isLiveAssemblyPresentation;
@@ -6515,9 +6759,11 @@ export class CinematicSolarSystemRenderer {
     const cargoCount = isAssembly ? 5 : progress;
     const existingWorkerFactionId = String(constructionCargo.userData["workerFactionId"] ?? "");
     const productionFactionId =
-      this.turnTransition?.to.debugEvents.find((event) => {
-        return event.type === "SHIP_PRODUCED" && event.nodeId === node.id;
-      })?.factionId ?? "";
+      (this.replayPreviewContext?.to.debugEvents ?? this.turnTransition?.to.debugEvents ?? []).find(
+        (event) => {
+          return event.type === "SHIP_PRODUCED" && event.nodeId === node.id;
+        }
+      )?.factionId ?? "";
     const snapshotWorkerFactionId =
       node.workingFactionId ?? node.shipyardWorkerFactionId ?? productionFactionId;
     const workerFactionId = (
@@ -6530,7 +6776,8 @@ export class CinematicSolarSystemRenderer {
       existingCargoCount === cargoCount &&
       existingAssembly === isAssembly &&
       existingLaunchReadyAssembly === isLaunchReadyAssembly &&
-      existingWorkerFactionId === workerFactionId
+      existingWorkerFactionId === workerFactionId &&
+      replayAssemblyAge === null
     ) {
       return;
     }
@@ -6544,11 +6791,13 @@ export class CinematicSolarSystemRenderer {
     }
 
     const assemblyStartedAt =
-      isAssembly && (!existingAssembly || shouldResetCargo)
-        ? isLaunchReadyAssembly
-          ? this.presentationElapsed - getConstructionCargoAssemblyReadyAge(cargoCount)
-          : this.presentationElapsed
-        : existingAssemblyStartedAt;
+      replayAssemblyAge !== null
+        ? cargoElapsed - replayAssemblyAge
+        : isAssembly && (!existingAssembly || shouldResetCargo)
+          ? isLaunchReadyAssembly
+            ? cargoElapsed - getConstructionCargoAssemblyReadyAge(cargoCount)
+            : cargoElapsed
+          : existingAssemblyStartedAt;
 
     constructionCargo.userData["cargoCount"] = cargoCount;
     constructionCargo.userData["isAssembly"] = isAssembly;
@@ -6579,7 +6828,7 @@ export class CinematicSolarSystemRenderer {
 
       existingCargoIndices.add(cargoIndex);
 
-      if (isAssembly && (!existingAssembly || shouldResetCargo)) {
+      if (isAssembly && (!existingAssembly || shouldResetCargo || replayAssemblyAge !== null)) {
         cargo.userData["constructionLaunchStartedAt"] =
           getConstructionCargoAssemblyModuleLaunchStartedAt(assemblyStartedAt, cargoIndex);
       }
@@ -6598,7 +6847,7 @@ export class CinematicSolarSystemRenderer {
       cargo.userData["factionId"] = workerFactionId;
       cargo.userData["constructionLaunchStartedAt"] = isAssembly
         ? getConstructionCargoAssemblyModuleLaunchStartedAt(assemblyStartedAt, index)
-        : this.presentationElapsed +
+        : cargoElapsed +
           getConstructionCargoLaunchDelaySeconds(index, index) +
           addedCargoCount * constructionCargoLaunchStaggerSeconds;
       constructionCargo.add(cargo);
@@ -6607,6 +6856,18 @@ export class CinematicSolarSystemRenderer {
   }
 
   private isShipyardAssemblyAnimating(nodeId: string): boolean {
+    const replayContext = this.replayPreviewContext;
+
+    if (replayContext !== null) {
+      return (
+        replayContext.progress >= replayWorkVisualProgress &&
+        replayContext.progress < replayMandatoryLaunchVisualProgress &&
+        replayContext.to.debugEvents.some((event) => {
+          return event.type === "SHIP_PRODUCED" && event.nodeId === nodeId;
+        })
+      );
+    }
+
     if (this.turnTransition === null) {
       return false;
     }
@@ -6614,6 +6875,29 @@ export class CinematicSolarSystemRenderer {
     return this.turnTransition.to.debugEvents.some((event) => {
       return event.type === "SHIP_PRODUCED" && event.nodeId === nodeId;
     });
+  }
+
+  private getReplayShipyardAssemblyAge(nodeId: string): number | null {
+    const replayContext = this.replayPreviewContext;
+
+    if (
+      replayContext === null ||
+      replayContext.progress < replayWorkVisualProgress ||
+      replayContext.progress >= replayMandatoryLaunchVisualProgress ||
+      !replayContext.to.debugEvents.some((event) => {
+        return event.type === "SHIP_PRODUCED" && event.nodeId === nodeId;
+      })
+    ) {
+      return null;
+    }
+
+    const assemblyProgress = clamp(
+      (replayContext.progress - replayWorkVisualProgress) /
+        Math.max(0.001, replayMandatoryLaunchVisualProgress - replayWorkVisualProgress),
+      0,
+      1
+    );
+    return getConstructionCargoAssemblyReadyAge(5) * assemblyProgress;
   }
 
   private isShipyardMandatoryLaunchReady(nodeId: string): boolean {
@@ -7616,6 +7900,10 @@ export class CinematicSolarSystemRenderer {
     const transit = this.getActiveBurnTransitForTargetKey(targetKey);
 
     if (transit === null) {
+      if (this.arrivalChaseCamera?.burnTargetKey === targetKey) {
+        return this.arrivalChaseCamera.destinationTargetKey;
+      }
+
       return null;
     }
 
@@ -7909,7 +8197,7 @@ export class CinematicSolarSystemRenderer {
       return;
     }
 
-    this.startArrivalChaseCameraForTransit(transit, to);
+    this.startArrivalChaseCameraForTransit(transit, to, { preserveFraming: true });
   }
 
   private startArrivalChaseCameraForTransit(
@@ -7919,6 +8207,7 @@ export class CinematicSolarSystemRenderer {
       releaseFocusTargetKey?: string | undefined;
       releaseTargetKeys?: readonly string[] | undefined;
       releasePadding?: number | undefined;
+      preserveFraming?: boolean | undefined;
     }> = {}
   ): boolean {
     const destinationNode = snapshot.nodes.find((node) => node.id === transit.destinationNodeId);
@@ -7939,6 +8228,15 @@ export class CinematicSolarSystemRenderer {
       startedAt: now,
       lastUpdatedAt: now,
       zoomOutWheelDelta: 0,
+      preserveFraming: options.preserveFraming === true,
+      framingDistance: this.distance,
+      framingYaw: this.yaw,
+      framingPitch: this.pitch,
+      initialShipDetailProgress: getShipDetailProgress(this.distance, this.tuning),
+      handoffStartedAt: null,
+      handoffFromFocus: null,
+      handoffFromDistance: null,
+      handoffToDistance: null,
       releaseFocusTargetKey: options.releaseFocusTargetKey,
       releaseTargetKeys: options.releaseTargetKeys,
       releasePadding: options.releasePadding
@@ -8024,17 +8322,25 @@ export class CinematicSolarSystemRenderer {
     this.focusedTargetKey = this.getPresentationFocusTargetKey(destinationTargetKey);
     this.trackedFocusTargetKey = destinationTargetKey;
     if (this.arrivalChaseCamera?.burnTargetKey === `burn:${transitId}`) {
+      const now = performance.now();
       this.arrivalChaseCamera = {
         ...this.arrivalChaseCamera,
         destinationTargetKey,
         destinationNodeId: arrivedTransit.destinationNodeId,
-        phase: "orbit",
-        lastUpdatedAt: performance.now(),
+        phase: "orbit-handoff",
+        lastUpdatedAt: now,
+        handoffStartedAt: now,
+        handoffFromFocus: this.focus.clone(),
+        handoffFromDistance: this.distance,
+        handoffToDistance: this.getArrivalOrbitHandoffTargetDistance(
+          this.arrivalChaseCamera,
+          destinationTargetKey,
+          targetPosition
+        ),
         zoomOutWheelDelta: 0
       };
       this.focusPanTransition = null;
       this.clearSmoothWheelZoomTarget();
-      this.focus.copy(targetPosition);
       return true;
     }
 
@@ -8272,7 +8578,11 @@ export class CinematicSolarSystemRenderer {
   }
 
   private shouldRecenterTrackedFocusTarget(): boolean {
-    return this.focusPanTransition === null && !this.hasTutorialCameraAssist();
+    return (
+      this.focusPanTransition === null &&
+      this.arrivalChaseCamera === null &&
+      !this.hasTutorialCameraAssist()
+    );
   }
 
   private getTutorialPoseTrackedFocusTargetKey(
@@ -10184,6 +10494,12 @@ export class CinematicSolarSystemRenderer {
   private bindEvents(): void {
     const canvas = this.renderer.domElement;
     const updateHoverFromPointer = (event: PointerEvent): void => {
+      if (!this.cameraInputEnabled) {
+        this.lastPointerCanvasPoint = null;
+        this.setHoveredTarget(null);
+        return;
+      }
+
       if (this.dragState !== null) {
         return;
       }
@@ -11601,8 +11917,8 @@ export class CinematicSolarSystemRenderer {
     if (panXDirection !== 0 || panYDirection !== 0) {
       const previousFocus = this.focus.clone();
       const diagonalScale = panXDirection !== 0 && panYDirection !== 0 ? Math.SQRT1_2 : 1;
-      // Screen-space speed produces a deliberately slow move while panByScreenDelta converts it
-      // to world units using the current camera distance, so the pan remains relative to zoom.
+      // Screen-space speed is converted to world units using the current camera distance.
+      // This keeps pan relative to zoom.
       const panPixels = keyboardCinematicPanPixelsPerSecond * deltaSeconds * diagonalScale;
       this.panByScreenDelta({
         x: panXDirection * panPixels,
@@ -12303,14 +12619,17 @@ export class CinematicSolarSystemRenderer {
       return;
     }
 
-    const deltaMs = clamp(now - this.arrivalChaseCamera.lastUpdatedAt, 0, 80);
-    const deltaSeconds = deltaMs / 1000;
-    this.arrivalChaseCamera.lastUpdatedAt = now;
+    const chase = this.arrivalChaseCamera;
 
-    const targetPosition =
-      this.arrivalChaseCamera.phase === "approach"
-        ? this.findTargetPosition(this.arrivalChaseCamera.burnTargetKey)
-        : this.findArrivalChaseOrbitalShipPosition(this.arrivalChaseCamera);
+    if (chase.phase === "orbit-handoff") {
+      this.updateArrivalOrbitHandoffCamera(now, chase);
+      return;
+    }
+
+    const deltaMs = clamp(now - chase.lastUpdatedAt, 0, 80);
+    chase.lastUpdatedAt = now;
+    const sample = this.activeBurnCameraSamples.get(chase.burnTargetKey);
+    const targetPosition = sample?.position ?? this.findTargetPosition(chase.burnTargetKey);
 
     if (targetPosition === null) {
       this.clearArrivalChaseCamera();
@@ -12318,24 +12637,32 @@ export class CinematicSolarSystemRenderer {
     }
 
     this.focus.copy(targetPosition);
+
+    if (chase.preserveFraming) {
+      if (this.smoothWheelZoomTargetDistance !== null) {
+        chase.framingDistance = this.distance;
+      }
+
+      this.yaw = chase.framingYaw;
+      this.pitch = chase.framingPitch;
+      this.distance = chase.framingDistance;
+      this.noteTrajectoryLabelCameraMotion(now);
+      return;
+    }
+
     const yawSmoothing = 1 - Math.exp(-deltaMs / arrivalChaseYawTimeConstantMs);
     const distanceSmoothing = 1 - Math.exp(-deltaMs / arrivalChaseDistanceTimeConstantMs);
-    const sample = this.activeBurnCameraSamples.get(this.arrivalChaseCamera.burnTargetKey);
-    const direction =
-      sample?.direction ??
-      this.activeBurnTargetDirections.get(this.arrivalChaseCamera.burnTargetKey);
+    const direction = sample?.direction ?? this.activeBurnTargetDirections.get(chase.burnTargetKey);
     const body = this.snapshot?.bodies.find(
-      (candidate) => candidate.id === this.arrivalChaseCamera?.destinationBodyId
+      (candidate) => candidate.id === chase.destinationBodyId
     );
     const bodyRadius =
       body === undefined ? closeInspectableTargetMinDistance : this.getDisplayBodyRadius(body);
     const bodyScale = clamp(bodyRadius / 52, 0, 1);
 
-    if (direction !== undefined && this.arrivalChaseCamera.phase === "approach") {
+    if (direction !== undefined) {
       const chaseYaw = this.getBacklitChaseYaw(targetPosition, direction);
       this.yaw = lerpRadians(this.yaw, chaseYaw, yawSmoothing);
-    } else if (this.arrivalChaseCamera.phase === "orbit") {
-      this.yaw += arrivalChaseOrbitRadiansPerSecond * deltaSeconds;
     }
 
     const targetPitch = THREE.MathUtils.lerp(
@@ -12353,23 +12680,74 @@ export class CinematicSolarSystemRenderer {
     this.noteTrajectoryLabelCameraMotion(now);
   }
 
-  private findArrivalChaseOrbitalShipPosition(chase: ArrivalChaseCamera): THREE.Vector3 | null {
-    const node = this.snapshotNodesById.get(chase.destinationNodeId);
-    const nodeObject = this.nodeObjects.get(chase.destinationNodeId);
+  private updateArrivalOrbitHandoffCamera(now: number, chase: ArrivalChaseCamera): void {
+    const handoffTarget = this.findTargetPosition(chase.destinationTargetKey);
 
-    if (node !== undefined && nodeObject !== undefined) {
-      const shipPosition = this.getPrimaryShipWorldPosition(
-        nodeObject,
-        node,
-        this.presentationElapsed
-      );
-
-      if (shipPosition !== null) {
-        return shipPosition;
-      }
+    if (
+      handoffTarget === null ||
+      chase.handoffStartedAt === null ||
+      chase.handoffFromFocus === null ||
+      chase.handoffFromDistance === null ||
+      chase.handoffToDistance === null
+    ) {
+      this.clearArrivalChaseCamera();
+      return;
     }
 
-    return this.findTargetPosition(chase.destinationTargetKey);
+    const easedProgress = resolveArrivalOrbitHandoffProgress(
+      now - chase.handoffStartedAt,
+      arrivalChaseOrbitHandoffDurationMs
+    );
+    this.focus.lerpVectors(chase.handoffFromFocus, handoffTarget, easedProgress);
+    this.distance = THREE.MathUtils.lerp(
+      chase.handoffFromDistance,
+      chase.handoffToDistance,
+      easedProgress
+    );
+    this.noteTrajectoryLabelCameraMotion(now);
+
+    if (easedProgress < 1) {
+      return;
+    }
+
+    this.focus.copy(handoffTarget);
+    this.distance = chase.handoffToDistance;
+    this.clearArrivalChaseCamera();
+  }
+
+  private getArrivalOrbitHandoffTargetDistance(
+    chase: ArrivalChaseCamera,
+    destinationTargetKey: string,
+    destinationPosition: THREE.Vector3
+  ): number {
+    const body = this.snapshot?.bodies.find(
+      (candidate) => candidate.id === chase.destinationBodyId
+    );
+    const bodyRadius =
+      body === undefined ? closeInspectableTargetMinDistance : this.getDisplayBodyRadius(body);
+    const closeDistance = this.getFocusTargetSafeCameraDistance(
+      destinationTargetKey,
+      destinationPosition,
+      closeInspectableTargetMinDistance
+    );
+    const wideDistance = Math.max(
+      closeDistance,
+      this.getArrivalChaseTargetDistance(
+        bodyRadius,
+        arrivalChaseShipDistanceMultiplier * arrivalChaseOrbitHandoffWideDistanceMultiplier
+      )
+    );
+
+    return clamp(
+      resolveArrivalOrbitHandoffDistance({
+        shipDetailProgress: chase.initialShipDetailProgress,
+        minimumShipDetailProgress: arrivalChaseMinimumShipDetailProgress,
+        closeDistance,
+        wideDistance
+      }),
+      closeDistance,
+      this.getZoomOutLimit()
+    );
   }
 
   private handleArrivalChaseWheelZoomOutRelease(event: WheelEvent, factor: number): boolean {
@@ -12771,6 +13149,13 @@ export class CinematicSolarSystemRenderer {
       });
 
       if (evadeEvent !== undefined) {
+        if (
+          this.isTimelinePreviewActive &&
+          presentationProgress < replayMissileDefenseVisualProgress
+        ) {
+          continue;
+        }
+
         const id = `${missile.id}:evade:${transition.to.turn}`;
 
         if (!this.registeredTransitionImpactKeys.has(id)) {
@@ -12786,7 +13171,10 @@ export class CinematicSolarSystemRenderer {
             factionId: missile.targetFactionId,
             evadeTurn: transition.from.turn,
             ...(evadeEvent.amount === undefined ? {} : { amount: evadeEvent.amount }),
-            startedAt: this.presentationElapsed,
+            startedAt: this.getReplayPresentationStartedAt(
+              presentationProgress,
+              replayMissileDefenseVisualProgress
+            ),
             seed: hashBodySeed(id),
             tracerMuzzlePositions: new Map(),
             ...(pointDefensePositions ?? {})
@@ -12805,6 +13193,13 @@ export class CinematicSolarSystemRenderer {
       });
 
       if (brokenSolutionEvent !== undefined) {
+        if (
+          this.isTimelinePreviewActive &&
+          presentationProgress < replayMissileDefenseVisualProgress
+        ) {
+          continue;
+        }
+
         const id = `${missile.id}:solution-broken:${transition.to.turn}`;
 
         this.registerMissileVoidBurstPresentation(
@@ -12822,7 +13217,10 @@ export class CinematicSolarSystemRenderer {
             nodeId: missile.targetNodeId,
             factionId: missile.targetFactionId,
             brokenTurn: transition.from.turn,
-            startedAt: this.presentationElapsed,
+            startedAt: this.getReplayPresentationStartedAt(
+              presentationProgress,
+              replayMissileDefenseVisualProgress
+            ),
             seed: hashBodySeed(id)
           });
         }
@@ -12927,6 +13325,20 @@ export class CinematicSolarSystemRenderer {
     this.activateScheduledMissileVoidBursts(transition, presentationProgress);
   }
 
+  private getReplayPresentationStartedAt(
+    presentationProgress: number,
+    eventProgress: number
+  ): number {
+    if (!this.isTimelinePreviewActive) {
+      return this.presentationElapsed;
+    }
+
+    return (
+      this.presentationElapsed -
+      Math.max(0, presentationProgress - eventProgress) * replayDestructionSecondsPerTurn
+    );
+  }
+
   private registerMissileVoidBurstPresentation(
     missile: ActiveMissile,
     source: MissileVoidBurstSource,
@@ -12986,7 +13398,9 @@ export class CinematicSolarSystemRenderer {
 
       this.missileVoidBurstPresentations[index] = {
         ...presentation,
-        startedAt: this.getNextMainBeatPresentationElapsed()
+        startedAt: this.isTimelinePreviewActive
+          ? this.getReplayPresentationStartedAt(presentationProgress, missileImpactVisualProgress)
+          : this.getNextMainBeatPresentationElapsed()
       };
     }
   }
@@ -13313,6 +13727,7 @@ export class CinematicSolarSystemRenderer {
     let presentationStageStartedAt = shouldMeasurePresentationStages ? performance.now() : 0;
     this.animateStarfield(elapsed);
     this.animateBurnTrajectoryDashPhases(elapsed);
+    this.animateFutureFireImpactMarkers(elapsed);
     const previewEffectPixelRatio = this.renderer.getPixelRatio();
     const hasAnimatedBurnPreviewEffect =
       this.burnPreviewEffectsEnabled &&
@@ -13494,7 +13909,8 @@ export class CinematicSolarSystemRenderer {
       );
       presentationStageStartedAt = performance.now();
     }
-    this.animateShipMarkers(this.getShipMarkerTimelineElapsed(elapsed));
+    const gameplayElapsed = this.getGameplayPresentationElapsed(elapsed);
+    this.animateShipMarkers(gameplayElapsed);
     if (shouldMeasurePresentationStages) {
       this.recordPerformanceSection(
         "shipAnimation",
@@ -13505,11 +13921,11 @@ export class CinematicSolarSystemRenderer {
     const effectAnimationStartedAt = presentationStageStartedAt;
     this.updateSolarOcclusionFlare(elapsed);
     this.updateDriveWakeCameraDazzle();
-    this.updateContestedThrusterJets(elapsed);
+    this.updateContestedThrusterJets(gameplayElapsed);
     if (shouldMeasurePresentationStages) {
       presentationStageStartedAt = performance.now();
     }
-    this.animateConstructionCargo(elapsed);
+    this.animateConstructionCargo(gameplayElapsed);
     if (shouldMeasurePresentationStages) {
       this.recordPerformanceSection(
         "constructionAnimation",
@@ -13517,7 +13933,7 @@ export class CinematicSolarSystemRenderer {
       );
       presentationStageStartedAt = performance.now();
     }
-    this.updateTritiumWorkStreams(elapsed);
+    this.updateTritiumWorkStreams(gameplayElapsed);
     if (shouldMeasurePresentationStages) {
       this.recordPerformanceSection(
         "tritiumAnimation",
@@ -13525,7 +13941,7 @@ export class CinematicSolarSystemRenderer {
       );
       presentationStageStartedAt = performance.now();
     }
-    this.updateWorkEffects(elapsed);
+    this.updateWorkEffects(gameplayElapsed);
     if (shouldMeasurePresentationStages) {
       this.recordPerformanceSection(
         "workAnimation",
@@ -13739,6 +14155,58 @@ export class CinematicSolarSystemRenderer {
 
     if (this.turnTransition !== null) {
       this.syncActiveBurnTrajectoryVisibleStarts();
+    }
+  }
+
+  private animateFutureFireImpactMarkers(elapsed: number): void {
+    let hasAnimatedImpactMarker = false;
+
+    for (const marker of this.futureGhostCache.values()) {
+      if (
+        !(marker instanceof THREE.Group) ||
+        marker.userData["futureFireImpactMarker"] !== true ||
+        marker.userData["futureFireImpactAnimated"] !== true ||
+        !marker.visible ||
+        marker.parent === null ||
+        !marker.parent.visible
+      ) {
+        continue;
+      }
+
+      const sourceTrajectoryKey = getStringUserData(
+        marker as THREE.Object3D,
+        "futureFireImpactSourceTrajectoryKey"
+      );
+      const sourceTrajectory =
+        sourceTrajectoryKey === ""
+          ? undefined
+          : this.fireTrajectoryPresentationCache.get(sourceTrajectoryKey);
+      const sourceAnimationState =
+        sourceTrajectory === undefined
+          ? null
+          : getBurnTrajectoryDashAnimationState(sourceTrajectory);
+      const normalizedDashPhase =
+        sourceAnimationState === null
+          ? 0
+          : sourceAnimationState.phase / Math.max(0.001, sourceAnimationState.cycle);
+      const sourceAccentSpeed =
+        sourceTrajectory === undefined
+          ? this.tuning.firePreviewEffectFlowSpeed
+          : getNumericUserData(sourceTrajectory, "trajectoryAccentSpeed");
+      const accentSpeed = Number.isFinite(sourceAccentSpeed)
+        ? sourceAccentSpeed
+        : this.tuning.firePreviewEffectFlowSpeed;
+
+      syncFutureFireImpactMarkerAnimation(
+        marker as THREE.Group,
+        normalizedDashPhase,
+        (elapsed * accentSpeed) % 1
+      );
+      hasAnimatedImpactMarker = true;
+    }
+
+    if (hasAnimatedImpactMarker) {
+      this.hasAnimatedUiBloomSource = true;
     }
   }
 
@@ -14043,13 +14511,20 @@ export class CinematicSolarSystemRenderer {
   private renderSolarOcclusionFlare(): void {
     const presentation = this.solarOcclusionFlarePresentation;
     const reemergenceStrength = this.solarOcclusionTransientState.flareStrength;
+    const limbGlintStrength =
+      presentation === null
+        ? 0
+        : computeSolarLimbGlintStrength(presentation.coverage) *
+          presentation.distanceVisibility *
+          this.tuning.solarOcclusionOpacity *
+          this.tuning.solarOcclusionLimbGlintIntensity;
     const coronaStrength =
       (presentation?.coverage ?? 0) *
       (presentation?.distanceVisibility ?? 0) *
       this.tuning.solarOcclusionOpacity *
       this.tuning.solarOcclusionCoronaIntensity;
 
-    if (coronaStrength <= 0.001 && reemergenceStrength <= 0.001) {
+    if (coronaStrength <= 0.001 && limbGlintStrength <= 0.001 && reemergenceStrength <= 0.001) {
       return;
     }
 
@@ -14070,11 +14545,15 @@ export class CinematicSolarSystemRenderer {
         this.tuning.solarOcclusionZoomFadeStart,
         this.tuning.solarOcclusionZoomFadeEnd
       );
-    const flareStrength =
-      reemergenceStrength *
-      distanceVisibility *
-      this.tuning.solarOcclusionOpacity *
-      this.tuning.solarOcclusionReemergenceIntensity;
+    const flareStrength = clamp(
+      limbGlintStrength +
+        reemergenceStrength *
+          distanceVisibility *
+          this.tuning.solarOcclusionOpacity *
+          this.tuning.solarOcclusionReemergenceIntensity,
+      0,
+      1.25
+    );
     const occluderCenter = presentation?.occluderCenter ?? sunProjection;
     const occluderRadius = presentation?.occluderRadius ?? projectedSunRadius;
     const uniforms = this.cinematicSolarOcclusionFlareMaterial.uniforms;
@@ -15125,6 +15604,10 @@ export class CinematicSolarSystemRenderer {
   }
 
   private getShipMarkerTimelineElapsed(elapsed: number): number {
+    return this.getGameplayPresentationElapsed(elapsed);
+  }
+
+  private getGameplayPresentationElapsed(elapsed = this.presentationElapsed): number {
     if (!this.isTimelinePreviewActive) {
       return elapsed;
     }
@@ -15133,6 +15616,16 @@ export class CinematicSolarSystemRenderer {
   }
 
   private getShipRadiatorAnimationFrame(key: string, elapsed: number): ShipRadiatorAnimationFrame {
+    if (this.isTimelinePreviewActive) {
+      const seed = hashStringToUnitInterval(`replay-radiator:${key}`);
+      const cycle = elapsed * THREE.MathUtils.lerp(0.42, 0.66, seed) + seed * Math.PI * 2;
+
+      return {
+        extension: 0.5 + Math.sin(cycle) * 0.5,
+        clockRotation: positiveModulo(elapsed * (0.62 + seed * 0.24), Math.PI * 2)
+      };
+    }
+
     const state = this.getShipRadiatorAnimationState(key);
     const delta =
       Number.isFinite(state.lastElapsed) && elapsed >= state.lastElapsed
@@ -15580,7 +16073,10 @@ export class CinematicSolarSystemRenderer {
 
     const updateIntervalSeconds = this.getContestedThrusterJetsUpdateIntervalSeconds();
 
-    if (elapsed - this.contestedThrusterJetsLastUpdatedAt < updateIntervalSeconds) {
+    if (
+      elapsed >= this.contestedThrusterJetsLastUpdatedAt &&
+      elapsed - this.contestedThrusterJetsLastUpdatedAt < updateIntervalSeconds
+    ) {
       return;
     }
 
@@ -16276,7 +16772,10 @@ export class CinematicSolarSystemRenderer {
 
     const updateIntervalSeconds = this.getWorkEffectsUpdateIntervalSeconds();
 
-    if (elapsed - this.workEffectsLastUpdatedAt < updateIntervalSeconds) {
+    if (
+      elapsed >= this.workEffectsLastUpdatedAt &&
+      elapsed - this.workEffectsLastUpdatedAt < updateIntervalSeconds
+    ) {
       return;
     }
 
@@ -17339,7 +17838,9 @@ export class CinematicSolarSystemRenderer {
       return null;
     }
 
-    const target = this.getFireTargetRenderData(missile, baseTarget);
+    const target = canonicalFirePreviewGeometryEnabled
+      ? baseTarget
+      : this.getFireTargetRenderData(missile, baseTarget);
     const points = buildMissileTrajectoryPreview(
       origin,
       target,
@@ -17788,9 +18289,13 @@ export class CinematicSolarSystemRenderer {
     const fadeIn = smoothStep(0.34, 1.6, age);
     const modelOpacity = (0.18 + smoothStep(0.18, 0.92, detailProgress) * 0.58) * fadeIn;
     const impactOrbitRadius = node.nodeOrbitRadius * 1.13;
+    const timelineImpactElapsed =
+      presentation.timelineImpactPosition === undefined
+        ? presentation.startedAt
+        : presentation.timelineImpactPosition * replayDestructionSecondsPerTurn;
     const impactAngle = computeNodeShipOrbitAngle(
       node.id,
-      presentation.startedAt,
+      timelineImpactElapsed,
       this.tuning,
       0,
       1
@@ -17865,10 +18370,11 @@ export class CinematicSolarSystemRenderer {
       );
 
       chunk.position.copy(localPosition);
+      const motionElapsed = presentation.timelineControlled ? age : elapsed;
       chunk.rotation.set(
-        inclination * Math.PI + elapsed * (0.22 + chunkIndex * 0.05) + presentation.seed,
+        inclination * Math.PI + motionElapsed * (0.22 + chunkIndex * 0.05) + presentation.seed,
         Math.PI / 2 - angle,
-        elapsed * (0.34 + chunkIndex * 0.06)
+        motionElapsed * (0.34 + chunkIndex * 0.06)
       );
       chunk.scale.setScalar(Math.max(0.28, chunkWorldSize / nodeScale));
       setObjectOpacity(chunk, modelOpacity);
@@ -18400,6 +18906,10 @@ export class CinematicSolarSystemRenderer {
     }
     this.camera.lookAt(this.focus);
     this.camera.updateMatrixWorld();
+    // Close-up transfer-field connectors are unprojected onto the camera plane. Keep that
+    // camera-dependent endpoint in the same update transaction as orbit/pan/zoom so the line
+    // cannot trail the destination between tactical-presentation rebuilds.
+    this.syncScreenStableBurnTransferFieldConnectors();
   }
 
   private updateLabels(): void {
@@ -19862,6 +20372,10 @@ export class CinematicSolarSystemRenderer {
   }
 
   private shouldShowLabel(label: LabelObject): boolean {
+    if (!this.isHoverTextEnabled()) {
+      return false;
+    }
+
     const hoveredNodeId = getNodeIdFromTargetKey(this.hoveredTargetKey);
     const labelNodeId = getNodeIdFromTargetKey(label.targetKey);
 
@@ -20261,6 +20775,7 @@ export class CinematicSolarSystemRenderer {
 
     return [
       snapshot.turn,
+      this.trajectoryReflectionMode,
       this.selectedTargetKey ?? "",
       this.hoveredTargetKey ?? "",
       this.selectedActionMode,
@@ -20404,6 +20919,7 @@ export class CinematicSolarSystemRenderer {
   private updateBurnPresentation(snapshot: SolarSystemSnapshot): void {
     this.burnTrajectoryCount = 0;
     this.syncTacticalDisplayCaches(snapshot);
+    this.refreshOrbitTimingProtectedOrbitInterruptions(snapshot);
     this.burnTrajectoryPresentationKeysInUse.clear();
     this.activeBurnResolvedTrajectories.clear();
     this.pruneActiveBurnOriginPresentationHeights(snapshot);
@@ -20417,6 +20933,7 @@ export class CinematicSolarSystemRenderer {
     this.futureGhostKeysInUse.clear();
     this.detachCachedFutureGhosts();
     clearGroup(this.burnTransferFieldGroup);
+    this.screenStableBurnTransferFieldConnectors.length = 0;
     clearGroup(this.burnPreviewGroup);
     clearGroup(this.burnPreviewEffectGroup);
     clearGroup(this.confirmedBurnEffectGroup);
@@ -20429,13 +20946,23 @@ export class CinematicSolarSystemRenderer {
 
     for (const order of snapshot.pendingBurnOrders) {
       const color = this.getBurnTrajectoryColor(order);
+      const trajectory = this.resolveBurnTrajectory(
+        order,
+        this.pendingBurnGroup,
+        undefined,
+        undefined,
+        "preview"
+      );
       const labelAnchor = this.renderBurnArc(
         order,
         this.pendingBurnGroup,
         this.tuning.pendingBurnOpacity,
-        true
+        true,
+        undefined,
+        undefined,
+        trajectory
       );
-      this.renderPendingBurnFutureDestinationLink(order, color);
+      this.renderPendingBurnFutureDestinationLink(order, color, trajectory);
       this.renderConfirmedBurnOrderEffect(order);
 
       if (labelAnchor !== null) {
@@ -20487,11 +21014,7 @@ export class CinematicSolarSystemRenderer {
         );
       }
 
-      this.renderFutureBodyPreview(
-        transit,
-        this.getBurnTrajectoryColor(transit),
-        !this.isMandatoryLaunchTransit(transit)
-      );
+      this.renderFutureBodyPreview(transit, this.getBurnTrajectoryColor(transit), trajectory);
       this.renderActiveBurnMarker(transit, progress, arrivalAngle, trajectory);
     }
 
@@ -20508,18 +21031,28 @@ export class CinematicSolarSystemRenderer {
     }
 
     const isHoverPlanAffordable = isRenderableBurnPlanAffordable(hoverPlan);
+    const resolvedHoverTrajectory = this.resolveBurnTrajectory(
+      hoverPlan,
+      this.burnPreviewGroup,
+      undefined,
+      undefined,
+      "preview"
+    );
     const labelAnchor = this.renderBurnArc(
       hoverPlan,
       this.burnPreviewGroup,
       this.tuning.burnPreviewOpacity,
-      true
+      true,
+      undefined,
+      undefined,
+      resolvedHoverTrajectory
     );
 
     if (labelAnchor !== null) {
       const hoverLabelTint = isHoverPlanAffordable
         ? this.getBurnTrajectoryColor(hoverPlan)
         : dimColor(this.getBurnTrajectoryColor(hoverPlan), 0.58);
-      this.showTrajectoryLabel(
+      this.showHoverTrajectoryLabel(
         this.getBurnDestinationBillboardAnchor(hoverPlan) ?? labelAnchor,
         `T+${hoverPlan.etaTurns} -${hoverPlan.burnCost} ΔV`,
         "burn-hover",
@@ -20528,22 +21061,13 @@ export class CinematicSolarSystemRenderer {
       );
     }
 
-    if (isHoverPlanAffordable) {
-      this.renderBurnPreviewEffect(hoverPlan);
-      this.renderFutureBodyPreview(hoverPlan, this.getBurnTrajectoryColor(hoverPlan));
-      const deltaHint = this.getBurnTransferDeltaHint?.(
-        hoverPlan.originNodeId,
-        hoverPlan.destinationNodeId
+    if (isHoverPlanAffordable && labelAnchor !== null && resolvedHoverTrajectory !== null) {
+      this.renderBurnPreviewEffect(hoverPlan, resolvedHoverTrajectory);
+      this.renderFutureBodyPreview(
+        hoverPlan,
+        this.getBurnTrajectoryColor(hoverPlan),
+        resolvedHoverTrajectory
       );
-
-      if (deltaHint !== undefined && deltaHint !== null) {
-        this.renderTransferDeltaHint(
-          hoverPlan,
-          deltaHint,
-          this.getBurnTrajectoryColor(hoverPlan),
-          "burn"
-        );
-      }
     }
 
     this.pruneCachedBurnTrajectoryPresentations();
@@ -21379,7 +21903,7 @@ export class CinematicSolarSystemRenderer {
           connectorOpacity
         )
       );
-      this.showTrajectoryLabel(
+      this.showHoverTrajectoryLabel(
         presentation.labelAnchor,
         `T+${presentation.etaTurns}`,
         "burn-field",
@@ -21407,7 +21931,7 @@ export class CinematicSolarSystemRenderer {
       return createBurnTransferFieldConnector(origin, sample.destination, color, opacity);
     }
 
-    return createBurnTransferFieldConnector(
+    const connector = createBurnTransferFieldConnector(
       origin,
       sample.destination,
       color,
@@ -21415,6 +21939,28 @@ export class CinematicSolarSystemRenderer {
       screenStableEnd,
       { depthTest: false }
     );
+    this.screenStableBurnTransferFieldConnectors.push({ connector, origin, sample });
+    return connector;
+  }
+
+  private syncScreenStableBurnTransferFieldConnectors(): void {
+    for (const presentation of this.screenStableBurnTransferFieldConnectors) {
+      if (presentation.connector.parent !== this.burnTransferFieldGroup) {
+        continue;
+      }
+
+      const screenStableEnd = this.getScreenStableBurnTransferFieldConnectorEnd(
+        presentation.origin,
+        presentation.sample
+      );
+      syncBurnTransferFieldConnectorGeometry(
+        presentation.connector,
+        presentation.origin,
+        presentation.sample.destination,
+        screenStableEnd,
+        { depthTest: false }
+      );
+    }
   }
 
   private getScreenStableBurnTransferFieldConnectorEnd(
@@ -21538,10 +22084,13 @@ export class CinematicSolarSystemRenderer {
 
     for (const order of pendingFireOrders) {
       const weight = getFireTrajectoryVisualWeight(getFireEtaTurns(order, this.visualTurn));
+      const resolvedTrajectory = this.resolveFireTrajectory(order, undefined, "orbit-center");
       const labelAnchor = this.renderFireArc(
         order,
         this.pendingFireGroup,
-        this.tuning.pendingFireOpacity * this.getPendingFireConfirmationOpacityMultiplier(order)
+        this.tuning.pendingFireOpacity * this.getPendingFireConfirmationOpacityMultiplier(order),
+        undefined,
+        resolvedTrajectory
       );
       this.renderConfirmedFireOrderEffect(order);
 
@@ -21590,7 +22139,7 @@ export class CinematicSolarSystemRenderer {
 
       if (labelAnchor !== null && this.hoveredTargetKey === `node:${missile.targetNodeId}`) {
         const remainingTurns = Math.max(0, Math.ceil(missile.impactTurn - this.visualTurn));
-        this.showTrajectoryLabel(
+        this.showHoverTrajectoryLabel(
           this.getFireImpactBillboardAnchor(missile) ?? labelAnchor,
           `T-${remainingTurns}`,
           "fire",
@@ -21629,30 +22178,29 @@ export class CinematicSolarSystemRenderer {
       return;
     }
 
+    const resolvedHoverTrajectory = this.resolveFireTrajectory(
+      hoverPlan,
+      undefined,
+      "orbit-center"
+    );
     const labelAnchor = this.renderFireArc(
       hoverPlan,
       this.firePreviewGroup,
-      this.tuning.firePreviewOpacity
+      this.tuning.firePreviewOpacity,
+      undefined,
+      resolvedHoverTrajectory
     );
 
     if (labelAnchor !== null) {
-      this.showTrajectoryLabel(
+      this.showHoverTrajectoryLabel(
         this.getFireImpactBillboardAnchor(hoverPlan) ?? labelAnchor,
         `T-${hoverPlan.missileEtaTurns}`,
         "fire"
       );
     }
 
-    this.renderFirePreviewEffect(hoverPlan);
-    this.renderFireFutureTargetPreview(hoverPlan);
-    const deltaHint = this.getFireTransferDeltaHint?.(
-      hoverPlan.originNodeId,
-      hoverPlan.targetNodeId
-    );
-
-    if (deltaHint !== undefined && deltaHint !== null) {
-      this.renderTransferDeltaHint(hoverPlan, deltaHint, this.tuning.fireMarkerColor, "fire");
-    }
+    this.renderFirePreviewEffect(hoverPlan, resolvedHoverTrajectory);
+    this.renderFireFutureTargetPreview(hoverPlan, resolvedHoverTrajectory);
 
     this.pruneCachedFireTrajectoryPresentations();
     this.pruneCachedFireTrajectoryPaths();
@@ -21694,10 +22242,13 @@ export class CinematicSolarSystemRenderer {
     presentations.sort(compareFireArrivalsForPresentation);
 
     for (const plan of presentations) {
+      const resolvedTrajectory = this.resolveFireTrajectory(plan, undefined, "orbit-center");
       const labelAnchor = this.renderFireArc(
         plan,
         this.firePreviewGroup,
-        this.tuning.firePreviewOpacity * 0.58
+        this.tuning.firePreviewOpacity * 0.58,
+        undefined,
+        resolvedTrajectory
       );
 
       if (labelAnchor === null) {
@@ -21705,14 +22256,14 @@ export class CinematicSolarSystemRenderer {
       }
 
       const weight = getFireTrajectoryVisualWeight(getFireEtaTurns(plan, this.visualTurn));
-      this.showTrajectoryLabel(
+      this.showHoverTrajectoryLabel(
         this.getFireImpactBillboardAnchor(plan) ?? labelAnchor,
         `T-${plan.missileEtaTurns}`,
         "fire-field",
         0.92 * weight.labelOpacityMultiplier,
         color
       );
-      this.renderFireFutureTargetPreview(plan);
+      this.renderFireFutureTargetPreview(plan, resolvedTrajectory);
     }
   }
 
@@ -21766,7 +22317,10 @@ export class CinematicSolarSystemRenderer {
       let previousImpactTurn: number | null = null;
 
       for (const impact of impactChronology) {
-        const futureTarget = this.getDisplayNodeRenderDataAtTurn(targetNodeId, impact.impactTurn);
+        const resolvedTrajectory = this.resolveFireTrajectory(impact, undefined, "orbit-center");
+        const futureTarget =
+          resolvedTrajectory?.target ??
+          this.getDisplayNodeRenderDataAtTurn(targetNodeId, impact.impactTurn);
 
         if (futureTarget === null) {
           continue;
@@ -21807,7 +22361,11 @@ export class CinematicSolarSystemRenderer {
           futureTarget,
           this.tuning.fireMarkerColor,
           targetColor,
-          this.tuning.futureDestinationMarkerOpacity * weight.targetOpacityMultiplier
+          this.tuning.futureDestinationMarkerOpacity * weight.targetOpacityMultiplier,
+          1,
+          undefined,
+          undefined,
+          this.tuning.pendingFireOpacity * weight.opacityMultiplier
         );
         impactMarker.name = `fire-future-impact-marker:${targetNodeId}`;
         this.futureDestinationGroup.add(impactMarker);
@@ -21871,8 +22429,7 @@ export class CinematicSolarSystemRenderer {
           continue;
         }
 
-        const markerOuterRadiusWorld =
-          Math.max(0.72, destination.ringRadius * 0.84) * futureFireImpactTickOuterRadius;
+        const markerOuterRadiusWorld = this.getFutureFireImpactArmOuterRadiusWorld();
         const markerRadiusPixels = Math.max(
           futureFireImpactTickMinimumOuterRadiusPixels,
           getScreenPixelsForWorldRadius(
@@ -21921,18 +22478,24 @@ export class CinematicSolarSystemRenderer {
     return this.isReducedPerformanceMode() ? "simple" : "full";
   }
 
-  private renderBurnPreviewEffect(plan: RenderableBurnPlan): void {
+  private renderBurnPreviewEffect(
+    plan: RenderableBurnPlan,
+    resolvedTrajectory?: ResolvedBurnTrajectory | null
+  ): void {
     if (!this.burnPreviewEffectsEnabled) {
       return;
     }
 
-    const trajectory = this.resolveBurnTrajectory(plan, this.burnPreviewGroup);
+    const trajectory =
+      resolvedTrajectory === undefined
+        ? this.resolveBurnTrajectory(plan, this.burnPreviewGroup)
+        : resolvedTrajectory;
 
-    if (trajectory === null) {
+    if (!isResolvedBurnTrajectoryRenderable(trajectory)) {
       return;
     }
 
-    const effect = createBurnPreviewEffect(trajectory.visiblePoints, {
+    const effect = createBurnPreviewEffect(trajectory.presentationPoints, {
       color: trajectory.color,
       opacity: this.tuning.burnPreviewEffectOpacity,
       particleCount: this.tuning.burnPreviewEffectParticleCount,
@@ -21949,18 +22512,27 @@ export class CinematicSolarSystemRenderer {
     }
   }
 
-  private renderFirePreviewEffect(plan: RenderableFirePlan): void {
+  private renderFirePreviewEffect(
+    plan: RenderableFirePlan,
+    resolvedTrajectory?: ResolvedFireTrajectory | null
+  ): void {
     if (!this.firePreviewEffectsEnabled) {
       return;
     }
 
-    const trajectory = this.resolveFireTrajectory(plan, undefined, "orbit-center");
+    const trajectory =
+      resolvedTrajectory ?? this.resolveFireTrajectory(plan, undefined, "orbit-center");
 
     if (trajectory === null) {
       return;
     }
 
-    const effect = createFirePreviewEffect(trajectory.points, {
+    const previewPoints = this.getFirePreviewDisplayPath(
+      trajectory.points,
+      trajectory.target,
+      1.08
+    );
+    const effect = createFirePreviewEffect(previewPoints, {
       color: this.tuning.fireMarkerColor,
       opacity: this.tuning.firePreviewEffectOpacity,
       particleCount: this.tuning.firePreviewEffectParticleCount,
@@ -21989,7 +22561,7 @@ export class CinematicSolarSystemRenderer {
       return;
     }
 
-    const effect = createBurnPreviewEffect(trajectory.visiblePoints, {
+    const effect = createBurnPreviewEffect(trajectory.presentationPoints, {
       color: trajectory.color,
       opacity:
         this.tuning.burnPreviewEffectOpacity * this.tuning.confirmedOrderEffectOpacityMultiplier,
@@ -22060,7 +22632,11 @@ export class CinematicSolarSystemRenderer {
     );
 
     const revealDurationSeconds = this.tuning.fireConfirmedSolutionRevealDurationSeconds;
-    const effect = createFirePreviewEffect(finalTrajectory.points, {
+    const previewPoints = this.getFirePreviewDisplayPath(
+      finalTrajectory.points,
+      finalTrajectory.target
+    );
+    const effect = createFirePreviewEffect(previewPoints, {
       color: this.tuning.fireMarkerColor,
       opacity:
         this.tuning.firePreviewEffectOpacity * this.tuning.confirmedOrderEffectOpacityMultiplier,
@@ -22125,7 +22701,49 @@ export class CinematicSolarSystemRenderer {
     return THREE.MathUtils.lerp(0.34, 0.54, extremeZoomOutProgress);
   }
 
-  private renderFireFutureTargetPreview(plan: RenderableFirePlan): void {
+  private getFutureFireImpactArmOuterRadiusWorld(scale = 1): number {
+    const smallestDisplayedOrbitRadius =
+      this.snapshot?.nodes.reduce((smallestRadius, node) => {
+        const ringScale = this.displayState?.nodeRingScales.get(node.id) ?? 1;
+        return Math.min(smallestRadius, node.nodeOrbitRadius * ringScale);
+      }, Number.POSITIVE_INFINITY) ?? Number.POSITIVE_INFINITY;
+    const referenceOrbitRadius = Number.isFinite(smallestDisplayedOrbitRadius)
+      ? smallestDisplayedOrbitRadius
+      : futureFireImpactFallbackSmallestOrbitRadius;
+
+    // Keep the complete X just inside the diameter of the smallest displayed node orbit.
+    return referenceOrbitRadius * scale * futureFireImpactArmLengthScale;
+  }
+
+  private getFirePreviewDisplayPath(
+    points: readonly THREE.Vector3[],
+    target: DisplayNodeRenderData,
+    markerScaleMultiplier = 1
+  ): readonly THREE.Vector3[] {
+    const markerOuterRadiusWorld =
+      this.getFutureFireImpactArmOuterRadiusWorld(markerScaleMultiplier);
+    const minimumOuterRadiusWorld = getWorldUnitsForScreenPixels(
+      this.camera,
+      target.center,
+      this.renderer.domElement.clientHeight,
+      futureFireImpactTickMinimumOuterRadiusPixels
+    );
+    const gapWorld = getWorldUnitsForScreenPixels(
+      this.camera,
+      target.center,
+      this.renderer.domElement.clientHeight,
+      firePreviewImpactGapPixels
+    );
+    return trimFirePreviewPathBeforeImpact(
+      points,
+      Math.max(markerOuterRadiusWorld, minimumOuterRadiusWorld) + gapWorld
+    );
+  }
+
+  private renderFireFutureTargetPreview(
+    plan: RenderableFirePlan,
+    resolvedTrajectory?: ResolvedFireTrajectory | null
+  ): void {
     const targetKey = `node:${plan.targetNodeId}`;
     const targetColor = this.getFireTargetFactionColor(plan);
     const isTargetHovered = this.hoveredTargetKey === targetKey;
@@ -22150,20 +22768,37 @@ export class CinematicSolarSystemRenderer {
     }
 
     const currentTarget = timingPreview.start;
-    const futureTarget = timingPreview.target;
+    // The curve, reflection, target dot and X consume the same render-data instance. This makes
+    // target alignment an invariant of the preview rather than a coincidence between resolvers.
+    const futureTarget = resolvedTrajectory?.target ?? timingPreview.target;
     const targetRingPoints = createNodeHoverRingPoints(futureTarget);
     const hoverPoints = [...timingPreview.points, ...targetRingPoints];
     const targetPulse = this.getTutorialAttentionPulseForTarget(targetKey);
     const tutorialLinkPulse = getTutorialAttentionNodeColorPulse(targetPulse);
     const markerOpacity =
       this.tuning.futureDestinationMarkerOpacity * weight.targetOpacityMultiplier;
+    const sourceTrajectoryKey = isTargetHovered
+      ? this.getFireTrajectoryPresentationCacheKey(plan, this.firePreviewGroup)
+      : undefined;
+    const impactArmHalfWidthWorld =
+      isTargetHovered && resolvedTrajectory !== null && resolvedTrajectory !== undefined
+        ? getBurnTrajectoryCoreHalfWidth(
+            measurePolylineLength(resolvedTrajectory.points),
+            this.tuning.burnPreviewThicknessMultiplier * 1.12 * weight.thicknessMultiplier,
+            this.getTacticalTrajectoryDetailMode()
+          )
+        : undefined;
+    const impactArmOpacity = this.tuning.firePreviewOpacity * (isTargetHovered ? 1 : 0.58);
     const impactMarker = this.getCachedFutureFireImpactMarker(
       `fire-preview-impact:${presentationKey}`,
       futureTarget,
       this.tuning.fireMarkerColor,
       targetColor,
       markerOpacity,
-      isTargetHovered ? 1.08 : 1
+      isTargetHovered ? 1.08 : 1,
+      impactArmHalfWidthWorld,
+      sourceTrajectoryKey,
+      impactArmOpacity
     );
     impactMarker.name = `fire-future-impact-marker:${plan.targetNodeId}`;
 
@@ -22253,8 +22888,20 @@ export class CinematicSolarSystemRenderer {
     const weight = isPreview
       ? getFullFireTrajectoryVisualWeight()
       : getFireTrajectoryVisualWeight(getFireEtaTurns(plan, this.visualTurn));
-    const renderedPoints = trajectory.points;
-    const anchorEndDash = !("launchedTurn" in plan);
+    const shouldLeaveImpactMarkerClear = activeProgress === undefined;
+    const impactMarkerScale = isPreview ? 1.08 : 1;
+    const renderedPoints = shouldLeaveImpactMarkerClear
+      ? this.getFirePreviewDisplayPath(trajectory.points, trajectory.target, impactMarkerScale)
+      : trajectory.points;
+    const renderedReflectionPoints =
+      shouldLeaveImpactMarkerClear && trajectory.reflectionPoints !== undefined
+        ? this.getFirePreviewDisplayPath(
+            trajectory.reflectionPoints,
+            trajectory.target,
+            impactMarkerScale
+          )
+        : trajectory.reflectionPoints;
+    const anchorEndDash = canonicalFirePreviewGeometryEnabled || !("launchedTurn" in plan);
     const trajectoryCacheKey = this.getFireTrajectoryPresentationCacheKey(plan, group);
     const reusableTrajectory = this.fireTrajectoryPresentationCache.get(trajectoryCacheKey);
     const trajectoryMesh = createBurnTrajectoryMesh(
@@ -22279,6 +22926,8 @@ export class CinematicSolarSystemRenderer {
         accentSpeed: this.tuning.firePreviewEffectFlowSpeed,
         enabled: hasPlaneReflection,
         elapsed: this.presentationElapsed,
+        ...(renderedReflectionPoints === undefined ? {} : { points: renderedReflectionPoints }),
+        readability: isPreview ? 1 : 0,
         showAnimatedAccent: isPreview
       }
     );
@@ -22303,36 +22952,52 @@ export class CinematicSolarSystemRenderer {
       return null;
     }
 
+    // FIRE predicts an impact at the geometric center of the target orbit. Unlike BURN it is not
+    // an orbital insertion, so active missiles and previews must never inherit a ship-orbit
+    // tangent or chase the decorative rendered ship position.
     const resolvedTargetMode =
-      targetMode ?? ("launchedTurn" in plan ? "tracked-ship" : "orbit-center");
+      targetMode ??
+      (canonicalFirePreviewGeometryEnabled
+        ? canonicalFirePreviewTargetMode
+        : "launchedTurn" in plan
+          ? "tracked-ship"
+          : "orbit-center");
     const target =
       resolvedTargetMode === "orbit-center"
         ? baseTarget
         : this.getFireTargetRenderData(plan, baseTarget);
     const cacheKey = `${this.getFirePlanPresentationKey(plan)}:${resolvedTargetMode}`;
-    const signature = `${getDisplayNodeRenderDataTrajectorySignature(
+    const usesCanonicalPreviewGeometry = canonicalFirePreviewGeometryEnabled;
+    const signature = `${usesCanonicalPreviewGeometry ? "canonical-v2;" : "legacy;"}${getDisplayNodeRenderDataTrajectorySignature(
       origin
     )};${getDisplayNodeRenderDataTrajectorySignature(target)}`;
     const cached = this.resolvedFireTrajectoryPathCache.get(cacheKey);
+    const cachedGeometry = cached?.signature === signature ? cached : undefined;
+    const rebuiltGeometry =
+      cachedGeometry === undefined && usesCanonicalPreviewGeometry
+        ? buildFirePreviewGeometry({
+            ...(origin.departureDirection === undefined
+              ? {}
+              : { departureDirection: origin.departureDirection }),
+            etaTurns: plan.missileEtaTurns,
+            impactCenter: target.center,
+            origin: origin.center
+          })
+        : undefined;
     const points =
-      cached?.signature === signature
-        ? cached.points
-        : buildMissileTrajectoryPreview(
-            origin,
-            target,
-            plan.issuedTurn,
-            plan.missileEtaTurns,
-            plan,
-            {
-              includeDepartureContinuity:
-                origin.departureOrbit !== undefined || origin.departureDirection !== undefined
-            }
-          );
+      cachedGeometry?.points ??
+      rebuiltGeometry?.flightPoints ??
+      buildMissileTrajectoryPreview(origin, target, plan.issuedTurn, plan.missileEtaTurns, plan, {
+        includeDepartureContinuity:
+          origin.departureOrbit !== undefined || origin.departureDirection !== undefined
+      });
+    const reflectionPoints = cachedGeometry?.reflectionPoints ?? rebuiltGeometry?.reflectionPoints;
     this.resolvedFireTrajectoryPathCache.set(cacheKey, {
       signature,
       origin,
       target,
-      points
+      points,
+      ...(reflectionPoints === undefined ? {} : { reflectionPoints })
     });
     this.resolvedFireTrajectoryPathKeysInUse.add(cacheKey);
     const visibleStartProgress =
@@ -22344,6 +23009,7 @@ export class CinematicSolarSystemRenderer {
       origin,
       target,
       points,
+      ...(reflectionPoints === undefined ? {} : { reflectionPoints }),
       visibleStartProgress
     };
   }
@@ -22547,7 +23213,7 @@ export class CinematicSolarSystemRenderer {
   }
 
   private getMissilePresentationFlightProgress(missile: ActiveMissile): number {
-    const transition = this.turnTransition;
+    const transition = this.turnTransition ?? this.replayPreviewContext;
 
     if (transition === null || missile.impactTurn > transition.to.turn) {
       return getMissileFlightProgress(missile, this.visualTurn);
@@ -22576,6 +23242,7 @@ export class CinematicSolarSystemRenderer {
     this.missileTransientCacheKeysInUse.clear();
     this.detachCachedMissileTransientObjects();
     clearGroup(this.missileTransientGroup);
+    this.clearTrajectoryLabelsByScope("missile-transient");
 
     if (
       this.missileEvadePresentations.length === 0 &&
@@ -22744,7 +23411,10 @@ export class CinematicSolarSystemRenderer {
           futureTimingTerminal ?? target.center,
           labelText,
           "fire-summary",
-          opacity
+          opacity,
+          undefined,
+          "missile-transient",
+          `missile-evade:${labelKey}`
         );
       }
     }
@@ -23142,19 +23812,94 @@ export class CinematicSolarSystemRenderer {
     radius = 0.34,
     endpoints?: OrbitTimingSegmentEndpoints,
     style: OrbitTimingStyle = "tactical"
-  ): THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial> {
+  ): THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> {
     const cached = this.orbitTimingSegmentCache.get(key);
-    const line =
-      cached ?? createOrbitTimingSegment(points, color, opacity, radius, endpoints, style);
+    const interruptions = [
+      ...(endpoints?.interruptions ?? []),
+      ...this.orbitTimingProtectedOrbitInterruptions
+    ];
+    const spacingAnchor = samplePolylineAtProgress(points, 0.5).position;
+    const dotSpacingWorld = getWorldUnitsForScreenPixels(
+      this.camera,
+      spacingAnchor,
+      this.renderer.domElement.clientHeight,
+      style === "astronomical" ? 7.5 : 6.25
+    );
+    const track =
+      cached ??
+      createOrbitTimingSegment(
+        points,
+        color,
+        opacity,
+        radius,
+        endpoints,
+        style,
+        dotSpacingWorld,
+        interruptions
+      );
 
     if (cached !== undefined) {
-      syncOrbitTimingSegment(cached, points, color, opacity, radius, endpoints, style);
+      syncOrbitTimingSegment(
+        cached,
+        points,
+        color,
+        opacity,
+        radius,
+        endpoints,
+        style,
+        dotSpacingWorld,
+        interruptions
+      );
     } else {
-      this.orbitTimingSegmentCache.set(key, line);
+      this.orbitTimingSegmentCache.set(key, track);
     }
 
     this.orbitTimingSegmentKeysInUse.add(key);
-    return line;
+    return track;
+  }
+
+  private refreshOrbitTimingProtectedOrbitInterruptions(snapshot: SolarSystemSnapshot): void {
+    const occupiedNodeIds = new Set(
+      snapshot.nodeOccupancies
+        .filter((occupancy) => occupancy.shipCount > 0)
+        .map((occupancy) => occupancy.nodeId)
+    );
+    const burnPreviewDestinationNodeId = this.getHoverBurnPlan()?.destinationNodeId ?? null;
+    const protectedNodeIds = new Set(occupiedNodeIds);
+
+    if (burnPreviewDestinationNodeId !== null) {
+      protectedNodeIds.add(burnPreviewDestinationNodeId);
+    }
+
+    const viewportHeight = this.renderer.domElement.clientHeight;
+    this.orbitTimingProtectedOrbitInterruptions = [...protectedNodeIds].flatMap((nodeId) => {
+      const node = this.getCurrentDisplayNodeRenderData(nodeId);
+
+      if (node === null) {
+        return [];
+      }
+
+      const occupiedRadiusMultiplier = occupiedNodeIds.has(nodeId)
+        ? this.tuning.playerOccupiedNodeRingWidthMultiplier
+        : 1;
+      const hoverRadiusMultiplier = nodeId === burnPreviewDestinationNodeId ? 1.035 : 1;
+      const orbitRadius = node.ringRadius * occupiedRadiusMultiplier * hoverRadiusMultiplier;
+      const visualClearance = getWorldUnitsForScreenPixels(
+        this.camera,
+        node.center,
+        viewportHeight,
+        3.5
+      );
+
+      // A one-point interruption is a disc: the dotted timing track disappears on contact with
+      // the protected orbit and only resumes after it has crossed the far side.
+      return [
+        {
+          points: [node.center.clone()],
+          clearanceWorld: orbitRadius + visualClearance
+        }
+      ];
+    });
   }
 
   private detachCachedOrbitTimingSegments(): void {
@@ -23252,32 +23997,16 @@ export class CinematicSolarSystemRenderer {
     return marker;
   }
 
-  private getCachedFutureNodeGhost(
-    key: string,
-    destination: DisplayNodeRenderData,
-    color: THREE.ColorRepresentation,
-    opacity: number,
-    scale = 1
-  ): THREE.LineLoop<THREE.BufferGeometry, THREE.LineBasicMaterial> {
-    const cached = this.futureGhostCache.get(key);
-    const marker =
-      cached instanceof THREE.LineLoop && cached.material instanceof THREE.LineBasicMaterial
-        ? (cached as THREE.LineLoop<THREE.BufferGeometry, THREE.LineBasicMaterial>)
-        : createFutureNodeGhost(destination, color, opacity);
-
-    syncFutureNodeGhost(marker, destination, color, opacity, scale);
-    this.futureGhostCache.set(key, marker);
-    this.futureGhostKeysInUse.add(key);
-    return marker;
-  }
-
   private getCachedFutureFireImpactMarker(
     key: string,
     destination: DisplayNodeRenderData,
     fireColor: THREE.ColorRepresentation,
     targetColor: THREE.ColorRepresentation,
     opacity: number,
-    scale = 1
+    scale = 1,
+    armHalfWidthWorld?: number,
+    sourceTrajectoryKey?: string,
+    armOpacity?: number
   ): THREE.Group {
     const cached = this.futureGhostCache.get(key);
     const minimumTickOuterRadiusWorld = getWorldUnitsForScreenPixels(
@@ -23286,12 +24015,15 @@ export class CinematicSolarSystemRenderer {
       this.renderer.domElement.clientHeight,
       futureFireImpactTickMinimumOuterRadiusPixels
     );
-    const tickThicknessWorld = getWorldUnitsForScreenPixels(
-      this.camera,
-      destination.center,
-      this.renderer.domElement.clientHeight,
-      futureFireImpactTickThicknessPixels
-    );
+    const resolvedArmHalfWidthWorld =
+      armHalfWidthWorld ??
+      getWorldUnitsForScreenPixels(
+        this.camera,
+        destination.center,
+        this.renderer.domElement.clientHeight,
+        futureFireImpactTickThicknessPixels * 0.5
+      );
+    const armOuterRadiusWorld = this.getFutureFireImpactArmOuterRadiusWorld(scale);
     const marker: THREE.Group =
       cached instanceof THREE.Group && cached.userData["futureFireImpactMarker"] === true
         ? (cached as THREE.Group)
@@ -23300,9 +24032,12 @@ export class CinematicSolarSystemRenderer {
             fireColor,
             targetColor,
             opacity,
+            armOpacity ?? clamp(opacity * 1.22, 0, 1),
             scale,
             minimumTickOuterRadiusWorld,
-            tickThicknessWorld
+            resolvedArmHalfWidthWorld,
+            armOuterRadiusWorld,
+            sourceTrajectoryKey
           );
 
     syncFutureFireImpactMarker(
@@ -23311,9 +24046,12 @@ export class CinematicSolarSystemRenderer {
       fireColor,
       targetColor,
       opacity,
+      armOpacity ?? clamp(opacity * 1.22, 0, 1),
       scale,
       minimumTickOuterRadiusWorld,
-      tickThicknessWorld
+      resolvedArmHalfWidthWorld,
+      armOuterRadiusWorld,
+      sourceTrajectoryKey
     );
     this.futureGhostCache.set(key, marker);
     this.futureGhostKeysInUse.add(key);
@@ -24282,7 +25020,9 @@ export class CinematicSolarSystemRenderer {
       return null;
     }
 
-    const target = this.getFireTargetRenderData(missile, baseTarget);
+    const target = canonicalFirePreviewGeometryEnabled
+      ? baseTarget
+      : this.getFireTargetRenderData(missile, baseTarget);
     const capturedLaunchPosition = this.reprojectCapturedLaunchPosition(
       this.activeMissileLaunchPositions.get(missile.id),
       this.activeMissileLaunchOriginFrames.get(missile.id),
@@ -24581,6 +25321,32 @@ export class CinematicSolarSystemRenderer {
     const visiblePoints = shouldClearLaunchNose
       ? this.getBurnPreviewLaunchClearedPoints(origin, rawVisiblePoints)
       : rawVisiblePoints;
+    const presentationBasePoints = flightPath === null ? visiblePoints : points;
+    const destinationLoopStart =
+      flightPath?.insertionPoints[0] ??
+      presentationBasePoints[presentationBasePoints.length - 1] ??
+      destination.center;
+    const destinationLoopDirection = getBurnPreviewDestinationLoopDirection(
+      flightPath?.insertionPoints,
+      destination.center,
+      trajectoryArcDirection
+    );
+    const presentationPoints = isAffordable
+      ? closeBurnPreviewDestinationLoop(
+          presentationBasePoints,
+          destination.center,
+          destinationLoopStart,
+          destinationLoopDirection,
+          flightPath === null
+        )
+      : presentationBasePoints;
+    const reflectionSourcePoints =
+      flightPath === null ? presentationBasePoints : flightPath.transferPoints;
+    const reflectionPoints = buildTrajectoryPlaneReflectionPoints(
+      reflectionSourcePoints,
+      origin.center.y,
+      destination.center.y
+    );
     const activeBurnCoreRadiusLimit =
       activeProgress === undefined && !isPendingOrderPreview
         ? undefined
@@ -24594,6 +25360,8 @@ export class CinematicSolarSystemRenderer {
       trajectoryArcDirection,
       flightPath,
       points,
+      presentationPoints,
+      reflectionPoints,
       visiblePoints,
       ...(activeBurnCoreRadiusLimit === undefined
         ? {}
@@ -24611,31 +25379,45 @@ export class CinematicSolarSystemRenderer {
     resolvedTrajectory?: ResolvedBurnTrajectory | null
   ): THREE.Vector3 | null {
     const trajectoryData =
-      resolvedTrajectory ??
-      this.resolveBurnTrajectory(
-        plan,
-        group,
-        activeProgress,
-        activeArrivalAngle,
-        activeProgress === undefined ? "preview" : "movement"
-      );
+      resolvedTrajectory === undefined
+        ? this.resolveBurnTrajectory(
+            plan,
+            group,
+            activeProgress,
+            activeArrivalAngle,
+            activeProgress === undefined ? "preview" : "movement"
+          )
+        : resolvedTrajectory;
 
-    if (trajectoryData === null) {
+    if (!isResolvedBurnTrajectoryRenderable(trajectoryData)) {
       return null;
     }
 
-    const { origin, destination, color, isAffordable, flightPath, points, visiblePoints } =
-      trajectoryData;
-    const renderedPoints = flightPath === null ? visiblePoints : points;
-    const visibleStartProgress =
+    const {
+      origin,
+      destination,
+      color,
+      isAffordable,
+      flightPath,
+      points,
+      presentationPoints,
+      reflectionPoints
+    } = trajectoryData;
+    const baseVisibleStartProgress =
       flightPath === null
         ? 0
         : this.getActiveBurnTrajectoryVisibleStartProgress(flightPath, activeProgress ?? 0, plan);
+    const visibleStartProgress =
+      flightPath === null
+        ? 0
+        : baseVisibleStartProgress *
+          (measurePolylineLength(points) /
+            Math.max(0.001, measurePolylineLength(presentationPoints)));
     const zoomOutThicknessMultiplier = this.getBurnTrajectoryZoomOutThicknessMultiplier();
     const trajectoryCacheKey = this.getBurnTrajectoryPresentationCacheKey(plan, group);
     const reusableTrajectory = this.burnTrajectoryPresentationCache.get(trajectoryCacheKey);
     const trajectory = createBurnTrajectoryMesh(
-      renderedPoints,
+      presentationPoints,
       color,
       isAffordable ? opacity : opacity * 0.48,
       this.presentationElapsed,
@@ -24658,6 +25440,7 @@ export class CinematicSolarSystemRenderer {
         accentSpeed: this.tuning.burnPreviewEffectFlowSpeed,
         enabled: this.shouldRenderTrajectoryPlaneReflection(group),
         elapsed: this.presentationElapsed,
+        points: reflectionPoints,
         showAnimatedAccent: group === this.burnPreviewGroup
       }
     );
@@ -24674,39 +25457,6 @@ export class CinematicSolarSystemRenderer {
       if (targetKey !== null) {
         this.transientTargetLastKnownPositions.set(targetKey, destination.center.clone());
       }
-      const tutorialPulse =
-        targetKey === null ? null : this.getTutorialAttentionPulseForTarget(targetKey);
-      const tutorialPulseIntensity = tutorialPulse?.intensity ?? 0;
-      const markerOpacity = clamp(
-        this.tuning.futureDestinationMarkerOpacity * (1 + tutorialPulseIntensity * 1.45),
-        0,
-        1
-      );
-      const futureMarker = this.getCachedFutureDestinationMarker(
-        `burn-marker:${trajectoryCacheKey}`,
-        destination.center,
-        color,
-        markerOpacity,
-        1 + tutorialPulseIntensity * 0.11
-      );
-      const futureMarkers: THREE.Object3D[] = [futureMarker];
-
-      if (group !== this.burnPreviewGroup) {
-        const nodeGhost = this.getCachedFutureNodeGhost(
-          `burn-node:${trajectoryCacheKey}`,
-          destination,
-          color,
-          markerOpacity,
-          1 + tutorialPulseIntensity * 0.13
-        );
-        futureMarkers.push(nodeGhost);
-      }
-
-      for (const marker of futureMarkers) {
-        setPreserveExtremeZoomUiOpacity(marker, tutorialPulse !== null);
-      }
-
-      this.futureDestinationGroup.add(...futureMarkers);
     }
 
     return (
@@ -24847,7 +25597,8 @@ export class CinematicSolarSystemRenderer {
 
   private renderPendingBurnFutureDestinationLink(
     plan: PendingBurnOrder,
-    color: THREE.ColorRepresentation
+    color: THREE.ColorRepresentation,
+    resolvedTrajectory?: ResolvedBurnTrajectory | null
   ): void {
     const timingPreview = this.createFutureOrbitTimingPreview(
       plan.destinationNodeId,
@@ -24870,7 +25621,7 @@ export class CinematicSolarSystemRenderer {
         color,
         this.tuning.pendingBurnOpacity * 0.64,
         this.getFutureBurnDestinationLineRadius(),
-        { start: timingPreview.start, end: timingPreview.target },
+        this.getBurnOrbitTimingSegmentEndpoints(timingPreview, resolvedTrajectory),
         "astronomical"
       );
       link.name = "pending-burn-future-destination-link";
@@ -25240,7 +25991,7 @@ export class CinematicSolarSystemRenderer {
   private renderFutureBodyPreview(
     plan: RenderableBurnPlan,
     color: THREE.ColorRepresentation,
-    includeDestinationNodeGhost = true
+    resolvedTrajectory?: ResolvedBurnTrajectory | null
   ): void {
     const isHoverPreview = !("id" in plan);
     const destinationNodeId = plan.destinationNodeId;
@@ -25270,23 +26021,13 @@ export class CinematicSolarSystemRenderer {
           color,
           isHoverPreview ? 0.36 : 0.48,
           this.getFutureBurnDestinationLineRadius(),
-          { start: timingPreview.start, end: timingPreview.target },
+          this.getBurnOrbitTimingSegmentEndpoints(timingPreview, resolvedTrajectory),
           "astronomical"
         ),
         ...timingPreview.timingDots
       );
     }
 
-    if (includeDestinationNodeGhost) {
-      this.futureDestinationGroup.add(
-        this.getCachedFutureNodeGhost(
-          `burn-preview-node:${presentationKey}`,
-          timingPreview.target,
-          color,
-          this.tuning.futureDestinationMarkerOpacity
-        )
-      );
-    }
     if (isHoverPreview) {
       this.futureDestinationGroup.add(
         this.getCachedFutureBodyGhost(`burn-hover-body:${presentationKey}`, timingPreview.target)
@@ -25298,6 +26039,50 @@ export class CinematicSolarSystemRenderer {
       points: [...timingPreview.points, ...destinationRingPoints],
       filledRingPoints: destinationRingPoints
     });
+  }
+
+  private getBurnOrbitTimingSegmentEndpoints(
+    timingPreview: FutureOrbitTimingPreview,
+    resolvedTrajectory?: ResolvedBurnTrajectory | null
+  ): OrbitTimingSegmentEndpoints {
+    if (
+      resolvedTrajectory === null ||
+      resolvedTrajectory === undefined ||
+      resolvedTrajectory.presentationPoints.length < 2
+    ) {
+      return {
+        start: timingPreview.start,
+        end: timingPreview.target,
+        endClearanceWorld: getOrbitTimingGhostCenterClearance(timingPreview.target)
+      };
+    }
+
+    const obstaclePoints = resolvedTrajectory.presentationPoints;
+    const obstacleAnchor = samplePolylineAtProgress(obstaclePoints, 0.5).position;
+    const trajectoryHalfWidth = getBurnTrajectoryCoreHalfWidth(
+      measurePolylineLength(obstaclePoints),
+      this.tuning.burnPreviewThicknessMultiplier *
+        this.getBurnTrajectoryZoomOutThicknessMultiplier(),
+      this.getTacticalTrajectoryDetailMode()
+    );
+    const visualGap = getWorldUnitsForScreenPixels(
+      this.camera,
+      obstacleAnchor,
+      this.renderer.domElement.clientHeight,
+      4.5
+    );
+
+    return {
+      start: timingPreview.start,
+      end: timingPreview.target,
+      endClearanceWorld: getOrbitTimingGhostCenterClearance(timingPreview.target),
+      interruptions: [
+        {
+          points: obstaclePoints,
+          clearanceWorld: trajectoryHalfWidth + visualGap
+        }
+      ]
+    };
   }
 
   private createFutureOrbitTimingPreview(
@@ -25381,82 +26166,6 @@ export class CinematicSolarSystemRenderer {
     }
 
     return this.getCurrentDisplayNodeRenderData(nodeId);
-  }
-
-  private renderTransferDeltaHint(
-    plan: RenderableBurnPlan | RenderableFirePlan,
-    hint: CinematicTransferDeltaHint,
-    color: THREE.ColorRepresentation,
-    mode: "burn" | "fire"
-  ): void {
-    const nodeId = "destinationNodeId" in plan ? plan.destinationNodeId : plan.targetNodeId;
-    const baseArrivalTurn = "arrivalTurn" in plan ? plan.arrivalTurn : plan.impactTurn;
-    const baseDestination = this.getDisplayNodeRenderDataAtTurn(nodeId, baseArrivalTurn);
-    const hintedDestination = this.getDisplayNodeRenderDataAtTurn(nodeId, hint.arrivalTurn);
-
-    if (baseDestination === null || hintedDestination === null) {
-      return;
-    }
-
-    const points: THREE.Vector3[] = [baseDestination.center.clone()];
-    const timingDots: THREE.Mesh[] = [];
-    const turnDelta = hint.arrivalTurn - baseArrivalTurn;
-
-    if (Math.abs(turnDelta) > 0.001) {
-      for (let offset = 1; offset <= hint.departureOffsetTurns; offset += 1) {
-        const progress = offset / (hint.departureOffsetTurns + 1);
-        const sampleTurn = baseArrivalTurn + turnDelta * progress;
-        const sample = this.getDisplayNodeRenderDataAtTurn(nodeId, sampleTurn);
-
-        if (sample === null) {
-          continue;
-        }
-
-        points.push(sample.center.clone());
-        timingDots.push(
-          this.getCachedOrbitTimingDot(
-            `transfer-hint:${mode}:${plan.originNodeId}:${nodeId}:${baseArrivalTurn}:${hint.arrivalTurn}:${offset}`,
-            sample.center,
-            color,
-            mode === "fire" ? 0.34 : 0.2,
-            mode === "fire" ? "tactical" : "astronomical"
-          )
-        );
-      }
-    }
-
-    points.push(hintedDestination.center.clone());
-
-    if (baseDestination.center.distanceToSquared(hintedDestination.center) > 0.01) {
-      this.futureDestinationGroup.add(
-        this.getCachedOrbitTimingSegment(
-          `transfer-hint:${mode}:${plan.originNodeId}:${nodeId}:${baseArrivalTurn}:${hint.arrivalTurn}`,
-          points,
-          color,
-          mode === "fire" ? 0.26 : 0.22,
-          (mode === "fire"
-            ? this.getFutureFireTargetLineRadius()
-            : this.getFutureBurnDestinationLineRadius()) * 0.64,
-          { start: baseDestination, end: hintedDestination },
-          mode === "fire" ? "tactical" : "astronomical"
-        ),
-        ...timingDots
-      );
-    }
-
-    this.futureDestinationGroup.add(
-      this.getCachedFutureBodyGhost(
-        `transfer-hint-body:${mode}:${plan.originNodeId}:${nodeId}:${baseArrivalTurn}:${hint.arrivalTurn}`,
-        hintedDestination
-      )
-    );
-    this.showTrajectoryLabel(
-      getTransferDeltaHintLabelAnchor(baseDestination, hintedDestination),
-      hint.label,
-      mode === "fire" ? "fire-field" : "burn-field",
-      0.9,
-      color
-    );
   }
 
   private getDisplayNodeRenderDataAtTurn(
@@ -25668,14 +26377,40 @@ export class CinematicSolarSystemRenderer {
     this.trajectoryLabelRenderIndex = 0;
   }
 
+  private clearTrajectoryLabelsByScope(scope: TrajectoryLabelScope): void {
+    let removedLabel = false;
+
+    for (let index = this.trajectoryLabels.length - 1; index >= 0; index -= 1) {
+      const label = this.trajectoryLabels[index];
+
+      if (label === undefined || label.scope !== scope) {
+        continue;
+      }
+
+      label.element.style.display = "none";
+      this.trajectoryLabelPool.push(label.element);
+      this.trajectoryLabels.splice(index, 1);
+      removedLabel = true;
+    }
+
+    if (!removedLabel) {
+      return;
+    }
+
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.updateTrajectoryLabels(rect.width, rect.height);
+  }
+
   private showTrajectoryLabel(
     anchor: THREE.Vector3,
     text: string,
     kind: TrajectoryLabelKind,
     opacity = 1,
-    tint?: THREE.ColorRepresentation
+    tint?: THREE.ColorRepresentation,
+    scope: TrajectoryLabelScope = "tactical",
+    offsetMemoryKey?: string
   ): void {
-    const memoryKey = this.getTrajectoryLabelOffsetMemoryKey(text, kind);
+    const memoryKey = this.getTrajectoryLabelOffsetMemoryKey(text, kind, offsetMemoryKey);
     const rect = this.renderer.domElement.getBoundingClientRect();
     const rememberedOffset = this.trajectoryLabelOffsetMemory.get(memoryKey);
     const projected = anchor.clone().project(this.camera);
@@ -25765,7 +26500,8 @@ export class CinematicSolarSystemRenderer {
         x: placement.x - x,
         y: placement.y - y
       },
-      size
+      size,
+      scope
     });
     this.trajectoryLabelBounds.push(placement.bounds);
 
@@ -25777,8 +26513,30 @@ export class CinematicSolarSystemRenderer {
     }
   }
 
-  private getTrajectoryLabelOffsetMemoryKey(text: string, kind: TrajectoryLabelKind): string {
-    const key = `${this.trajectoryLabelRenderIndex}:${kind}:${text}`;
+  private showHoverTrajectoryLabel(
+    anchor: THREE.Vector3,
+    text: string,
+    kind: TrajectoryLabelKind,
+    opacity = 1,
+    tint?: THREE.ColorRepresentation
+  ): void {
+    if (!this.isHoverTextEnabled()) {
+      return;
+    }
+
+    this.showTrajectoryLabel(anchor, text, kind, opacity, tint);
+  }
+
+  private isHoverTextEnabled(): boolean {
+    return this.getHoverTextEnabled?.() !== false;
+  }
+
+  private getTrajectoryLabelOffsetMemoryKey(
+    text: string,
+    kind: TrajectoryLabelKind,
+    override?: string
+  ): string {
+    const key = override ?? `${this.trajectoryLabelRenderIndex}:${kind}:${text}`;
     this.trajectoryLabelRenderIndex += 1;
     return key;
   }
@@ -26488,6 +27246,7 @@ export class CinematicSolarSystemRenderer {
     }
 
     this.hoveredTargetKey = targetKey;
+    this.onHoverInterestChange?.(targetKey);
   }
 
   private getSelection(targetKey: string | null): CinematicSelection | null {
@@ -26784,7 +27543,24 @@ function createBurnTransferFieldConnector(
   opacity: number,
   fallbackEnd: THREE.Vector3 | null = null,
   options: Readonly<{ depthTest?: boolean }> = {}
-): THREE.Line {
+): THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial> {
+  const connector = new THREE.Line(
+    new THREE.BufferGeometry(),
+    createBurnTransferFieldMaterial(color, opacity, THREE.NormalBlending, 1, options)
+  );
+  syncBurnTransferFieldConnectorGeometry(connector, origin, destination, fallbackEnd, options);
+  connector.name = `burn-transfer-field-destination-connector:${destination.node.id}`;
+  connector.renderOrder = 28.45;
+  return connector;
+}
+
+function syncBurnTransferFieldConnectorGeometry(
+  connector: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>,
+  origin: DisplayNodeRenderData,
+  destination: DisplayNodeRenderData,
+  fallbackEnd: THREE.Vector3 | null,
+  options: Readonly<{ depthTest?: boolean }> = {}
+): void {
   const direction = getBurnTransferFieldConnectorDirection(origin, destination);
   const start = getBurnTransferFieldConnectorStart(origin, direction);
   const end =
@@ -26794,14 +27570,17 @@ function createBurnTransferFieldConnector(
           .addScaledVector(direction, -destination.ringRadius * 0.92)
           .addScaledVector(mapPlaneUp, 0.18)
       : fallbackEnd.clone().addScaledVector(mapPlaneUp, options.depthTest === false ? 0 : 0.18);
-  const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
-  const connector = new THREE.Line(
-    geometry,
-    createBurnTransferFieldMaterial(color, opacity, THREE.NormalBlending, 1, options)
-  );
-  connector.name = `burn-transfer-field-destination-connector:${destination.node.id}`;
-  connector.renderOrder = 28.45;
-  return connector;
+  let positions = connector.geometry.getAttribute("position");
+
+  if (!(positions instanceof THREE.BufferAttribute) || positions.count !== 2) {
+    positions = new THREE.Float32BufferAttribute(6, 3);
+    connector.geometry.setAttribute("position", positions);
+  }
+
+  positions.setXYZ(0, start.x, start.y, start.z);
+  positions.setXYZ(1, end.x, end.y, end.z);
+  positions.needsUpdate = true;
+  connector.geometry.computeBoundingSphere();
 }
 
 function getBurnTransferFieldConnectorDirection(
@@ -34265,6 +35044,16 @@ function isRenderableBurnPlanAffordable(plan: RenderableBurnPlan): boolean {
   return !("isAffordable" in plan) || plan.isAffordable !== false;
 }
 
+function isResolvedBurnTrajectoryRenderable(
+  trajectory: ResolvedBurnTrajectory | null
+): trajectory is ResolvedBurnTrajectory {
+  return (
+    trajectory !== null &&
+    trajectory.presentationPoints.length >= 2 &&
+    measurePolylineLength(trajectory.presentationPoints) > 0.001
+  );
+}
+
 function toCssColor(color: THREE.ColorRepresentation): string {
   return `#${new THREE.Color(color).getHexString()}`;
 }
@@ -34474,6 +35263,25 @@ function getBurnTrajectoryDashAnimationState(
     : null;
 }
 
+function getBurnTrajectoryCoreRadius(
+  distance: number,
+  thicknessMultiplier: number,
+  coreRadiusLimit?: number
+): number {
+  const rawCoreRadius = clamp(distance * 0.0018, 0.34, 1.2) * thicknessMultiplier;
+  return coreRadiusLimit === undefined ? rawCoreRadius : Math.min(rawCoreRadius, coreRadiusLimit);
+}
+
+function getBurnTrajectoryCoreHalfWidth(
+  distance: number,
+  thicknessMultiplier: number,
+  detailMode: BurnTrajectoryDetailMode,
+  coreRadiusLimit?: number
+): number {
+  const coreRadius = getBurnTrajectoryCoreRadius(distance, thicknessMultiplier, coreRadiusLimit);
+  return detailMode === "simple" ? coreRadius * 1.12 : coreRadius;
+}
+
 function createBurnTrajectoryDash(
   points: readonly THREE.Vector3[],
   color: THREE.ColorRepresentation,
@@ -34496,9 +35304,7 @@ function createBurnTrajectoryDash(
     showAnimatedAccent: false
   }
 ): THREE.Group {
-  const rawCoreRadius = clamp(distance * 0.0018, 0.34, 1.2) * thicknessMultiplier;
-  const coreRadius =
-    coreRadiusLimit === undefined ? rawCoreRadius : Math.min(rawCoreRadius, coreRadiusLimit);
+  const coreRadius = getBurnTrajectoryCoreRadius(distance, thicknessMultiplier, coreRadiusLimit);
   const group = reusableGroup ?? new THREE.Group();
   const terminalAnchorProgress = anchorEndDash
     ? clamp((dashLength * 0.42) / Math.max(0.001, distance), 0.0015, 0.025)
@@ -34521,7 +35327,12 @@ function createBurnTrajectoryDash(
   }
 
   const reusableCore = getBurnTrajectoryDashLayer(group, "burn-trajectory-core");
-  const coreHalfWidth = detailMode === "simple" ? coreRadius * 1.12 : coreRadius;
+  const coreHalfWidth = getBurnTrajectoryCoreHalfWidth(
+    distance,
+    thicknessMultiplier,
+    detailMode,
+    coreRadiusLimit
+  );
   const coreEdgeSoftness = detailMode === "simple" ? 0.22 : 0.18;
   const core = createBurnTrajectoryDashLayer(
     points,
@@ -34662,28 +35473,67 @@ function syncBurnTrajectoryPlaneReflection(
     return undefined;
   }
 
+  const customReflectionPoints =
+    options.points !== undefined && options.points.length >= 2 ? options.points : undefined;
+  const readability = clamp(options.readability ?? 0, 0, 1);
+  const reflectionOpacity =
+    opacity *
+    trajectoryPlaneReflectionOpacityMultiplier *
+    THREE.MathUtils.lerp(1, firePreviewReflectionOpacityBoost, readability);
+  const reflectionHalfWidth =
+    coreRadius *
+    trajectoryPlaneReflectionWidthMultiplier *
+    THREE.MathUtils.lerp(1, firePreviewReflectionWidthBoost, readability);
+  const reflectionAccentStrength = options.showAnimatedAccent
+    ? THREE.MathUtils.lerp(1, firePreviewReflectionAccentBoost, readability)
+    : 0;
+  const reflectionScreenOffsetScale =
+    (customReflectionPoints === undefined ? 1 : 0) *
+    THREE.MathUtils.lerp(1, firePreviewReflectionScreenOffsetBoost, readability);
+  const reflectionDistance =
+    customReflectionPoints === undefined ? distance : measurePolylineLength(customReflectionPoints);
   const reflection =
     reusableReflection ??
     new THREE.Mesh(
-      core.geometry,
+      customReflectionPoints === undefined
+        ? core.geometry
+        : createBurnTrajectoryRibbonGeometry(customReflectionPoints, reflectionDistance),
       createBurnTrajectoryPlaneReflectionMaterial(
         color,
-        opacity * trajectoryPlaneReflectionOpacityMultiplier,
-        distance,
+        reflectionOpacity,
+        reflectionDistance,
         dashCycle,
         dashLength,
         dashPhase,
         visibleStartProgress,
         terminalAnchorProgress,
-        coreRadius * trajectoryPlaneReflectionWidthMultiplier,
+        reflectionHalfWidth,
         options.showAnimatedAccent && options.accentSpeed > 0
           ? (options.elapsed * options.accentSpeed) % 1
           : 0,
-        options.showAnimatedAccent ? 1 : 0
+        reflectionAccentStrength,
+        reflectionScreenOffsetScale,
+        readability
       )
     );
-  reflection.geometry = core.geometry;
-  reflection.userData["usesSharedGeometry"] = true;
+  const wasUsingSharedGeometry = reflection.userData["usesSharedGeometry"] === true;
+
+  if (customReflectionPoints === undefined) {
+    if (!wasUsingSharedGeometry && reflection.geometry !== core.geometry) {
+      reflection.geometry.dispose();
+    }
+    reflection.geometry = core.geometry;
+    reflection.userData["usesSharedGeometry"] = true;
+  } else {
+    if (wasUsingSharedGeometry) {
+      reflection.geometry = createBurnTrajectoryRibbonGeometry(
+        customReflectionPoints,
+        reflectionDistance
+      );
+    }
+    syncBurnTrajectoryRibbonGeometry(reflection, customReflectionPoints, reflectionDistance);
+    reflection.userData["usesSharedGeometry"] = false;
+  }
   reflection.frustumCulled = false;
   reflection.name = "burn-trajectory-plane-reflection";
   reflection.renderOrder = 37.65;
@@ -34696,23 +35546,31 @@ function syncBurnTrajectoryPlaneReflection(
     trajectoryPlaneReflectionMinimumDepth,
     trajectoryPlaneReflectionMaximumDepth
   );
-  reflection.position.set(0, -reflectionDepth, 0);
-  reflection.scale.set(1, -trajectoryPlaneReflectionVerticalScale, 1);
+
+  if (customReflectionPoints === undefined) {
+    reflection.position.set(0, -reflectionDepth, 0);
+    reflection.scale.set(1, -trajectoryPlaneReflectionVerticalScale, 1);
+  } else {
+    reflection.position.set(0, 0, 0);
+    reflection.scale.set(1, 1, 1);
+  }
   syncBurnTrajectoryPlaneReflectionMaterial(
     reflection.material,
     color,
-    opacity * trajectoryPlaneReflectionOpacityMultiplier,
-    distance,
+    reflectionOpacity,
+    reflectionDistance,
     dashCycle,
     dashLength,
     dashPhase,
     visibleStartProgress,
     terminalAnchorProgress,
-    coreRadius * trajectoryPlaneReflectionWidthMultiplier,
+    reflectionHalfWidth,
     options.showAnimatedAccent && options.accentSpeed > 0
       ? (options.elapsed * options.accentSpeed) % 1
       : 0,
-    options.showAnimatedAccent ? 1 : 0
+    reflectionAccentStrength,
+    reflectionScreenOffsetScale,
+    readability
   );
   return reflection;
 }
@@ -35186,7 +36044,9 @@ function syncBurnTrajectoryPlaneReflectionMaterial(
   terminalAnchorProgress: number,
   halfWidth: number,
   accentPhase: number,
-  accentStrength: number
+  accentStrength: number,
+  screenOffsetScale: number,
+  readability: number
 ): void {
   const reflectionColor: unknown = material.uniforms["reflectionColor"]?.value;
 
@@ -35209,6 +36069,8 @@ function syncBurnTrajectoryPlaneReflectionMaterial(
   setShaderUniformNumber(material, "ribbonHalfWidth", Math.max(0.001, halfWidth));
   setShaderUniformNumber(material, "trajectoryAccentPhase", accentPhase);
   setShaderUniformNumber(material, "trajectoryAccentStrength", accentStrength);
+  setShaderUniformNumber(material, "reflectionScreenOffsetScale", screenOffsetScale);
+  setShaderUniformNumber(material, "reflectionReadability", readability);
 }
 
 function createBurnTrajectoryPlaneReflectionMaterial(
@@ -35222,7 +36084,9 @@ function createBurnTrajectoryPlaneReflectionMaterial(
   terminalAnchorProgress: number,
   halfWidth: number,
   accentPhase: number,
-  accentStrength: number
+  accentStrength: number,
+  screenOffsetScale: number,
+  readability: number
 ): THREE.ShaderMaterial {
   const material = new THREE.ShaderMaterial({
     uniforms: {
@@ -35238,7 +36102,9 @@ function createBurnTrajectoryPlaneReflectionMaterial(
       dashPhase: { value: dashPhase },
       dashVisibleStart: { value: clamp(visibleStartProgress, 0, 1) },
       dashTerminalAnchorProgress: { value: clamp(terminalAnchorProgress, 0, 0.1) },
-      ribbonHalfWidth: { value: Math.max(0.001, halfWidth) }
+      ribbonHalfWidth: { value: Math.max(0.001, halfWidth) },
+      reflectionScreenOffsetScale: { value: screenOffsetScale },
+      reflectionReadability: { value: readability }
     },
     transparent: true,
     side: THREE.DoubleSide,
@@ -35249,6 +36115,7 @@ function createBurnTrajectoryPlaneReflectionMaterial(
       attribute vec3 ribbonTangent;
       attribute float ribbonSideSign;
       uniform float ribbonHalfWidth;
+      uniform float reflectionScreenOffsetScale;
       varying vec2 vReflectionUv;
       varying float vReflectionGrazing;
 
@@ -35283,7 +36150,7 @@ function createBurnTrajectoryPlaneReflectionMaterial(
         clipPosition.xy += vec2(
           ${trajectoryPlaneReflectionScreenOffsetX.toFixed(4)},
           ${trajectoryPlaneReflectionScreenOffsetY.toFixed(4)}
-        ) * clipPosition.w;
+        ) * clipPosition.w * reflectionScreenOffsetScale;
         gl_Position = clipPosition;
       }
     `,
@@ -35292,6 +36159,7 @@ function createBurnTrajectoryPlaneReflectionMaterial(
       uniform float reflectionOpacity;
       uniform float trajectoryAccentPhase;
       uniform float trajectoryAccentStrength;
+      uniform float reflectionReadability;
       uniform float dashDistance;
       uniform float dashCycle;
       uniform float dashLength;
@@ -35309,6 +36177,7 @@ function createBurnTrajectoryPlaneReflectionMaterial(
         float trail = 1.0 - smoothstep(dashLength - edgeWidth, dashLength, dashPosition);
         float lateral = abs(vReflectionUv.y - 0.5) * 2.0;
         float softRibbon = 1.0 - smoothstep(0.08, 1.0, lateral);
+        float centerCore = 1.0 - smoothstep(0.02, 0.34, lateral);
         float visibleMask = dashVisibleStart <= 0.0001
           ? 1.0
           : smoothstep(dashVisibleStart, dashVisibleStart + 0.004, vReflectionUv.x);
@@ -35341,7 +36210,17 @@ function createBurnTrajectoryPlaneReflectionMaterial(
           * visibleMask
           * grazingBoost
           * trajectoryAccentStrength;
-        float reflectionMask = reflectedDash * mix(0.52, 0.82, vReflectionGrazing);
+        // FIRE previews keep a faint continuous silhouette below the reflected dashes. The
+        // narrow core preserves their direction at distant zooms without turning other
+        // trajectory reflections into solid paths.
+        float continuousSilhouette =
+          (softRibbon * 0.26 + centerCore * 0.74)
+          * visibleMask
+          * reflectionReadability;
+        float reflectionMask =
+          max(reflectedDash, continuousSilhouette * 0.2)
+          * mix(0.52, 0.82, vReflectionGrazing);
+        reflectionMask += reflectedDash * centerCore * reflectionReadability * 0.24;
         float alpha = reflectionOpacity * (reflectionMask + glintMask * 1.85);
 
         if (alpha <= 0.004) {
@@ -36394,106 +37273,88 @@ function syncFutureBodyGhost(
   ghost.material.userData["extremeZoomBaseOpacity"] = 0.24;
 }
 
-function getTransferDeltaHintLabelAnchor(
-  baseDestination: DisplayNodeRenderData,
-  hintedDestination: DisplayNodeRenderData
-): THREE.Vector3 {
-  const direction = hintedDestination.center.clone().sub(baseDestination.center);
-  direction.y = 0;
-
-  if (direction.lengthSq() <= 0.001) {
-    direction.copy(hintedDestination.center).setY(0);
-  }
-
-  if (direction.lengthSq() <= 0.001) {
-    direction.set(1, 0, 0);
-  }
-
-  return hintedDestination.center
-    .clone()
-    .addScaledVector(direction.normalize(), hintedDestination.ringRadius * 1.28)
-    .addScaledVector(mapPlaneUp, 1.5);
-}
-
-function createFutureNodeGhost(
-  destination: DisplayNodeRenderData,
-  color: THREE.ColorRepresentation,
-  opacity: number
-): THREE.LineLoop<THREE.BufferGeometry, THREE.LineBasicMaterial> {
-  const marker = createSharedCircleLine(
-    destination.ringRadius,
-    new THREE.LineBasicMaterial({
-      color,
-      transparent: true,
-      opacity,
-      depthTest: false,
-      depthWrite: false,
-      linewidth: 1
-    })
-  );
-  marker.name = `future-node:${destination.node.id}`;
-  marker.position.copy(destination.center);
-  marker.position.y += 0.16;
-  marker.renderOrder = 39.5;
-  marker.userData["extremeZoomUiFade"] = true;
-  return marker;
-}
-
-function syncFutureNodeGhost(
-  marker: THREE.LineLoop<THREE.BufferGeometry, THREE.LineBasicMaterial>,
-  destination: DisplayNodeRenderData,
-  color: THREE.ColorRepresentation,
-  opacity: number,
-  scale: number
-): void {
-  marker.name = `future-node:${destination.node.id}`;
-  marker.position.copy(destination.center).addScaledVector(mapPlaneUp, 0.16);
-  marker.scale.setScalar(destination.ringRadius * scale);
-  marker.material.color.set(color);
-  marker.material.opacity = opacity;
-  marker.material.userData["extremeZoomBaseOpacity"] = opacity;
-}
-
 function createFutureFireImpactMarker(
   destination: DisplayNodeRenderData,
   fireColor: THREE.ColorRepresentation,
   targetColor: THREE.ColorRepresentation,
   opacity: number,
+  armOpacity: number,
   scale: number,
   minimumTickOuterRadiusWorld: number,
-  tickThicknessWorld: number
+  armHalfWidthWorld: number,
+  armOuterRadiusWorld: number,
+  sourceTrajectoryKey?: string
 ): THREE.Group {
   const marker = new THREE.Group();
   marker.userData["futureFireImpactMarker"] = true;
   marker.renderOrder = 39.5;
   marker.userData["extremeZoomUiFade"] = true;
 
-  const ticks = new THREE.Mesh(
-    createFutureFireImpactTicksGeometry(),
+  const armGeometry = createFutureFireImpactTicksGeometry();
+  const tickOpacity = clamp(armOpacity, 0, 1);
+  const ticks = createFutureFireImpactArmLayer(
+    armGeometry,
+    "future-fire-impact-diagonal-ticks",
+    fireColor,
+    tickOpacity,
+    armHalfWidthWorld,
+    0.18,
+    0
+  );
+  ticks.renderOrder = 39.5;
+  const tickGlow = createFutureFireImpactArmLayer(
+    armGeometry,
+    "future-fire-impact-diagonal-ticks-glow",
+    fireColor,
+    tickOpacity * 0.24,
+    armHalfWidthWorld * 2.45,
+    0.72,
+    0
+  );
+  tickGlow.userData["usesSharedGeometry"] = true;
+  tickGlow.renderOrder = 39.3;
+  const tickEdge = createFutureFireImpactArmLayer(
+    armGeometry,
+    "future-fire-impact-diagonal-ticks-edge",
+    fireColor,
+    tickOpacity * 0.36,
+    armHalfWidthWorld * 1.25,
+    0.48,
+    0.78
+  );
+  tickEdge.userData["usesSharedGeometry"] = true;
+  tickEdge.renderOrder = 39.4;
+  setExclusiveObjectRenderLayer(tickGlow, cinematicUiBloomRenderLayer);
+  setExclusiveObjectRenderLayer(tickEdge, cinematicUiBloomRenderLayer);
+  setExclusiveObjectRenderLayer(ticks, cinematicUiBloomRenderLayer);
+
+  const targetPointRim = new THREE.Mesh(
+    new THREE.CircleGeometry(futureFireImpactTargetPointGeometryRadius, 16),
     new THREE.MeshBasicMaterial({
       color: fireColor,
       transparent: true,
-      opacity: clamp(opacity * 1.22, 0, 1),
+      opacity: clamp(opacity * 0.72, 0, 1),
       depthTest: false,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide
     })
   );
-  ticks.material.toneMapped = false;
-  ticks.name = "future-fire-impact-diagonal-ticks";
-  ticks.renderOrder = 39.5;
-  ticks.frustumCulled = false;
+  targetPointRim.material.toneMapped = false;
+  targetPointRim.name = "future-fire-impact-target-point-fire-rim";
+  targetPointRim.rotation.x = -Math.PI / 2;
+  targetPointRim.renderOrder = 39.55;
+  setExclusiveObjectRenderLayer(targetPointRim, cinematicUiBloomRenderLayer);
 
   const targetPoint = new THREE.Mesh(
-    new THREE.CircleGeometry(0.11, 16),
+    new THREE.CircleGeometry(futureFireImpactTargetPointGeometryRadius, 16),
     new THREE.MeshBasicMaterial({
       color: targetColor,
       transparent: true,
       opacity: clamp(opacity * 1.4, 0, 1),
       depthTest: false,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NormalBlending,
       side: THREE.DoubleSide
     })
   );
@@ -36501,18 +37362,52 @@ function createFutureFireImpactMarker(
   targetPoint.name = "future-fire-impact-target-point";
   targetPoint.rotation.x = -Math.PI / 2;
   targetPoint.renderOrder = 39.6;
-  marker.add(ticks, targetPoint);
+  marker.add(tickGlow, tickEdge, ticks, targetPointRim, targetPoint);
   syncFutureFireImpactMarker(
     marker,
     destination,
     fireColor,
     targetColor,
     opacity,
+    armOpacity,
     scale,
     minimumTickOuterRadiusWorld,
-    tickThicknessWorld
+    armHalfWidthWorld,
+    armOuterRadiusWorld,
+    sourceTrajectoryKey
   );
   return marker;
+}
+
+function createFutureFireImpactArmLayer(
+  geometry: THREE.BufferGeometry,
+  name: string,
+  color: THREE.ColorRepresentation,
+  opacity: number,
+  halfWidth: number,
+  edgeSoftness: number,
+  verticalBias: number
+): THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> {
+  const layer = new THREE.Mesh(
+    geometry,
+    createBurnTrajectoryDashMaterial(
+      color,
+      opacity,
+      futureFireImpactArmDashCycle,
+      futureFireImpactArmDashCycle,
+      futureFireImpactArmDashCycle,
+      0,
+      edgeSoftness,
+      0,
+      0,
+      halfWidth,
+      verticalBias
+    )
+  );
+  layer.name = name;
+  layer.frustumCulled = false;
+  layer.material.toneMapped = false;
+  return layer;
 }
 
 function syncFutureFireImpactMarker(
@@ -36521,32 +37416,123 @@ function syncFutureFireImpactMarker(
   fireColor: THREE.ColorRepresentation,
   targetColor: THREE.ColorRepresentation,
   opacity: number,
+  armOpacity: number,
   scale: number,
   minimumTickOuterRadiusWorld: number,
-  tickThicknessWorld: number
+  armHalfWidthWorld: number,
+  armOuterRadiusWorld: number,
+  sourceTrajectoryKey?: string
 ): void {
   marker.name = `future-fire-impact:${destination.node.id}`;
   marker.position.copy(destination.center);
-  const markerScale = Math.max(0.72, destination.ringRadius * 0.84) * scale;
+  const markerScale =
+    Math.max(futureFireImpactTargetPointMinimumScale, destination.ringRadius * 0.84) * scale;
+  const proportions = getFutureFireImpactMarkerProportions(
+    armOuterRadiusWorld,
+    minimumTickOuterRadiusWorld,
+    armHalfWidthWorld
+  );
+  const armMarkerScale =
+    proportions.outerRadiusWorld / Math.max(0.001, futureFireImpactTickOuterRadius);
   marker.scale.setScalar(markerScale);
+  const isAnimated = sourceTrajectoryKey !== undefined;
+  marker.userData["futureFireImpactAnimated"] = isAnimated;
+
+  if (sourceTrajectoryKey === undefined) {
+    delete marker.userData["futureFireImpactSourceTrajectoryKey"];
+  } else {
+    marker.userData["futureFireImpactSourceTrajectoryKey"] = sourceTrajectoryKey;
+  }
 
   const ticks = marker.getObjectByName("future-fire-impact-diagonal-ticks");
 
-  if (ticks instanceof THREE.Mesh && ticks.material instanceof THREE.MeshBasicMaterial) {
-    const tickLengthScale = Math.max(
-      1,
-      minimumTickOuterRadiusWorld / Math.max(0.001, markerScale * futureFireImpactTickOuterRadius)
-    );
-    const tickHalfWidth = tickThicknessWorld / Math.max(0.001, markerScale * 2);
-    const tickOpacity = clamp(opacity * 1.22, 0, 1);
+  if (ticks instanceof THREE.Mesh && ticks.material instanceof THREE.ShaderMaterial) {
     syncFutureFireImpactTicksGeometry(
       ticks.geometry as THREE.BufferGeometry,
-      tickLengthScale,
-      tickHalfWidth
+      proportions.innerRadiusWorld / Math.max(0.001, armMarkerScale),
+      futureFireImpactTickOuterRadius
     );
-    ticks.material.color.set(fireColor);
-    ticks.material.opacity = tickOpacity;
-    ticks.material.userData["extremeZoomBaseOpacity"] = tickOpacity;
+  }
+
+  for (const layerName of [
+    "future-fire-impact-diagonal-ticks",
+    "future-fire-impact-diagonal-ticks-glow",
+    "future-fire-impact-diagonal-ticks-edge"
+  ]) {
+    const layer = marker.getObjectByName(layerName);
+
+    if (layer !== undefined) {
+      layer.scale.setScalar(armMarkerScale / Math.max(0.001, markerScale));
+    }
+  }
+
+  const currentDashPhase =
+    ticks instanceof THREE.Mesh &&
+    ticks.material instanceof THREE.ShaderMaterial &&
+    typeof ticks.material.uniforms["dashPhase"]?.value === "number"
+      ? ticks.material.uniforms["dashPhase"].value
+      : 0;
+  const currentAccentPhase =
+    ticks instanceof THREE.Mesh &&
+    ticks.material instanceof THREE.ShaderMaterial &&
+    typeof ticks.material.uniforms["trajectoryAccentPhase"]?.value === "number"
+      ? ticks.material.uniforms["trajectoryAccentPhase"].value
+      : 0;
+  const tickOpacity = clamp(armOpacity, 0, 1);
+  syncFutureFireImpactArmLayer(
+    marker,
+    "future-fire-impact-diagonal-ticks",
+    fireColor,
+    tickOpacity,
+    armHalfWidthWorld,
+    0.18,
+    0,
+    isAnimated,
+    currentDashPhase,
+    currentAccentPhase,
+    1.2
+  );
+  syncFutureFireImpactArmLayer(
+    marker,
+    "future-fire-impact-diagonal-ticks-glow",
+    fireColor,
+    tickOpacity * 0.24,
+    armHalfWidthWorld * 2.45,
+    0.72,
+    0,
+    isAnimated,
+    currentDashPhase,
+    currentAccentPhase,
+    0.36
+  );
+  syncFutureFireImpactArmLayer(
+    marker,
+    "future-fire-impact-diagonal-ticks-edge",
+    fireColor,
+    tickOpacity * 0.36,
+    armHalfWidthWorld * 1.25,
+    0.48,
+    0.78,
+    isAnimated,
+    currentDashPhase,
+    currentAccentPhase,
+    0.58
+  );
+
+  const targetPointScale =
+    proportions.targetPointRadiusWorld /
+    Math.max(0.001, markerScale * futureFireImpactTargetPointGeometryRadius);
+  const targetPointRim = marker.getObjectByName("future-fire-impact-target-point-fire-rim");
+
+  if (
+    targetPointRim instanceof THREE.Mesh &&
+    targetPointRim.material instanceof THREE.MeshBasicMaterial
+  ) {
+    const rimOpacity = clamp(opacity * 0.72, 0, 1);
+    targetPointRim.scale.setScalar(targetPointScale);
+    targetPointRim.material.color.set(fireColor);
+    targetPointRim.material.opacity = rimOpacity;
+    targetPointRim.material.userData["extremeZoomBaseOpacity"] = rimOpacity;
   }
 
   const targetPoint = marker.getObjectByName("future-fire-impact-target-point");
@@ -36555,67 +37541,179 @@ function syncFutureFireImpactMarker(
     targetPoint instanceof THREE.Mesh &&
     targetPoint.material instanceof THREE.MeshBasicMaterial
   ) {
-    const targetOpacity = clamp(opacity * 1.4, 0, 1);
+    const targetOpacity = clamp(opacity * 1.65, 0, 1);
+    targetPoint.scale.setScalar(targetPointScale * futureFireImpactTargetPointCoreRadiusRatio);
     targetPoint.material.color.set(targetColor);
     targetPoint.material.opacity = targetOpacity;
     targetPoint.material.userData["extremeZoomBaseOpacity"] = targetOpacity;
   }
 }
 
+function getFutureFireImpactMarkerProportions(
+  armOuterRadiusWorld: number,
+  minimumTickOuterRadiusWorld: number,
+  armHalfWidthWorld: number
+): Readonly<{
+  outerRadiusWorld: number;
+  innerRadiusWorld: number;
+  targetPointRadiusWorld: number;
+}> {
+  // The outer diameter still follows the smallest displayed node orbit. Everything inside it is
+  // derived from that diameter and the FIRE ribbon stroke, so node size cannot distort the mark.
+  const outerRadiusWorld = Math.max(armOuterRadiusWorld, minimumTickOuterRadiusWorld);
+  const armStrokeWorld = Math.max(0.001, armHalfWidthWorld * 2);
+  const targetPointRadiusWorld = clamp(
+    armStrokeWorld * futureFireImpactTargetPointStrokeRadiusMultiplier,
+    outerRadiusWorld * futureFireImpactTargetPointMinimumOuterRadiusRatio,
+    outerRadiusWorld * futureFireImpactTargetPointMaximumOuterRadiusRatio
+  );
+  const targetPointGapWorld = clamp(
+    armStrokeWorld * futureFireImpactArmGapStrokeMultiplier,
+    outerRadiusWorld * futureFireImpactArmGapMinimumOuterRadiusRatio,
+    outerRadiusWorld * futureFireImpactArmGapMaximumOuterRadiusRatio
+  );
+  const minimumInnerRadiusWorld =
+    outerRadiusWorld * (1 - futureFireImpactArmMaximumLengthOuterRadiusRatio);
+  const maximumInnerRadiusWorld =
+    outerRadiusWorld * (1 - futureFireImpactArmMinimumLengthOuterRadiusRatio);
+
+  return {
+    outerRadiusWorld,
+    innerRadiusWorld: clamp(
+      targetPointRadiusWorld + targetPointGapWorld,
+      minimumInnerRadiusWorld,
+      maximumInnerRadiusWorld
+    ),
+    targetPointRadiusWorld
+  };
+}
+
+function syncFutureFireImpactArmLayer(
+  marker: THREE.Group,
+  name: string,
+  color: THREE.ColorRepresentation,
+  opacity: number,
+  halfWidth: number,
+  edgeSoftness: number,
+  verticalBias: number,
+  isAnimated: boolean,
+  dashPhase: number,
+  accentPhase: number,
+  accentStrength: number
+): void {
+  const layer = marker.getObjectByName(name);
+
+  if (!(layer instanceof THREE.Mesh) || !(layer.material instanceof THREE.ShaderMaterial)) {
+    return;
+  }
+
+  syncBurnTrajectoryDashMaterial(
+    layer.material,
+    color,
+    opacity,
+    futureFireImpactArmDashCycle,
+    futureFireImpactArmDashCycle,
+    isAnimated ? futureFireImpactArmDashLength : futureFireImpactArmDashCycle,
+    isAnimated ? dashPhase : 0,
+    edgeSoftness,
+    0,
+    0,
+    halfWidth,
+    verticalBias
+  );
+  setShaderUniformNumber(layer.material, "trajectoryAccentPhase", isAnimated ? accentPhase : 0);
+  setShaderUniformNumber(
+    layer.material,
+    "trajectoryAccentStrength",
+    isAnimated ? accentStrength : 0
+  );
+}
+
+function syncFutureFireImpactMarkerAnimation(
+  marker: THREE.Group,
+  normalizedDashPhase: number,
+  accentPhase: number
+): void {
+  setObjectShaderUniformNumber(marker, "dashPhase", ((normalizedDashPhase % 1) + 1) % 1);
+  setObjectShaderUniformNumber(marker, "trajectoryAccentPhase", ((accentPhase % 1) + 1) % 1);
+}
+
 function createFutureFireImpactTicksGeometry(): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute(
     "position",
-    new THREE.Float32BufferAttribute(new Float32Array(4 * 6 * 3), 3)
+    new THREE.Float32BufferAttribute(new Float32Array(4 * 4 * 3), 3)
   );
-  syncFutureFireImpactTicksGeometry(geometry, 1, 0.085);
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(new Float32Array(4 * 4 * 2), 2));
+  geometry.setAttribute(
+    "ribbonTangent",
+    new THREE.Float32BufferAttribute(new Float32Array(4 * 4 * 3), 3)
+  );
+  geometry.setAttribute(
+    "ribbonSideSign",
+    new THREE.Float32BufferAttribute(new Float32Array(4 * 4), 1)
+  );
+  geometry.setIndex(new THREE.BufferAttribute(new Uint16Array(4 * 6), 1));
+  syncFutureFireImpactTicksGeometry(
+    geometry,
+    futureFireImpactTickInitialInnerRadius,
+    futureFireImpactTickOuterRadius
+  );
   return geometry;
 }
 
 function syncFutureFireImpactTicksGeometry(
   geometry: THREE.BufferGeometry,
-  lengthScale: number,
-  dashHalfWidth: number
+  innerRadius: number,
+  outerRadius: number
 ): void {
   const positions = geometry.getAttribute("position");
+  const uvs = geometry.getAttribute("uv");
+  const tangents = geometry.getAttribute("ribbonTangent");
+  const sideSigns = geometry.getAttribute("ribbonSideSign");
+  const indices = geometry.getIndex();
 
-  if (!(positions instanceof THREE.BufferAttribute)) {
+  if (
+    !(positions instanceof THREE.BufferAttribute) ||
+    !(uvs instanceof THREE.BufferAttribute) ||
+    !(tangents instanceof THREE.BufferAttribute) ||
+    !(sideSigns instanceof THREE.BufferAttribute) ||
+    indices === null
+  ) {
     return;
   }
-
-  const dashCenterRadius = futureFireImpactTickCenterRadius * lengthScale;
-  const dashHalfLength = futureFireImpactTickHalfLength * lengthScale;
-  let positionIndex = 0;
 
   for (let index = 0; index < 4; index += 1) {
     const angle = Math.PI / 4 + index * (Math.PI / 2);
     const direction = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
-    const perpendicular = new THREE.Vector3(-direction.z, 0, direction.x);
-    const center = direction.clone().multiplyScalar(dashCenterRadius);
-    const innerLeft = center
-      .clone()
-      .addScaledVector(direction, -dashHalfLength)
-      .addScaledVector(perpendicular, -dashHalfWidth);
-    const innerRight = center
-      .clone()
-      .addScaledVector(direction, -dashHalfLength)
-      .addScaledVector(perpendicular, dashHalfWidth);
-    const outerRight = center
-      .clone()
-      .addScaledVector(direction, dashHalfLength)
-      .addScaledVector(perpendicular, dashHalfWidth);
-    const outerLeft = center
-      .clone()
-      .addScaledVector(direction, dashHalfLength)
-      .addScaledVector(perpendicular, -dashHalfWidth);
+    const inner = direction.clone().multiplyScalar(innerRadius);
+    const outer = direction.clone().multiplyScalar(outerRadius);
+    const vertexOffset = index * 4;
 
-    for (const point of [innerLeft, innerRight, outerRight, innerLeft, outerRight, outerLeft]) {
-      positions.setXYZ(positionIndex, point.x, point.y, point.z);
-      positionIndex += 1;
+    for (let vertex = 0; vertex < 4; vertex += 1) {
+      const isOuter = vertex >= 2;
+      const point = isOuter ? outer : inner;
+      positions.setXYZ(vertexOffset + vertex, point.x, point.y, point.z);
+      tangents.setXYZ(vertexOffset + vertex, direction.x, direction.y, direction.z);
+      sideSigns.setX(vertexOffset + vertex, vertex % 2 === 0 ? -1 : 1);
+      uvs.setXY(vertexOffset + vertex, isOuter ? 1 : 0, vertex % 2);
     }
+
+    const indexOffset = index * 6;
+    indices.setX(indexOffset, vertexOffset);
+    indices.setX(indexOffset + 1, vertexOffset + 1);
+    indices.setX(indexOffset + 2, vertexOffset + 2);
+    indices.setX(indexOffset + 3, vertexOffset + 2);
+    indices.setX(indexOffset + 4, vertexOffset + 1);
+    indices.setX(indexOffset + 5, vertexOffset + 3);
   }
 
   positions.needsUpdate = true;
+  uvs.needsUpdate = true;
+  tangents.needsUpdate = true;
+  sideSigns.needsUpdate = true;
+  indices.needsUpdate = true;
+  geometry.computeBoundingSphere();
 }
 
 function createNodeHoverRingPoints(destination: DisplayNodeRenderData): THREE.Vector3[] {
@@ -36639,10 +37737,93 @@ function createNodeHoverRingPoints(destination: DisplayNodeRenderData): THREE.Ve
   return points;
 }
 
+function getBurnPreviewDestinationLoopDirection(
+  insertionPoints: readonly THREE.Vector3[] | undefined,
+  destinationCenter: THREE.Vector3,
+  fallbackDirection: -1 | 1
+): -1 | 1 {
+  const first = insertionPoints?.[0];
+  const second = insertionPoints?.[1];
+
+  if (first === undefined || second === undefined) {
+    return fallbackDirection;
+  }
+
+  const firstAngle = Math.atan2(first.z - destinationCenter.z, first.x - destinationCenter.x);
+  const secondAngle = Math.atan2(second.z - destinationCenter.z, second.x - destinationCenter.x);
+  const signedDelta = positiveModulo(secondAngle - firstAngle + Math.PI, Math.PI * 2) - Math.PI;
+  return signedDelta < 0 ? -1 : 1;
+}
+
+export function closeBurnPreviewDestinationLoop(
+  points: readonly THREE.Vector3[],
+  destinationCenter: THREE.Vector3,
+  loopStartPoint: THREE.Vector3,
+  direction: -1 | 1,
+  forceFullRevolution = false
+): THREE.Vector3[] {
+  const closedPoints = points.map((point) => point.clone());
+  const loopEndPoint = closedPoints[closedPoints.length - 1];
+
+  if (loopEndPoint === undefined) {
+    return closedPoints;
+  }
+
+  if (!forceFullRevolution && loopEndPoint.distanceToSquared(loopStartPoint) <= 0.0001) {
+    closedPoints[closedPoints.length - 1] = loopStartPoint.clone();
+    return closedPoints;
+  }
+
+  const startOffset = loopStartPoint.clone().sub(destinationCenter);
+  const endOffset = loopEndPoint.clone().sub(destinationCenter);
+  const startRadius = Math.hypot(startOffset.x, startOffset.z);
+  const endRadius = Math.hypot(endOffset.x, endOffset.z);
+
+  if (startRadius <= 0.001 || endRadius <= 0.001) {
+    closedPoints.push(loopStartPoint.clone());
+    return closedPoints;
+  }
+
+  const startAngle = Math.atan2(startOffset.z, startOffset.x);
+  const endAngle = Math.atan2(endOffset.z, endOffset.x);
+  let signedArc =
+    direction < 0
+      ? -positiveModulo(endAngle - startAngle, Math.PI * 2)
+      : positiveModulo(startAngle - endAngle, Math.PI * 2);
+
+  if (forceFullRevolution && Math.abs(signedArc) <= 0.0001) {
+    signedArc = direction * Math.PI * 2;
+  }
+
+  const sampleCount = Math.max(3, Math.ceil(Math.abs(signedArc) / (Math.PI / 18)));
+
+  for (let index = 1; index <= sampleCount; index += 1) {
+    const progress = index / sampleCount;
+    const easedProgress = smootherStep(0, 1, progress);
+    const angle = endAngle + signedArc * progress;
+    const radius = THREE.MathUtils.lerp(endRadius, startRadius, easedProgress);
+    const heightOffset = THREE.MathUtils.lerp(endOffset.y, startOffset.y, easedProgress);
+    closedPoints.push(
+      destinationCenter
+        .clone()
+        .add(new THREE.Vector3(Math.cos(angle) * radius, heightOffset, Math.sin(angle) * radius))
+    );
+  }
+
+  closedPoints[closedPoints.length - 1] = loopStartPoint.clone();
+  return closedPoints;
+}
+
 type OrbitTimingSegmentEndpoints = Readonly<{
   start: DisplayNodeRenderData;
   end: DisplayNodeRenderData;
   endClearanceWorld?: number;
+  interruptions?: readonly OrbitTimingPathInterruption[];
+}>;
+
+type OrbitTimingPathInterruption = Readonly<{
+  points: readonly THREE.Vector3[];
+  clearanceWorld: number;
 }>;
 
 type OrbitTimingStyle = "tactical" | "astronomical";
@@ -36653,45 +37834,67 @@ function createOrbitTimingSegment(
   opacity: number,
   radius = 0.34,
   endpoints?: OrbitTimingSegmentEndpoints,
-  style: OrbitTimingStyle = "tactical"
-): THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial> {
-  const line = new THREE.Line(
+  style: OrbitTimingStyle = "tactical",
+  dotSpacingWorld = 1,
+  interruptions: readonly OrbitTimingPathInterruption[] = endpoints?.interruptions ?? []
+): THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> {
+  const track = new THREE.Points(
     new THREE.BufferGeometry(),
-    new THREE.LineBasicMaterial({
+    new THREE.PointsMaterial({
       transparent: true,
       depthTest: true,
       depthWrite: false,
-      blending: THREE.AdditiveBlending
+      blending: THREE.AdditiveBlending,
+      map: getOrbitTimingDottedTrackTexture(),
+      alphaTest: 0.08,
+      sizeAttenuation: false
     })
   );
-  syncOrbitTimingSegment(line, points, color, opacity, radius, endpoints, style);
-  line.frustumCulled = false;
-  line.userData["extremeZoomUiFade"] = true;
-  return line;
+  track.material.toneMapped = false;
+  syncOrbitTimingSegment(
+    track,
+    points,
+    color,
+    opacity,
+    radius,
+    endpoints,
+    style,
+    dotSpacingWorld,
+    interruptions
+  );
+  track.frustumCulled = false;
+  track.userData["extremeZoomUiFade"] = true;
+  return track;
 }
 
 function syncOrbitTimingSegment(
-  line: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>,
+  track: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>,
   points: readonly THREE.Vector3[],
   color: THREE.ColorRepresentation,
   opacity: number,
   radius = 0.34,
   endpoints?: OrbitTimingSegmentEndpoints,
-  style: OrbitTimingStyle = "tactical"
+  style: OrbitTimingStyle = "tactical",
+  dotSpacingWorld = 1,
+  interruptions: readonly OrbitTimingPathInterruption[] = endpoints?.interruptions ?? []
 ): void {
   const clippedPoints =
     endpoints === undefined
       ? points.map((point) => point.clone())
       : clipOrbitTimingSegment(points, endpoints);
-  let positions = line.geometry.getAttribute("position");
+  const dottedPoints = filterOrbitTimingDottedTrackPointsAroundPaths(
+    createOrbitTimingDottedTrackPoints(clippedPoints, dotSpacingWorld),
+    interruptions
+  );
+  let positions = track.geometry.getAttribute("position");
 
-  if (!(positions instanceof THREE.BufferAttribute) || positions.count !== clippedPoints.length) {
-    positions = new THREE.Float32BufferAttribute(clippedPoints.length * 3, 3);
-    line.geometry.setAttribute("position", positions);
+  if (!(positions instanceof THREE.BufferAttribute) || positions.count !== dottedPoints.length) {
+    positions = new THREE.Float32BufferAttribute(dottedPoints.length * 3, 3);
+    track.geometry.setAttribute("position", positions);
   }
 
-  for (let index = 0; index < clippedPoints.length; index += 1) {
-    const point = clippedPoints[index];
+  for (let index = 0; index < dottedPoints.length; index += 1) {
+    const point = dottedPoints[index];
 
     if (point !== undefined) {
       positions.setXYZ(
@@ -36704,16 +37907,82 @@ function syncOrbitTimingSegment(
   }
 
   positions.needsUpdate = true;
-  line.material.color.copy(getOrbitTimingPresentationColor(color, style));
-  line.material.opacity = opacity;
-  line.material.blending = style === "astronomical" ? THREE.NormalBlending : THREE.AdditiveBlending;
-  line.material.userData["extremeZoomBaseOpacity"] = opacity;
-  line.material.linewidth =
-    style === "astronomical" ? 1 : Math.max(1, Math.min(1.35, radius * 2.4));
-  line.name =
-    style === "astronomical" ? "astronomical-orbit-ephemeris-arc" : "future-orbit-timing-filament";
-  line.renderOrder = style === "astronomical" ? 28.8 : 37;
-  line.userData["orbitTimingStyle"] = style;
+  track.geometry.computeBoundingSphere();
+  track.material.color.copy(getOrbitTimingPresentationColor(color, style));
+  track.material.opacity = opacity;
+  track.material.blending =
+    style === "astronomical" ? THREE.NormalBlending : THREE.AdditiveBlending;
+  track.material.size =
+    style === "astronomical"
+      ? clamp(1.9 + radius * 0.45, 2, 2.45)
+      : clamp(2.25 + radius * 0.8, 2.4, 3.2);
+  track.material.userData["extremeZoomBaseOpacity"] = opacity;
+  track.name =
+    style === "astronomical"
+      ? "astronomical-orbit-ephemeris-dotted-track"
+      : "future-orbit-timing-dotted-track";
+  track.renderOrder = style === "astronomical" ? 28.8 : 37;
+  track.userData["orbitTimingStyle"] = style;
+}
+
+export function createOrbitTimingDottedTrackPoints(
+  points: readonly THREE.Vector3[],
+  spacingWorld: number
+): THREE.Vector3[] {
+  if (points.length < 2) {
+    return points.map((point) => point.clone());
+  }
+
+  const distance = measurePolylineLength(points);
+
+  if (distance <= 0.0001) {
+    return [points[0]?.clone() ?? new THREE.Vector3()];
+  }
+
+  const safeSpacing = Math.max(0.001, spacingWorld);
+  const dotCount = Math.round(clamp(Math.ceil(distance / safeSpacing) + 1, 2, 256));
+  const dottedPoints: THREE.Vector3[] = [];
+
+  for (let index = 0; index < dotCount; index += 1) {
+    dottedPoints.push(samplePolylineAtProgress(points, index / (dotCount - 1)).position);
+  }
+
+  return dottedPoints;
+}
+
+let orbitTimingDottedTrackTexture: THREE.CanvasTexture | null = null;
+
+function getOrbitTimingDottedTrackTexture(): THREE.CanvasTexture {
+  if (orbitTimingDottedTrackTexture !== null) {
+    return orbitTimingDottedTrackTexture;
+  }
+
+  const size = 32;
+  const center = size / 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
+
+  if (context === null) {
+    throw new Error("Cannot create orbit timing dotted-track texture without a 2D context.");
+  }
+
+  const gradient = context.createRadialGradient(center, center, 0, center, center, center * 0.92);
+  gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+  gradient.addColorStop(0.62, "rgba(255, 255, 255, 1)");
+  gradient.addColorStop(0.84, "rgba(255, 255, 255, 0.78)");
+  gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, size, size);
+
+  orbitTimingDottedTrackTexture = new THREE.CanvasTexture(canvas);
+  orbitTimingDottedTrackTexture.colorSpace = THREE.SRGBColorSpace;
+  orbitTimingDottedTrackTexture.minFilter = THREE.LinearFilter;
+  orbitTimingDottedTrackTexture.magFilter = THREE.LinearFilter;
+  orbitTimingDottedTrackTexture.generateMipmaps = false;
+  orbitTimingDottedTrackTexture.needsUpdate = true;
+  return orbitTimingDottedTrackTexture;
 }
 
 function getOrbitTimingPresentationColor(
@@ -36756,6 +38025,72 @@ export function getOrbitTimingEndpointClearance(
   const bodyClearance = node.bodyRadius * 1.035;
   const orbitClearance = node.ringRadius * 1.035;
   return Math.max(bodyClearance, orbitClearance) + 0.16;
+}
+
+export function getOrbitTimingGhostCenterClearance(
+  node: Readonly<Pick<DisplayNodeRenderData, "bodyRadius">>
+): number {
+  return node.bodyRadius * 1.035 + 0.16;
+}
+
+export function filterOrbitTimingDottedTrackPointsAroundPaths(
+  points: readonly THREE.Vector3[],
+  interruptions: readonly OrbitTimingPathInterruption[]
+): THREE.Vector3[] {
+  return points
+    .filter((point) => {
+      return interruptions.every((interruption) => {
+        const clearanceSquared = Math.max(0, interruption.clearanceWorld) ** 2;
+        return (
+          getMinimumPlanarDistanceSquaredToPolyline(point, interruption.points) > clearanceSquared
+        );
+      });
+    })
+    .map((point) => point.clone());
+}
+
+function getMinimumPlanarDistanceSquaredToPolyline(
+  point: THREE.Vector3,
+  path: readonly THREE.Vector3[]
+): number {
+  if (path.length === 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  if (path.length === 1) {
+    return getPlanarDistanceSquared(point, path[0] ?? point);
+  }
+
+  let minimumDistanceSquared = Number.POSITIVE_INFINITY;
+
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const start = path[index];
+    const end = path[index + 1];
+
+    if (start === undefined || end === undefined) {
+      continue;
+    }
+
+    const segmentX = end.x - start.x;
+    const segmentZ = end.z - start.z;
+    const lengthSquared = segmentX * segmentX + segmentZ * segmentZ;
+    const progress =
+      lengthSquared <= 0.0000001
+        ? 0
+        : clamp(
+            ((point.x - start.x) * segmentX + (point.z - start.z) * segmentZ) / lengthSquared,
+            0,
+            1
+          );
+    const distanceX = point.x - (start.x + segmentX * progress);
+    const distanceZ = point.z - (start.z + segmentZ * progress);
+    minimumDistanceSquared = Math.min(
+      minimumDistanceSquared,
+      distanceX * distanceX + distanceZ * distanceZ
+    );
+  }
+
+  return minimumDistanceSquared;
 }
 
 export function clipOrbitTimingPolylineStartToClearance(

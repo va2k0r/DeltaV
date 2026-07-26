@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { applyTutorialCameraHintDisplayLimits } from "../../src/ui/tutorial/cameraHintDisplay";
+import {
+  applyTutorialCameraHintDisplayLimits,
+  removeTutorialCameraHintRows
+} from "../../src/ui/tutorial/cameraHintDisplay";
 import { findFirstTutorialEnemyKillResolutionEvent } from "../../src/ui/tutorial/firstEnemyKillReplay";
 import {
   getTutorialRequiredShipSelectionRecoveryTargetKey,
   isTutorialTargetInputAllowed
 } from "../../src/ui/tutorial/selectionGate";
+import {
+  createTutorialContextualHoverCopy,
+  getTutorialContextProgressiveText
+} from "../../src/ui/tutorial/contextualHoverHelp";
 import {
   createTutorialConfirmTransferBurnLiveRows,
   createTutorialEnemyContactVictoryWarningRows,
@@ -40,6 +47,53 @@ import {
 } from "../../src/ui/tutorial/runtimeState";
 
 describe("tutorial row modules", () => {
+  it("explains burn and fire previews from the hovered destination", () => {
+    const commonNode = {
+      kind: "node" as const,
+      name: "NEREID TRANSFER",
+      bodyName: "NEPTUNE",
+      nodeType: "barren" as const,
+      occupancy: "unoccupied",
+      isContested: false,
+      isWorking: false,
+      workingFactionName: null,
+      tritiumOutput: 0,
+      shipyardProgress: 0
+    };
+    const burn = createTutorialContextualHoverCopy({
+      ...commonNode,
+      action: {
+        kind: "burn",
+        originName: "TRITON",
+        destinationName: "NEREID TRANSFER",
+        etaTurns: 3,
+        burnCost: 4,
+        failureReason: null
+      }
+    });
+    const fire = createTutorialContextualHoverCopy({
+      ...commonNode,
+      action: {
+        kind: "fire",
+        originName: "TRITON",
+        targetName: "NEREID TRANSFER",
+        etaTurns: 2,
+        failureReason: null
+      }
+    });
+
+    expect(burn.text).toContain("closed destination loop");
+    expect(burn.text).toContain("dotted connector");
+    expect(fire.text).toContain("geometric centre");
+    expect(fire.text).toContain("stops just before the X");
+  });
+
+  it("types from the top and rapidly erases back toward it", () => {
+    expect(getTutorialContextProgressiveText("ABCDE", 0.4, "type")).toBe("AB");
+    expect(getTutorialContextProgressiveText("ABCDE", 0.4, "erase")).toBe("ABC");
+    expect(getTutorialContextProgressiveText("ABCDE", 1, "erase")).toBe("");
+  });
+
   it("accepts only the player ship while the tutorial awaits its initial selection", () => {
     expect(
       isTutorialTargetInputAllowed(
@@ -351,14 +405,44 @@ describe("tutorial row modules", () => {
     );
   });
 
-  it("places the orbit reminder between blank rows before the shipyard execute prompt", () => {
-    expect(createTutorialShipyardProductionRows("player-highlight").slice(-3)).toEqual([
-      createTutorialSpacerRow(),
+  it("does not repeat camera guidance during the later shipyard lesson", () => {
+    const rows = createTutorialShipyardProductionRows("player-highlight");
+    const text = rows
+      .flatMap((row) => row.parts)
+      .map((part) => part.text)
+      .join("");
+
+    expect(text).not.toContain("Right click and drag to orbit.");
+    expect(rows.at(-1)).toEqual(createTutorialSpacerRow());
+  });
+
+  it("removes camera guidance rows and their spacers after the first tutorial turn", () => {
+    const rows = [
+      {
+        parts: [{ text: "Mouse wheel to zoom in / out." }],
+        className: tutorialCompleteHintClassName,
+        key: "tutorial:test:zoom-hint"
+      },
+      createTutorialSpacerRow("tutorial:test:zoom-hint-spacer"),
       {
         parts: [{ text: "Right click and drag to orbit." }],
-        className: tutorialLineClassName
+        className: tutorialCompleteHintClassName,
+        key: "tutorial:test:orbit"
       },
-      createTutorialSpacerRow()
+      createTutorialSpacerRow("tutorial:test:orbit-spacer"),
+      {
+        parts: [{ text: "Left click to confirm burn." }],
+        className: tutorialDelayedLiveHintClassName,
+        key: "tutorial:test:confirm"
+      }
+    ];
+
+    expect(removeTutorialCameraHintRows(rows)).toEqual([
+      {
+        parts: [{ text: "Left click to confirm burn." }],
+        className: tutorialDelayedLiveHintClassName,
+        key: "tutorial:test:confirm"
+      }
     ]);
   });
 

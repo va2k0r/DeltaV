@@ -100,6 +100,14 @@ export function computeSolarOcclusionDistanceVisibility(
   return 1 - smoothStep(fadeStart, Math.max(fadeStart + 0.0001, fadeEnd), cameraDistance);
 }
 
+export function computeSolarLimbGlintStrength(coverage: number): number {
+  const clampedCoverage = clamp(coverage, 0, 1);
+  const eclipseContact = smoothStep(0.04, 0.52, clampedCoverage);
+  const fullyHiddenFade = 1 - smoothStep(0.92, 0.995, clampedCoverage);
+
+  return eclipseContact * fullyHiddenFade;
+}
+
 export function advanceSolarOcclusionTransientState(
   previous: SolarOcclusionTransientState,
   options: SolarOcclusionTransientOptions

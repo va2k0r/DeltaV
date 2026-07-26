@@ -7,6 +7,7 @@ export type ResolutionEventType =
   | "FIRE_LAUNCHED"
   | "BURN_DEPARTED"
   | "EVADE"
+  | "EVADE_BLOCKED"
   | "MISSILE_IMPACT"
   | "SIGNAL_LOST"
   | "MANDATORY_LAUNCH"
@@ -147,6 +148,19 @@ function createPlayerFacingResolutionEvent(
         sourceDebugEventTypes: [event.type],
         sourceDebugEventIndices: [eventIndex]
       });
+    case "SHIP_PRODUCED":
+      return createResolutionEvent({
+        id: createResolutionEventId(event, eventIndex, rowNumber),
+        turn: event.turn,
+        index: rowNumber,
+        type: "WORK_SHIPYARD",
+        actorFactionId: event.factionId,
+        nodeId: event.nodeId,
+        progress: (event.progressBefore ?? 4) + 1,
+        criticality: "notable",
+        sourceDebugEventTypes: [event.type],
+        sourceDebugEventIndices: [eventIndex]
+      });
     case "CONTESTED_UPKEEP_PAID":
       return createContestedUpkeepResolutionEvent(events, event, eventIndex, consumed, rowNumber);
     case "FIRE_LAUNCHED":
@@ -187,6 +201,20 @@ function createPlayerFacingResolutionEvent(
         actorFactionId: event.factionId,
         nodeId: event.nodeId,
         dvDelta: event.amount ?? -1,
+        criticality: "critical",
+        sourceDebugEventTypes: [event.type],
+        sourceDebugEventIndices: [eventIndex]
+      });
+    case "EVADE_BLOCKED":
+      return createResolutionEvent({
+        id: createResolutionEventId(event, eventIndex, rowNumber),
+        turn: event.turn,
+        index: rowNumber,
+        type: "EVADE_BLOCKED",
+        actorFactionId: event.factionId,
+        nodeId: event.nodeId,
+        missileId: event.missileId,
+        result: event.reason ?? "contested",
         criticality: "critical",
         sourceDebugEventTypes: [event.type],
         sourceDebugEventIndices: [eventIndex]

@@ -448,6 +448,8 @@ describe("Cinematic 3D visual tuning", () => {
     expect(defaultCinematic3dVisualTuning.solarOcclusionOpacity).toBeGreaterThan(0.9);
     expect(defaultCinematic3dVisualTuning.solarOcclusionOpacity).toBeLessThanOrEqual(1);
     expect(defaultCinematic3dVisualTuning.solarOcclusionCoronaIntensity).toBeGreaterThan(0);
+    expect(defaultCinematic3dVisualTuning.solarOcclusionLimbGlintIntensity).toBeGreaterThan(0.5);
+    expect(defaultCinematic3dVisualTuning.solarOcclusionLimbGlintIntensity).toBeLessThan(0.8);
     expect(defaultCinematic3dVisualTuning.solarOcclusionExposureCompression).toBeGreaterThan(0);
     expect(defaultCinematic3dVisualTuning.solarOcclusionExposureCompression).toBeLessThan(0.3);
     expect(defaultCinematic3dVisualTuning.solarOcclusionReemergenceIntensity).toBeLessThan(0.4);

@@ -14,10 +14,16 @@ import {
 import { generateProceduralMap, parseSolarSystemData, type SolarSystemData } from "../../src/data";
 import {
   alignMissileFlightProgressToImpactPresentation,
+  contestedUpkeepImpactVisualProgress,
+  createReversibleReplaySnapshot,
   createOrbitalTransitionSnapshot,
   getTransitionDepartingBurnTransits,
   getTransitionLaunchedMissiles,
-  missileImpactVisualProgress
+  missileImpactVisualProgress,
+  replayBurnArrivalVisualProgress,
+  replayMissileDefenseVisualProgress,
+  replayOrderLaunchVisualProgress,
+  replayWorkVisualProgress
 } from "../../src/renderers/cinematic3d";
 
 const bodiesJsonUrl = new URL("../../public/content/vanilla/data/bodies.json", import.meta.url);
@@ -37,6 +43,117 @@ function findBody(snapshot: ReturnType<typeof createSolarSystemSnapshot>, bodyId
 }
 
 describe("Orbital turn interpolation", () => {
+  it("reconstructs the same complete replay state independently of scrub direction", () => {
+    const content = loadContent();
+    const ordered = applyCommand(
+      createInitialGameState({
+        factionDv: { player: 40, opponent: 0 },
+        nodeOccupancies: [{ nodeId: "mars_node", factionId: "player", shipCount: 1 }]
+      }),
+      {
+        type: "ASSIGN_BURN_ORDER",
+        originNodeId: "mars_node",
+        destinationNodeId: "saturn_node"
+      },
+      content
+    );
+    const resolved = applyCommand(ordered, ADVANCE_TURN_COMMAND, content);
+    const from = createSolarSystemSnapshot(content, ordered);
+    const to = createSolarSystemSnapshot(content, resolved);
+    const positions = [
+      0,
+      replayOrderLaunchVisualProgress - 0.001,
+      replayOrderLaunchVisualProgress,
+      replayWorkVisualProgress,
+      replayBurnArrivalVisualProgress,
+      1
+    ];
+    const forward = positions.map((position) => {
+      return createReversibleReplaySnapshot(from, to, position);
+    });
+    const backward = [...positions].reverse().map((position) => {
+      return createReversibleReplaySnapshot(from, to, position);
+    });
+
+    expect([...backward].reverse()).toEqual(forward);
+    expect(forward[0]?.pendingBurnOrders).toEqual(from.pendingBurnOrders);
+    expect(forward[0]?.activeBurnTransits).toEqual(from.activeBurnTransits);
+    expect(forward.at(-1)?.nodeOccupancies).toEqual(to.nodeOccupancies);
+    expect(forward.at(-1)?.activeBurnTransits).toEqual(to.activeBurnTransits);
+  });
+
+  it("reverses Shipyard progress, production, occupancy and mandatory launch as one state", () => {
+    const content = loadContent();
+    const state = createInitialGameState({
+      factionDv: { player: 50, opponent: 0 },
+      nodeOccupancies: [{ nodeId: "mars_node", factionId: "player", shipCount: 1 }],
+      shipyardProgress: [{ nodeId: "mars_node", progress: 4, workerFactionId: "player" }]
+    });
+    const produced = applyCommand(state, ADVANCE_TURN_COMMAND, content);
+    const from = createSolarSystemSnapshot(content, state);
+    const to = createSolarSystemSnapshot(content, produced);
+    const before = createReversibleReplaySnapshot(from, to, replayWorkVisualProgress - 0.001);
+    const after = createReversibleReplaySnapshot(from, to, replayWorkVisualProgress);
+    const rewound = createReversibleReplaySnapshot(from, to, replayWorkVisualProgress - 0.001);
+
+    expect(to.debugEvents).toContainEqual(
+      expect.objectContaining({ type: "SHIP_PRODUCED", nodeId: "mars_node" })
+    );
+    expect(before.shipyardProgress).toEqual(from.shipyardProgress);
+    expect(before.nodeOccupancies).toEqual(from.nodeOccupancies);
+    expect(before.mandatoryLaunches).toEqual(from.mandatoryLaunches);
+    expect(before.debugEvents).not.toContainEqual(
+      expect.objectContaining({ type: "SHIP_PRODUCED" })
+    );
+    expect(after.shipyardProgress).toEqual(to.shipyardProgress);
+    expect(after.nodeOccupancies).toEqual(to.nodeOccupancies);
+    expect(after.mandatoryLaunches).toEqual(to.mandatoryLaunches);
+    expect(after.debugEvents).toContainEqual(
+      expect.objectContaining({ type: "SHIP_PRODUCED", nodeId: "mars_node" })
+    );
+    expect(rewound).toEqual(before);
+  });
+
+  it("turns launched missiles back into committed FIRE orders when rewound", () => {
+    const content = loadContent();
+    const ordered = applyCommand(
+      createInitialGameState({
+        factionDv: { player: 40, opponent: 0 },
+        nodeOccupancies: [
+          { nodeId: "mars_node", factionId: "player", shipCount: 1 },
+          { nodeId: "venus_node", factionId: "opponent", shipCount: 1 }
+        ]
+      }),
+      {
+        type: "ASSIGN_FIRE_ORDER",
+        originNodeId: "mars_node",
+        targetNodeId: "venus_node"
+      },
+      content
+    );
+    const launched = applyCommand(ordered, ADVANCE_TURN_COMMAND, content);
+    const from = createSolarSystemSnapshot(content, ordered);
+    const to = createSolarSystemSnapshot(content, launched);
+    const before = createReversibleReplaySnapshot(
+      from,
+      to,
+      replayOrderLaunchVisualProgress - 0.001
+    );
+    const after = createReversibleReplaySnapshot(from, to, replayOrderLaunchVisualProgress);
+    const rewound = createReversibleReplaySnapshot(
+      from,
+      to,
+      replayOrderLaunchVisualProgress - 0.001
+    );
+
+    expect(before.pendingFireOrders).toEqual(from.pendingFireOrders);
+    expect(before.activeMissiles).toEqual(from.activeMissiles);
+    expect(after.pendingFireOrders).toEqual([]);
+    expect(after.activeMissiles).toEqual(to.activeMissiles);
+    expect(rewound.pendingFireOrders).toEqual(from.pendingFireOrders);
+    expect(rewound.activeMissiles).toEqual(from.activeMissiles);
+  });
+
   it("consumes the last missile trajectory segment before the impact presentation begins", () => {
     const missile = {
       issuedTurn: 4,
@@ -376,6 +493,45 @@ describe("Orbital turn interpolation", () => {
     expect(atImpact.nodeOccupancies).not.toContainEqual(targetOccupancy);
   });
 
+  it("keeps contested ships intact until their reversible upkeep-destruction moment", () => {
+    const content = loadContent();
+    const state = createInitialGameState({
+      factionDv: { player: 0, opponent: 0 },
+      nodeOccupancies: [
+        { nodeId: "mars_node", factionId: "player", shipCount: 1 },
+        { nodeId: "mars_node", factionId: "opponent", shipCount: 1 }
+      ]
+    });
+    const destroyed = applyCommand(state, ADVANCE_TURN_COMMAND, content);
+    const from = createSolarSystemSnapshot(content, state);
+    const to = createSolarSystemSnapshot(content, destroyed);
+    const playerShip = {
+      nodeId: "mars_node",
+      factionId: "player",
+      shipCount: 1
+    };
+    const beforeDestruction = createOrbitalTransitionSnapshot(
+      from,
+      to,
+      contestedUpkeepImpactVisualProgress - 0.001
+    );
+    const atDestruction = createOrbitalTransitionSnapshot(
+      from,
+      to,
+      contestedUpkeepImpactVisualProgress
+    );
+
+    expect(to.debugEvents).toContainEqual(
+      expect.objectContaining({
+        type: "CONTESTED_UPKEEP_FAILED",
+        nodeId: "mars_node",
+        factionId: "player"
+      })
+    );
+    expect(beforeDestruction.nodeOccupancies).toContainEqual(playerShip);
+    expect(atDestruction.nodeOccupancies).not.toContainEqual(playerShip);
+  });
+
   it("removes only missiles evaded this turn from normal flight interpolation", () => {
     const content = loadContent();
     const state = createInitialGameState({
@@ -421,6 +577,21 @@ describe("Orbital turn interpolation", () => {
       to,
       missileImpactVisualProgress - 0.01
     );
+    const replayBeforeDefense = createReversibleReplaySnapshot(
+      from,
+      to,
+      replayMissileDefenseVisualProgress - 0.001
+    );
+    const replayAfterDefense = createReversibleReplaySnapshot(
+      from,
+      to,
+      replayMissileDefenseVisualProgress
+    );
+    const replayRewound = createReversibleReplaySnapshot(
+      from,
+      to,
+      replayMissileDefenseVisualProgress - 0.001
+    );
 
     expect(to.activeMissiles).toEqual([
       expect.objectContaining({ id: "opponent-fire-jupiter-later" })
@@ -437,6 +608,13 @@ describe("Orbital turn interpolation", () => {
     expect(transitionStart.activeMissiles).not.toContainEqual(
       expect.objectContaining({ id: "opponent-fire-jupiter-now" })
     );
+    expect(replayBeforeDefense.activeMissiles).toContainEqual(
+      expect.objectContaining({ id: "opponent-fire-jupiter-now" })
+    );
+    expect(replayAfterDefense.activeMissiles).not.toContainEqual(
+      expect.objectContaining({ id: "opponent-fire-jupiter-now" })
+    );
+    expect(replayRewound.activeMissiles).toEqual(replayBeforeDefense.activeMissiles);
     expect(to.debugEvents).toContainEqual(
       expect.objectContaining({
         type: "EVADE",

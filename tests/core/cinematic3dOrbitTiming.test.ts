@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import {
+  closeBurnPreviewDestinationLoop,
   clipOrbitTimingPolylineStartToClearance,
+  createOrbitTimingDottedTrackPoints,
+  filterOrbitTimingDottedTrackPointsAroundPaths,
   getFutureOrbitTimingSampleTurns,
-  getOrbitTimingEndpointClearance
+  getOrbitTimingEndpointClearance,
+  getOrbitTimingGhostCenterClearance
 } from "../../src/renderers/cinematic3d";
 
 describe("Cinematic 3D future orbit timing", () => {
@@ -60,6 +64,11 @@ describe("Cinematic 3D future orbit timing", () => {
     );
   });
 
+  it("extends a burn timing track from the orbit ring to the ghost center marker", () => {
+    expect(getOrbitTimingGhostCenterClearance({ bodyRadius: 1 })).toBeCloseTo(1 * 1.035 + 0.16);
+    expect(getOrbitTimingGhostCenterClearance({ bodyRadius: 4 })).toBeCloseTo(4 * 1.035 + 0.16);
+  });
+
   it("keeps the visible line pinned to a constant surface clearance between samples", () => {
     const surfaceClearance = 0.2;
     const targetX = 3;
@@ -80,5 +89,94 @@ describe("Cinematic 3D future orbit timing", () => {
     });
 
     expect(visibleLengths).toEqual([...visibleLengths].sort((first, second) => second - first));
+  });
+
+  it("resamples an orbit-to-ghost connector as evenly spaced dots", () => {
+    const dots = createOrbitTimingDottedTrackPoints(
+      [new THREE.Vector3(0, 0, 0), new THREE.Vector3(5, 0, 0), new THREE.Vector3(10, 0, 0)],
+      2
+    );
+    const gaps = dots.slice(1).map((dot, index) => dot.distanceTo(dots[index] ?? dot));
+
+    expect(dots).toHaveLength(6);
+    expect(dots[0]?.x).toBeCloseTo(0);
+    expect(dots.at(-1)?.x).toBeCloseTo(10);
+    expect(gaps.every((gap) => Math.abs(gap - 2) < 0.0001)).toBe(true);
+  });
+
+  it("interrupts timing dots at a burn path and resumes them beyond it", () => {
+    const dots = createOrbitTimingDottedTrackPoints(
+      [new THREE.Vector3(0, 0, 0), new THREE.Vector3(10, 0, 0)],
+      1
+    );
+    const visibleDots = filterOrbitTimingDottedTrackPointsAroundPaths(dots, [
+      {
+        points: [new THREE.Vector3(5, 4, -2), new THREE.Vector3(5, 4, 2)],
+        clearanceWorld: 1.1
+      }
+    ]);
+
+    expect(visibleDots.map((point) => point.x)).toEqual([0, 1, 2, 3, 7, 8, 9, 10]);
+  });
+
+  it("hides a dotted timing line inside a protected ship orbit and resumes beyond it", () => {
+    const dots = createOrbitTimingDottedTrackPoints(
+      [new THREE.Vector3(-8, 0, 0), new THREE.Vector3(8, 0, 0)],
+      1
+    );
+    const visibleDots = filterOrbitTimingDottedTrackPointsAroundPaths(dots, [
+      {
+        points: [new THREE.Vector3(0, 0, 0)],
+        clearanceWorld: 3.25
+      }
+    ]);
+
+    expect(visibleDots.map((point) => point.x)).toEqual([-8, -7, -6, -5, -4, 4, 5, 6, 7, 8]);
+  });
+
+  it("closes the burn preview around its destination without moving the flight-path points", () => {
+    const destinationCenter = new THREE.Vector3(0, 0, 0);
+    const insertionStart = new THREE.Vector3(10, 0.2, 0);
+    const flightPathPoints = [
+      new THREE.Vector3(-20, 4, 0),
+      insertionStart.clone(),
+      new THREE.Vector3(0, 0.2, 10)
+    ];
+    const closedPreview = closeBurnPreviewDestinationLoop(
+      flightPathPoints,
+      destinationCenter,
+      insertionStart,
+      1
+    );
+
+    expect(closedPreview.length).toBeGreaterThan(flightPathPoints.length);
+    expect(closedPreview.at(-1)).toEqual(insertionStart);
+    expect(flightPathPoints.at(-1)).toEqual(new THREE.Vector3(0, 0.2, 10));
+    expect(
+      closedPreview
+        .slice(flightPathPoints.length)
+        .every((point) => Math.abs(Math.hypot(point.x, point.z) - 10) < 0.0001)
+    ).toBe(true);
+  });
+
+  it("adds a full closed revolution when the hover preview has no insertion arc", () => {
+    const destinationCenter = new THREE.Vector3(0, 0, 0);
+    const loopStart = new THREE.Vector3(12, 0.2, 0);
+    const previewPoints = [new THREE.Vector3(-20, 3, 0), loopStart.clone()];
+    const closedPreview = closeBurnPreviewDestinationLoop(
+      previewPoints,
+      destinationCenter,
+      loopStart,
+      -1,
+      true
+    );
+
+    expect(closedPreview).toHaveLength(previewPoints.length + 36);
+    expect(closedPreview.at(-1)).toEqual(loopStart);
+    expect(
+      closedPreview
+        .slice(previewPoints.length)
+        .every((point) => Math.abs(Math.hypot(point.x, point.z) - 12) < 0.0001)
+    ).toBe(true);
   });
 });

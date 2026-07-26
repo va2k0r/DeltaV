@@ -81,6 +81,19 @@ export {
   type ResolutionEventType
 } from "./resolution/resolutionEvents";
 export {
+  TRAILER_CAPTURE_POST_ROLL_MS,
+  TRAILER_CAPTURE_PRE_ROLL_MS,
+  TRAILER_CAPTURE_SEED,
+  createTrailerCaptureInitialState,
+  createTrailerCaptureTimeline,
+  getTrailerSceneEvents,
+  type TrailerCaptureCameraCue,
+  type TrailerCaptureCameraShot,
+  type TrailerCaptureScene,
+  type TrailerCaptureStep,
+  type TrailerCaptureTimeline
+} from "./trailerCapture";
+export {
   createEvadeTMinusOneDebugScenario,
   createMissileImpactTMinusOneDebugScenario,
   type DebugEvadeTMinusOneScenario,

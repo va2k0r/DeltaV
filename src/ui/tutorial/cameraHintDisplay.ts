@@ -1,6 +1,8 @@
 import {
   tutorialCameraFocusHintText,
+  tutorialCameraOrbitHintText,
   tutorialCameraPanOrbitHintText,
+  tutorialCameraPanHintText,
   tutorialCameraZoomHintText,
   tutorialConfirmCameraPanOrbitHintText
 } from "./constants";
@@ -19,6 +21,15 @@ export type TutorialCameraHintDisplayRow = Readonly<{
 }>;
 
 const tutorialCameraHintDisplayLimit = 2;
+
+export function removeTutorialCameraHintRows<TRow extends TutorialCameraHintDisplayRow>(
+  rows: readonly TRow[]
+): readonly TRow[] {
+  return rows.filter((row) => {
+    const key = row.key ?? "";
+    return !isTutorialCameraHintRow(row) && !isTutorialCameraHintSpacerKey(key);
+  });
+}
 
 export function applyTutorialCameraHintDisplayLimits<TRow extends TutorialCameraHintDisplayRow>(
   rows: readonly TRow[],
@@ -120,6 +131,26 @@ function isTutorialZoomFocusHintRow(row: TutorialCameraHintDisplayRow): boolean 
 function isTutorialPanOrbitHintRow(row: TutorialCameraHintDisplayRow): boolean {
   const text = getTutorialCameraHintRowText(row);
   return text === tutorialCameraPanOrbitHintText || text === tutorialConfirmCameraPanOrbitHintText;
+}
+
+function isTutorialCameraHintRow(row: TutorialCameraHintDisplayRow): boolean {
+  const text = getTutorialCameraHintRowText(row);
+  return (
+    isTutorialZoomFocusHintRow(row) ||
+    isTutorialPanOrbitHintRow(row) ||
+    text === tutorialCameraOrbitHintText ||
+    text === tutorialCameraPanHintText
+  );
+}
+
+function isTutorialCameraHintSpacerKey(key: string): boolean {
+  return (
+    isTutorialZoomFocusHintSpacerKey(key) ||
+    isTutorialPanOrbitHintSpacerKey(key) ||
+    key.endsWith(":zoom-spacer") ||
+    key.endsWith(":orbit-spacer") ||
+    key.endsWith(":pan-spacer")
+  );
 }
 
 function isTutorialZoomFocusHintSpacerKey(key: string): boolean {

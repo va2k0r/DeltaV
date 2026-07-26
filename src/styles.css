@@ -903,6 +903,11 @@ select {
   pointer-events: none;
 }
 
+.command-console__transcript.has-scrollback::before {
+  flex: 0 0 0;
+  max-height: 0;
+}
+
 .command-console__transcript > * {
   flex-shrink: 0;
 }
@@ -962,6 +967,88 @@ select {
 .command-console__live.is-command-log-reviewing {
   opacity: 0.42;
   filter: saturate(0.55);
+}
+
+.tutorial-context-help {
+  position: fixed;
+  top: calc(clamp(16px, 2vh, 32px) + clamp(250px, 34vh, 460px) + clamp(18px, 2.5vh, 34px));
+  right: clamp(4px, 0.65vw, 14px);
+  z-index: 6;
+  width: min(clamp(310px, 22vw, 500px), calc(100vw - 24px));
+  height: min(
+    clamp(190px, 28vh, 310px),
+    calc(
+      100vh - (clamp(16px, 2vh, 32px) + clamp(250px, 34vh, 460px) + clamp(18px, 2.5vh, 34px)) - 18px
+    )
+  );
+  box-sizing: border-box;
+  contain: layout paint style;
+  overflow: hidden;
+  border-left: 1px solid rgba(159, 232, 255, 0.28);
+  background: linear-gradient(
+    90deg,
+    rgba(5, 12, 18, 0.3) 0,
+    rgba(5, 12, 18, 0.12) 42%,
+    rgba(5, 12, 18, 0) 100%
+  );
+  color: rgba(224, 230, 234, 0.88);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: clamp(11px, 0.78vw, 14px);
+  font-weight: 430;
+  line-height: 1.42;
+  opacity: 0;
+  padding: 2px clamp(12px, 1vw, 18px);
+  pointer-events: none;
+  text-shadow:
+    -1px -1px 0 rgba(0, 0, 0, 0.92),
+    0 -1px 0 rgba(0, 0, 0, 0.92),
+    1px -1px 0 rgba(0, 0, 0, 0.92),
+    -1px 0 0 rgba(0, 0, 0, 0.92),
+    1px 0 0 rgba(0, 0, 0, 0.92),
+    -1px 1px 0 rgba(0, 0, 0, 0.92),
+    0 1px 0 rgba(0, 0, 0, 0.92),
+    1px 1px 0 rgba(0, 0, 0, 0.92),
+    0 0 5px rgba(0, 0, 0, 0.72);
+  transition: opacity 90ms ease-out;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+}
+
+.tutorial-context-help.is-enabled.is-visible {
+  opacity: 1;
+}
+
+.tutorial-context-help.is-erasing {
+  opacity: 0.82;
+  transition-duration: 55ms;
+}
+
+.tutorial-context-help__label {
+  min-height: 1.35em;
+  color: rgba(159, 232, 255, 0.72);
+  font-size: 0.8em;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.72em;
+  text-transform: uppercase;
+}
+
+.tutorial-context-help__text {
+  max-width: 52ch;
+  white-space: pre-wrap;
+}
+
+.tutorial-context-help.is-typewriting .tutorial-context-help__text::after {
+  content: "";
+  display: inline-block;
+  width: 0.48em;
+  height: 1em;
+  margin-left: 0.18em;
+  background: currentColor;
+  box-shadow: 0 0 8px rgba(159, 232, 255, 0.34);
+  vertical-align: -0.14em;
+  animation: command-type-cursor-blink var(--beat-command-cursor-duration, 620ms) steps(1, end)
+    infinite;
 }
 
 .game-menu {
@@ -1336,6 +1423,16 @@ select {
     width: min(clamp(255px, 38vw, 315px), calc(100vw - 16px));
     height: auto;
     max-height: min(32vh, 260px);
+  }
+
+  .tutorial-context-help {
+    top: calc(clamp(8px, 1vh, 12px) + min(32vh, 260px) + clamp(14px, 2vh, 22px));
+    right: clamp(6px, 1vw, 10px);
+    width: min(clamp(255px, 38vw, 315px), calc(100vw - 16px));
+    height: min(
+      clamp(170px, 26vh, 240px),
+      calc(100vh - (clamp(8px, 1vh, 12px) + min(32vh, 260px) + clamp(14px, 2vh, 22px)) - 14px)
+    );
   }
 
   .command-console__transcript {
@@ -1896,6 +1993,56 @@ select {
 
 .is-hidden {
   display: none;
+}
+
+.app-shell.is-trailer-capture,
+.app-shell.is-trailer-capture * {
+  cursor: none !important;
+}
+
+.app-shell.is-trailer-capture .debug-drawer,
+.app-shell.is-trailer-capture .debug-toggle,
+.app-shell.is-trailer-capture .debug-panel,
+.app-shell.is-trailer-capture .ai-report,
+.app-shell.is-trailer-capture .debug-recording-indicator,
+.app-shell.is-trailer-capture .debug-fps {
+  display: none !important;
+}
+
+.trailer-capture-status {
+  position: absolute;
+  bottom: clamp(18px, 2.2vh, 34px);
+  left: 50%;
+  z-index: 8;
+  border: 1px solid rgba(159, 232, 255, 0.42);
+  border-radius: 4px;
+  background: rgba(4, 9, 14, 0.82);
+  color: rgba(222, 243, 255, 0.88);
+  font:
+    700 13px/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+  letter-spacing: 0.06em;
+  padding: 7px 10px;
+  pointer-events: none;
+  text-shadow: 0 1px 3px #000;
+  transform: translateX(-50%);
+}
+
+@media (min-width: 2200px) and (min-height: 1200px) {
+  .app-shell.is-trailer-capture .command-console {
+    width: min(580px, calc(100vw - 32px));
+    height: 500px;
+    max-height: 500px;
+    font-size: 17px;
+  }
+
+  .trailer-capture-status {
+    font-size: 15px;
+  }
 }
 
 @media (max-width: 720px) {

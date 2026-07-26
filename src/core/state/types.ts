@@ -186,6 +186,7 @@ export type TurnDebugEventType =
   | "SHIP_DESTROYED"
   | "WRECK_FIELD_CREATED"
   | "EVADE"
+  | "EVADE_BLOCKED"
   | "BURN_DEPARTED"
   | "BURN_FAILED";
 

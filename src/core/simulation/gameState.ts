@@ -4044,6 +4044,19 @@ export function advanceTurn(
 
     const destroyedShipKey = createNodeFactionKey(missile.targetNodeId, destroyedFactionId);
     destroyedShipKeys.add(destroyedShipKey);
+    if (contestedShipKeysAtTurnStart.has(targetKey)) {
+      debugEvents.push({
+        turn: nextTurn,
+        type: "EVADE_BLOCKED",
+        message: "EVADE BLOCKED — CONTESTED",
+        nodeId: missile.targetNodeId,
+        factionId: destroyedFactionId,
+        missileId: missile.id,
+        evadeBlocked: true,
+        contested: true,
+        reason: "contested"
+      });
+    }
     const cleanupResult = removeDestroyedShipReferences(
       plannedState,
       activeMissiles,

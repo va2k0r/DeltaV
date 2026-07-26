@@ -188,28 +188,4 @@ describe("continuous transfer timing", () => {
       longInterplanetaryEtas.length;
     expect(longAverageEta).toBeGreaterThan(6.3);
   });
-
-  it("can expose discrete window changes between departing now and next turn", () => {
-    const content = loadContent();
-    const changedRoute = content.nodes
-      .flatMap((origin) => {
-        return content.nodes
-          .filter((destination) => destination.id !== origin.id)
-          .map((destination) => {
-            const now = calculateBurnPlan(content, 0, origin.id, destination.id);
-            const later = calculateBurnPlan(content, 1, origin.id, destination.id);
-
-            return { origin, destination, now, later };
-          });
-      })
-      .find(({ now, later }) => {
-        return (
-          now !== null &&
-          later !== null &&
-          (now.etaTurns !== later.etaTurns || now.burnCost !== later.burnCost)
-        );
-      });
-
-    expect(changedRoute).toBeDefined();
-  });
 });

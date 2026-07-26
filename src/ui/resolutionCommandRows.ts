@@ -102,6 +102,20 @@ function createPlayerFacingResolutionRow(
           { text: `  ${nodeName}  ${event.dvDelta ?? -1} ΔV` }
         ]
       };
+    case "EVADE_BLOCKED":
+      return {
+        parts: [
+          { text: numberPrefix },
+          {
+            text: "EVADE BLOCKED — CONTESTED",
+            className: mergeResolutionCommandClasses(
+              factionClass,
+              "command-console__event-contested"
+            )
+          },
+          { text: `  ${nodeName}` }
+        ]
+      };
     case "MISSILE_IMPACT":
       return {
         parts: [
@@ -115,9 +129,11 @@ function createPlayerFacingResolutionRow(
         parts: [
           { text: numberPrefix },
           {
-            text: "CREW LOST",
+            text: "SIGNAL LOST",
             className: mergeResolutionCommandClasses(factionClass, crewLostCueClassName)
           },
+          { text: " — ", className: crewLostCueClassName },
+          { text: "CREW LOST", className: crewLostCueClassName },
           { text: ` at ${nodeName}`, className: crewLostCueClassName }
         ]
       };
