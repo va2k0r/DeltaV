@@ -2202,7 +2202,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("for (let layerIndex = 0; layerIndex < this.tuning.starLayerCount");
     const starfieldBlock = source.slice(
       source.indexOf("function createStarfieldLayer"),
-      source.indexOf("function computePhysicalShadowConeRadiusAtDistance")
+      source.indexOf("function createPhysicalShadowCone")
     );
     expect(starfieldBlock).toContain("const layerWeights = [0.5, 0.32, 0.18]");
     expect(starfieldBlock).toContain("const radius = 24000 + layerIndex * 4200");
@@ -2630,8 +2630,8 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).not.toContain("createImageData(width, height)");
     expect(source).toContain("new THREE.PerspectiveCamera(42, 1, 0.1, 64000)");
     expect(source).toContain("sizeAttenuation: false");
-    expect(source).not.toContain("createPhysicalShadowCone");
-    expect(source).not.toContain("physical-shadow-cone");
+    expect(source).toContain("createPhysicalShadowCone");
+    expect(source).toContain("physical-shadow-cone");
     expect(source).not.toContain("createShadowTrailTexture");
     expect(source).toContain("syncNodePresentation");
     expect(source).toContain("updateOrbitRailPresentation");
@@ -3269,19 +3269,61 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("shadowVolumeDarkness");
     expect(source).toContain("finalShadowVolumeMultiplier");
     expect(source).toContain("color *= finalBodyEclipseMultiplier * finalShadowVolumeMultiplier");
+    expect(source).toContain("createPhysicalShadowCone");
+    expect(source).toContain("createPhysicalShadowConeContrast");
+    expect(source).toContain("createPhysicalShadowConeGeometry");
     expect(source).toContain("PhysicalShadowConeHit");
     expect(source).toContain("findFirstPhysicalShadowConeHit");
+    expect(source).toContain("updatePhysicalShadowConeGeometry");
     expect(source).toContain("computePhysicalShadowConeRadiusAtDistance");
+    expect(source).toContain("const lengthWorld = maxLengthWorld");
+    expect(source).not.toContain("const lengthWorld = hit?.length ?? maxLengthWorld");
+    expect(source).not.toContain("hit?.farRadius ?? 0");
+    expect(source).toContain("28 * lengthMultiplier");
     expect(source).toContain("bodyRadius * 260");
     expect(source).not.toContain("180 * lengthMultiplier");
     expect(source).not.toContain("farCenterIndex");
-    expect(source).not.toContain("shadowCone:");
-    expect(source).not.toContain("shadowConeContrast:");
-    expect(source).not.toContain("group.add(shadowCone)");
-    expect(source).not.toContain("group.add(shadowConeContrast)");
-    expect(source).not.toContain("shadowCoreOpacity");
-    expect(source).not.toContain("shadowContrastOpacity");
-    expect(source).not.toContain("PhysicalShadowConePresentation");
+    expect(source).toContain('cone.name = "physical-shadow-cone"');
+    expect(source).toContain('cone.name = "physical-shadow-cone-contrast"');
+    expect(source).toContain("cone.renderOrder = 24");
+    expect(source).toContain("cone.renderOrder = 25");
+    expect(source).toContain("depthTest: true");
+    expect(source).toContain("shadowConeContrast");
+    expect(source).toContain("shadowCone.position.set(0, 0, 0)");
+    expect(source).toContain("shadowConeContrast.position.set(0, 0, 0)");
+    expect(source).not.toContain("shadowCone.position.copy(awayFromSun).multiplyScalar");
+    expect(source).toContain("shadowCone.quaternion.setFromUnitVectors");
+    expect(source).toContain("shadowConeContrast.quaternion.setFromUnitVectors");
+    expect(source).toContain("localAwayFromSun");
+    expect(source).toContain("getMeshLocalDirection(shadowCone.parent, awayFromSun)");
+    expect(source).toContain("getPhysicalShadowConeStyle");
+    expect(source).toContain('body.kind !== "moon"');
+    expect(source).toContain("coreOpacityMultiplier: 0.92");
+    expect(source).toContain("coreOpacityMultiplier: 1.08");
+    expect(source).toContain("contrastOpacityMultiplier: 1.08");
+    expect(source).toContain("contrastColor: 0x0a0a0a");
+    expect(source).toContain("renderOrderOffset: 0.2");
+    expect(source).toContain("shadowCone.renderOrder = 24 + shadowStyle.renderOrderOffset");
+    expect(source).toContain("shadowConeContrast.renderOrder = 25 + shadowStyle.renderOrderOffset");
+    expect(source).toContain("setShaderUniformColor");
+    expect(source).toContain("shadowCoreOpacity");
+    expect(source).toContain("shadowCoreColor");
+    expect(source).toContain("PhysicalShadowConePresentation");
+    expect(source).toContain("getPhysicalShadowConePresentation");
+    expect(source).toContain("getPhysicalShadowConeDistanceOpacityMultiplier");
+    expect(source).toContain("      nearRadius\n    );");
+    expect(source).toContain("shadowTailFadeStart");
+    expect(source).toContain(
+      "float tailFade = 1.0 - smoothstep(shadowTailFadeStart, shadowTailFadeEnd, vConeDepth)"
+    );
+    expect(source).toContain("shadowCoreOpacity * startFade * tailFade");
+    expect(source).toContain("shadowContrastOpacity * penumbra * startFade * tailFade");
+    expect(source).toContain("physicalShadowConeOpacity");
+    expect(source).toContain("physicalShadowConeContrastOpacity");
+    expect(source).toContain("physicalShadowConeContrastColor");
+    expect(source).toContain("physicalShadowConeFarRadius");
+    expect(source).toContain("shadowContrastOpacity");
+    expect(source).toContain("THREE.NormalBlending");
     expect(source).toContain("giantProjectedShadowLengthMultiplier = 0.5");
     expect(source).toContain("getProjectedShadowLengthMultiplier");
     expect(source.indexOf("float finalBodyEclipseMultiplier")).toBeGreaterThan(
@@ -3294,6 +3336,11 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).not.toContain("localHalfWidth");
     expect(source).not.toContain('globalCompositeOperation = "destination-out"');
     expect(source).not.toContain("color: 0x111824");
+    const physicalShadowSource = source.slice(
+      source.indexOf("function createPhysicalShadowCone("),
+      source.indexOf("function computePhysicalShadowConeRadiusAtDistance")
+    );
+    expect(physicalShadowSource).not.toContain("new THREE.PlaneGeometry");
     expect(source).not.toContain("shadow.renderOrder = 8");
   });
 
@@ -4599,16 +4646,15 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("this.isKeyboardCameraControlActive()");
   });
 
-  it("uses analytic per-fragment solar visibility without rendering shadow volumes in space", () => {
+  it("keeps strategic shadow connectors alongside analytic per-fragment solar visibility", () => {
     const source = readFileSync(join(process.cwd(), "src/renderers/cinematic3d/index.ts"), "utf8");
     const dynamicLightingSource = readFileSync(
       join(process.cwd(), "src/renderers/cinematic3d/dynamicSolarLighting.ts"),
       "utf8"
     );
 
-    expect(source).not.toContain("physicalShadowConeMeshesEnabled");
-    expect(source).not.toContain("createPhysicalShadowCone");
-    expect(source).not.toContain('name = "physical-shadow-cone"');
+    expect(source).toContain("const physicalShadowConeMeshesEnabled = true");
+    expect(source).toContain("!physicalShadowConeMeshesEnabled ||");
     expect(source).toContain(
       "this.syncDynamicSolarLighting(bodyObject, body, position, bodiesById)"
     );
