@@ -7771,7 +7771,8 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("firePreviewReflectionOpacityBoost");
     expect(source).toContain("firePreviewReflectionWidthBoost");
     expect(source).toContain("firePreviewReflectionAccentBoost");
-    expect(source).toContain("firePreviewReflectionScreenOffsetBoost");
+    expect(source).toContain("firePreviewReflectionScreenOffsetScale");
+    expect(source).toContain("readability * firePreviewReflectionScreenOffsetScale");
     expect(source).toContain("readability: isPreview ? 1 : 0");
     expect(source).toContain("uniform float reflectionReadability");
     expect(source).toContain("float continuousSilhouette =");

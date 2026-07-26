@@ -1655,7 +1655,7 @@ const trajectoryPlaneReflectionScreenOffsetY = -0.011;
 const firePreviewReflectionOpacityBoost = 1.42;
 const firePreviewReflectionWidthBoost = 1.16;
 const firePreviewReflectionAccentBoost = 1.28;
-const firePreviewReflectionScreenOffsetBoost = 1.18;
+const firePreviewReflectionScreenOffsetScale = 0.38;
 
 type ShipRadiatorPoseIndex = 0 | 1 | 2;
 type ShipRadiatorStepDirection = -1 | 1;
@@ -35488,8 +35488,7 @@ function syncBurnTrajectoryPlaneReflection(
     ? THREE.MathUtils.lerp(1, firePreviewReflectionAccentBoost, readability)
     : 0;
   const reflectionScreenOffsetScale =
-    (customReflectionPoints === undefined ? 1 : 0) *
-    THREE.MathUtils.lerp(1, firePreviewReflectionScreenOffsetBoost, readability);
+    customReflectionPoints === undefined ? 1 : readability * firePreviewReflectionScreenOffsetScale;
   const reflectionDistance =
     customReflectionPoints === undefined ? distance : measurePolylineLength(customReflectionPoints);
   const reflection =
