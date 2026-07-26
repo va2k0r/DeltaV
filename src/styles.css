@@ -1510,6 +1510,26 @@ select {
   word-break: normal;
 }
 
+.command-console__transcript.is-trailer-replay-rewriting .is-trailer-replay-future {
+  display: none;
+}
+
+.command-console__line.is-trailer-replay-revealing {
+  animation: command-trailer-replay-reveal 420ms steps(14, end) both;
+}
+
+@keyframes command-trailer-replay-reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+    opacity: 0;
+  }
+
+  to {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+}
+
 .command-console__line > span {
   max-width: 100%;
   overflow-wrap: inherit;

@@ -7,7 +7,7 @@ npm install
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-Open the debug drawer and press `TRAILER`:
+Open the debug drawer and press `PLAY TRAILER`:
 
 ```text
 http://127.0.0.1:5173/?debug=1
@@ -20,6 +20,14 @@ http://127.0.0.1:5173/?trailer=1
 ```
 
 `?mode=trailer` is an equivalent URL entry point.
+
+`TRAILER MODE` is the separate clean-presentation mode: it hides the debug interface, returns to
+the main menu, and uses the `9:99` planning-timer presentation.
+
+In a Trailer Mode AI match, `Space` executes the turn and `1` / `2` / `3` control rewind, pause,
+and replay. Rewind and replay share the same 1.45-second-per-turn presentation speed in opposite
+directions—slightly slower than an ordinary Execute—and replay also rebuilds the command log as
+its actions happen.
 
 Start a specific scene (1–18) in the ready state:
 

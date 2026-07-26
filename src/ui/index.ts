@@ -60,8 +60,15 @@ import {
 } from "../data";
 import {
   CinematicSolarSystemRenderer,
+  contestedUpkeepImpactVisualProgress,
   defaultCinematic3dVisualTuning,
   getNodeIdFromTargetKey,
+  missileImpactVisualProgress,
+  replayBurnArrivalVisualProgress,
+  replayMandatoryLaunchVisualProgress,
+  replayMissileDefenseVisualProgress,
+  replayOrderLaunchVisualProgress,
+  replayWorkVisualProgress,
   type CinematicInputGesture,
   type CinematicPerformanceMode,
   type CinematicPerformanceStats,
@@ -123,9 +130,7 @@ import {
   type ReplayTransition
 } from "./replayTimeline";
 import {
-  easeAdaptiveRewindProgress,
-  fixedTimelineReviewTurnDurationMs,
-  getAdaptiveRewindDurationMs,
+  fixedTimelineReviewReplayTurnDurationMs,
   getFixedTimelineReviewDurationMs,
   sampleFixedTimelineReviewPosition
 } from "./replayPacing";
@@ -273,6 +278,8 @@ const cinematicTrajectoryReflectionModeStorageKey = "deltavTrajectoryReflectionM
 const displayBrightnessStorageKey = "deltav.displayBrightness.v1";
 const fpsCounterSampleWindowMs = 300;
 const fpsCounterSmoothing = 0.35;
+const fpsCounterPacingWindowMs = 12_000;
+const fpsCounterPauseIgnoreMs = 240;
 
 type CinematicCameraState = ReturnType<CinematicSolarSystemRenderer["captureCameraState"]>;
 
@@ -302,7 +309,18 @@ type CommandLogReviewPlaybackOptions = Readonly<{
 }>;
 
 type CommandLogReviewPositionOptions = Readonly<{
+  deferRender?: boolean;
   includePresentationEffects?: boolean;
+}>;
+
+type TrailerReplayLogLineCacheEntry = Readonly<{
+  line: HTMLElement;
+  revealPosition: number | null;
+}>;
+
+type TrailerReplayLogBlockCacheEntry = Readonly<{
+  block: HTMLElement;
+  timedLines: readonly HTMLElement[];
 }>;
 
 type CommandLogScrubState = {
@@ -519,6 +537,8 @@ type PlanningTimerPhase = "disabled" | "planning" | "executeCountdown" | "resolv
 type PlanningTimerAuthority = "server" | "local";
 type GameMenuScreen = "main" | "new-game" | "options" | "quit";
 type GameMenuActionTone = "bright" | "regular" | "soft" | "dim";
+type GameMenuAccentsMode = "on" | "burn" | "fire" | "off";
+type GameMenuNewGameMode = "2-factions" | "3-factions" | "ai-vs-ai" | "ai-vs-ai-vs-ai";
 type GameMenuTypingTarget = Readonly<{
   element: HTMLElement;
   text: string;
@@ -684,7 +704,7 @@ const turnTransitionWatchdogMaxMs = turnResolutionPresentationMaxMs;
 export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   root.innerHTML = "";
   const urlSearchParams = new URLSearchParams(window.location.search);
-  const isDebugUiEnabled = urlSearchParams.get("debug") !== "0";
+  const isDebugUiEnabled = urlSearchParams.get("debug") === "1";
   const isTrailerCaptureRequested =
     urlSearchParams.get("trailer") === "1" ||
     urlSearchParams.get("trailer") === "true" ||
@@ -802,7 +822,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   const twoPlayerModeButton = createDebugModeButton("2 PLAYERS");
   const threePlayerModeButton = createDebugModeButton("3 PLAYERS");
   const gameMenuModeButton = createDebugModeButton("GAME MENU");
-  const trailerModeButton = createDebugModeButton("TRAILER");
+  const trailerModeButton = createDebugModeButton("TRAILER MODE");
+  const trailerCaptureButton = createDebugModeButton("PLAY TRAILER");
   const aiVsAiModeButton = createDebugModeButton("AIvsAI");
   const aiVsAiVsAiModeButton = createDebugModeButton("AIvsAIvsAI");
   const fireVsAiModeButton = createDebugModeButton("FIREvsAI");
@@ -812,7 +833,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   const planningTimerButton = createDebugModeButton("TIMER AUTO");
   const beatSyncButton = createDebugModeButton("BEAT ON");
   const performanceDiagnosticsButton = createDebugModeButton("PERF OFF");
-  const burnPreviewEffectsButton = createDebugModeButton("BURN FX OFF");
+  const burnPreviewEffectsButton = createDebugModeButton("BURN FX ON");
   const firePreviewEffectsButton = createDebugModeButton("FIRE FX ON");
   const solarHazeButton = createDebugModeButton("SOLAR HAZE OFF");
   const solarOcclusionButton = createDebugModeButton("OCCLUSION ON");
@@ -871,6 +892,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     threePlayerModeButton,
     gameMenuModeButton,
     trailerModeButton,
+    trailerCaptureButton,
     aiVsAiModeButton,
     aiVsAiVsAiModeButton,
     fireVsAiModeButton,
@@ -1041,6 +1063,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let hasRenderedLiveCommandRows = false;
   let shouldTypeNextLiveCommandBlock = false;
   let isReplayMode = false;
+  let userReplayFocusTargetKeys: readonly string[] = [];
   let replayCancelRequested = false;
   let commandLogTimeReviewState: CommandLogTimeReviewState | null = null;
   let isCommandLogTimeReviewAnimating = false;
@@ -1048,6 +1071,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let commandLogTimeReviewAnimationResolve: (() => void) | null = null;
   let commandLogScrubState: CommandLogScrubState | null = null;
   let shouldSuppressNextCommandLogClick = false;
+  let isTrailerReplayLogRewriteActive = false;
+  let lastTrailerReplayLogPosition: number | null = null;
+  let trailerReplayLogLineCache: readonly TrailerReplayLogLineCacheEntry[] = [];
+  let trailerReplayLogBlockCache: readonly TrailerReplayLogBlockCacheEntry[] = [];
+  let isTrailerReplayLogCacheValid = false;
+  let commandScrollbackPlayingEventId: string | null | undefined;
   let isTutorialFirstEnemyKillReplayCueInputPending = false;
   let postMatchReportText: string | null = null;
   let postMatchReturnTimer: number | null = null;
@@ -1086,7 +1115,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let tutorialCameraAssistAnchor: CinematicCameraState | null = null;
   let commandInputHintsMode: CommandInputHintsMode = "off";
   let isGameMenuDemoActive = false;
+  let isInGameMenuActive = false;
   let isTrailerModeActive = false;
+  let isTrailerCaptureActive = false;
   let trailerCaptureTimeline: TrailerCaptureTimeline | null = null;
   let trailerCaptureSceneIndex = 0;
   let trailerCapturePlaybackGeneration = 0;
@@ -1094,7 +1125,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let isTrailerCapturePlayAll = false;
   let isTrailerCameraAutomationInterrupted = false;
   let gameMenuScreen: GameMenuScreen = "main";
-  let gameMenuNewGameOpponentCount: 1 | 2 = 1;
+  let gameMenuNewGameMode: GameMenuNewGameMode = "2-factions";
   let gameMenuNewGameTimerSeconds: 10 | 90 = 90;
   let gameMenuDemoTurnTimer: number | null = null;
   let gameMenuDemoRestartTimer: number | null = null;
@@ -1107,7 +1138,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let planningTimerDurationOverrideMs: number | null = null;
   let beatSyncMode: "on" | "off" = "on";
   let performanceDiagnosticsMode: "on" | "off" = "off";
-  let burnPreviewEffectsMode: "on" | "off" = "off";
+  let burnPreviewEffectsMode: "on" | "off" = "on";
   let firePreviewEffectsMode: "on" | "off" = "on";
   let solarHazeMode: "on" | "off" = "off";
   let solarOcclusionMode: "on" | "off" = "on";
@@ -1145,12 +1176,17 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let fpsCounterSampleStartedAt = performance.now();
   let fpsCounterFrames = 0;
   let smoothedFps = 0;
+  let fpsCounterLastFrameAt: number | null = null;
+  let fpsCounterPacingWindowStartedAt = performance.now();
+  let fpsCounterLongestFrameMs = 0;
+  let fpsCounterFramesOver20Ms = 0;
+  let fpsCounterFramesOver30Ms = 0;
   let lastCinematicPerformanceStats: CinematicPerformanceStats | null = null;
   const commandLogOptions = {
     cueCameraPreviewEnabled: false
   };
   const commandLogTimeReviewDurations = {
-    replayTurnMs: fixedTimelineReviewTurnDurationMs
+    replayTurnMs: fixedTimelineReviewReplayTurnDurationMs
   };
   const commandLogReplayFocusBeforePlaybackMs = 340;
   const commandScrollbackLineSelector =
@@ -1212,7 +1248,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   startMusicOnGameStart();
   startGameMenuDemo();
   if (isTrailerCaptureRequested) {
-    void activateTrailerMode();
+    void activateTrailerCapture();
   }
 
   function tacticalViewport(): ViewportSize {
@@ -1573,7 +1609,44 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
   }
 
-  async function activateTrailerMode(): Promise<void> {
+  function openDebugDrawerFromGameMenu(): void {
+    if (!debugToggleButton.isConnected || !header.isConnected) {
+      canvasFrame.append(debugToggleButton, header);
+    }
+
+    if (header.classList.contains("is-hidden")) {
+      toggleDebugDrawer();
+    }
+  }
+
+  function activateTrailerMode(): void {
+    if (isTrailerModeActive) {
+      return;
+    }
+
+    enableTrailerPresentationMode();
+
+    const returnToMainMenuWhenReady = (): void => {
+      if (isTurnTransitionActive || isCommandConsoleResolving) {
+        window.setTimeout(returnToMainMenuWhenReady, 40);
+        return;
+      }
+
+      startGameMenuDemo();
+    };
+
+    returnToMainMenuWhenReady();
+  }
+
+  function enableTrailerPresentationMode(): void {
+    isTrailerModeActive = true;
+    header.classList.add("is-hidden");
+    debugToggleButton.setAttribute("aria-expanded", "false");
+    header.remove();
+    debugToggleButton.remove();
+  }
+
+  async function activateTrailerCapture(): Promise<void> {
     if (isTrailerModeActive) {
       return;
     }
@@ -1605,6 +1678,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     isTrailerModeActive = true;
+    isTrailerCaptureActive = true;
     planningTimerMode = "auto";
     planningTimerDurationOverrideMs = null;
     hasConsumedZeroTimerInitialCountdown = true;
@@ -1905,9 +1979,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     hasConsumedZeroTimerInitialCountdown = false;
     debugAiStrategyProfiles = {};
     setDebugAiLevel(3);
+    isInGameMenuActive = false;
     isGameMenuDemoActive = true;
     gameMenuScreen = "main";
-    gameMenuNewGameOpponentCount = 1;
+    gameMenuNewGameMode = isTrailerModeActive ? "ai-vs-ai" : "2-factions";
     gameMenuNewGameTimerSeconds = 90;
     header.classList.add("is-hidden");
     debugToggleButton.setAttribute("aria-expanded", "false");
@@ -1937,6 +2012,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   function stopGameMenuDemo(): void {
     isGameMenuDemoActive = false;
+    isInGameMenuActive = false;
     clearGameMenuDemoTimers();
     if (gameMenuBaseContent !== null) {
       content = gameMenuBaseContent;
@@ -1952,6 +2028,39 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     hideCommandConsoleForGameMenuLaunch();
     cinematicRenderer?.setForcedCameraFocusTarget(null);
     cinematicRenderer?.setCameraInputEnabled(true);
+  }
+
+  function isGameMenuOpen(): boolean {
+    return isGameMenuDemoActive || isInGameMenuActive;
+  }
+
+  function openInGameMenu(): void {
+    if (isGameMenuOpen()) {
+      return;
+    }
+
+    isInGameMenuActive = true;
+    gameMenuScreen = "main";
+    gameMenuMainActions = null;
+    gameMenuSubmenuActions = null;
+    dragStart = null;
+    cinematicRenderer?.setCameraInputEnabled(false);
+    renderGameMenu();
+    updateInteractionLocks();
+  }
+
+  function resumeGameFromMenu(): void {
+    if (!isInGameMenuActive) {
+      return;
+    }
+
+    isInGameMenuActive = false;
+    gameMenuScreen = "main";
+    renderGameMenu();
+    cinematicRenderer?.setCameraInputEnabled(true);
+    updateCommandConsole();
+    updateInteractionLocks();
+    redraw();
   }
 
   function hideCommandConsoleForGameMenuLaunch(): void {
@@ -2152,10 +2261,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function renderGameMenu(): void {
-    gameMenu.classList.toggle("is-hidden", !isGameMenuDemoActive);
-    commandConsole.classList.toggle("is-hidden", isGameMenuDemoActive);
+    const isMenuOpen = isGameMenuOpen();
+    gameMenu.classList.toggle("is-hidden", !isMenuOpen);
+    commandConsole.classList.toggle("is-hidden", isMenuOpen);
 
-    if (!isGameMenuDemoActive) {
+    if (!isMenuOpen) {
       gameMenuTypingGeneration += 1;
       gameMenuMainActions = null;
       gameMenuSubmenuActions = null;
@@ -2187,10 +2297,23 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       const mainActions = document.createElement("div");
       mainActions.className = "game-menu__actions game-menu__main-actions";
       mainActions.append(
+        ...(isInGameMenuActive
+          ? [
+              createGameMenuAction(
+                "RESUME",
+                resumeGameFromMenu,
+                { actionScreen: "main", tone: "bright" },
+                typingTargets
+              )
+            ]
+          : []),
         createGameMenuAction(
           "TUTORIAL",
           startTutorialFromGameMenu,
-          { actionScreen: "main", tone: "bright" },
+          {
+            actionScreen: "main",
+            tone: isInGameMenuActive ? "regular" : "bright"
+          },
           typingTargets
         ),
         createGameMenuAction(
@@ -2280,20 +2403,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     actions: HTMLElement,
     typingTargets: GameMenuTypingTarget[]
   ): void {
-    const factionsAction = createGameMenuAction(
-      getGameMenuFactionLabel(),
-      (action) => {
-        gameMenuNewGameOpponentCount = gameMenuNewGameOpponentCount === 1 ? 2 : 1;
-        typeGameMenuAction(action, getGameMenuFactionLabel());
-      },
-      { tone: "soft" },
-      typingTargets
-    );
-
     const timerAction = createGameMenuAction(
       getGameMenuNewGameTimerLabel(),
       (action) => {
-        if (isTrailerModeActive) {
+        if (isTrailerModeActive || isGameMenuNewGameAiMode()) {
           return;
         }
 
@@ -2303,10 +2416,23 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       { tone: "regular" },
       typingTargets
     );
-    timerAction.disabled = isTrailerModeActive;
+    timerAction.disabled = isTrailerModeActive || isGameMenuNewGameAiMode();
+
+    const modeAction = createGameMenuAction(
+      getGameMenuModeLabel(),
+      (action) => {
+        gameMenuNewGameMode = getNextGameMenuNewGameMode();
+        typeGameMenuAction(action, getGameMenuModeLabel());
+        timerAction.disabled = isTrailerModeActive || isGameMenuNewGameAiMode();
+        typeGameMenuAction(timerAction, getGameMenuNewGameTimerLabel());
+      },
+      { tone: "soft" },
+      typingTargets
+    );
+    modeAction.classList.add("game-menu__action--nowrap");
 
     actions.append(
-      factionsAction,
+      modeAction,
       timerAction,
       createGameMenuAction(
         "START GAME",
@@ -2389,9 +2515,46 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       typingTargets
     );
     reflectionsAction.classList.add("game-menu__action--nowrap");
+    const accentsAction = createGameMenuAction(
+      getGameMenuAccentsLabel(),
+      (action) => {
+        const nextAccentsMode = getNextGameMenuAccentsMode();
+        setGameMenuAccentsMode(nextAccentsMode);
+        action.classList.toggle("game-menu__action--bright", nextAccentsMode === "on");
+        action.classList.toggle(
+          "game-menu__action--regular",
+          nextAccentsMode === "burn" || nextAccentsMode === "fire"
+        );
+        action.classList.toggle("game-menu__action--dim", nextAccentsMode === "off");
+        typeGameMenuAction(action, getGameMenuAccentsLabel());
+      },
+      {
+        tone:
+          getGameMenuAccentsMode() === "on"
+            ? "bright"
+            : getGameMenuAccentsMode() === "off"
+              ? "dim"
+              : "regular"
+      },
+      typingTargets
+    );
     const brightnessControl = createGameMenuBrightnessControl(typingTargets);
+    const debugAction = createGameMenuAction(
+      "DEBUG",
+      openDebugDrawerFromGameMenu,
+      { tone: "dim" },
+      typingTargets
+    );
 
-    actions.append(musicAction, sfxAction, bloomAction, reflectionsAction, brightnessControl);
+    actions.append(
+      musicAction,
+      sfxAction,
+      bloomAction,
+      reflectionsAction,
+      accentsAction,
+      brightnessControl,
+      debugAction
+    );
   }
 
   function createGameMenuBrightnessControl(
@@ -2514,7 +2677,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     generation: number
   ): Promise<void> {
     for (const target of targets) {
-      if (generation !== gameMenuTypingGeneration || !isGameMenuDemoActive) {
+      if (generation !== gameMenuTypingGeneration || !isGameMenuOpen()) {
         return;
       }
 
@@ -2620,8 +2783,13 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function startConfiguredGameFromMenu(): void {
-    const mode: MultiFactionGameModeId = gameMenuNewGameOpponentCount === 1 ? "2p" : "3p";
+    const mode = getGameMenuGameModeId();
+    const isAiShowcaseMode = isGameMenuNewGameAiMode();
     const timerDurationMs = gameMenuNewGameTimerSeconds * 1000;
+
+    if (isAiShowcaseMode) {
+      enableTrailerPresentationMode();
+    }
 
     stopGameMenuDemo();
 
@@ -2718,15 +2886,43 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function getGameMenuNewGameTimerLabel(): string {
-    if (isTrailerModeActive) {
+    if (isTrailerModeActive || isGameMenuNewGameAiMode()) {
       return `TIMER ${trailerModePlanningTimerLabel}`;
     }
 
     return `TIMER ${gameMenuNewGameTimerSeconds}`;
   }
 
-  function getGameMenuFactionLabel(): string {
-    return gameMenuNewGameOpponentCount === 1 ? "2 FACTIONS" : "3 FACTIONS";
+  function getNextGameMenuNewGameMode(): GameMenuNewGameMode {
+    if (gameMenuNewGameMode === "2-factions") {
+      return "3-factions";
+    }
+
+    if (gameMenuNewGameMode === "3-factions") {
+      return "ai-vs-ai";
+    }
+
+    return gameMenuNewGameMode === "ai-vs-ai" ? "ai-vs-ai-vs-ai" : "2-factions";
+  }
+
+  function getGameMenuModeLabel(): string {
+    if (gameMenuNewGameMode === "2-factions") {
+      return "2 FACTIONS";
+    }
+
+    if (gameMenuNewGameMode === "3-factions") {
+      return "3 FACTIONS";
+    }
+
+    return gameMenuNewGameMode === "ai-vs-ai" ? "AI VS AI" : "AI VS AI VS AI";
+  }
+
+  function getGameMenuGameModeId(): MultiFactionGameModeId {
+    return gameMenuNewGameMode === "2-factions" || gameMenuNewGameMode === "ai-vs-ai" ? "2p" : "3p";
+  }
+
+  function isGameMenuNewGameAiMode(): boolean {
+    return gameMenuNewGameMode === "ai-vs-ai" || gameMenuNewGameMode === "ai-vs-ai-vs-ai";
   }
 
   function getGameMenuBloomLabel(): string {
@@ -2757,6 +2953,45 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     return trajectoryReflectionMode === "on" ? "REFLECTIONS ON" : "REFLECTIONS OFF";
+  }
+
+  function getGameMenuAccentsMode(): GameMenuAccentsMode {
+    if (burnPreviewEffectsMode === "on" && firePreviewEffectsMode === "on") {
+      return "on";
+    }
+
+    if (burnPreviewEffectsMode === "on") {
+      return "burn";
+    }
+
+    return firePreviewEffectsMode === "on" ? "fire" : "off";
+  }
+
+  function getNextGameMenuAccentsMode(): GameMenuAccentsMode {
+    const mode = getGameMenuAccentsMode();
+
+    if (mode === "on") {
+      return "burn";
+    }
+
+    if (mode === "burn") {
+      return "fire";
+    }
+
+    return mode === "fire" ? "off" : "on";
+  }
+
+  function setGameMenuAccentsMode(mode: GameMenuAccentsMode): void {
+    burnPreviewEffectsMode = mode === "on" || mode === "burn" ? "on" : "off";
+    firePreviewEffectsMode = mode === "on" || mode === "fire" ? "on" : "off";
+    cinematicRenderer?.setBurnPreviewEffectsEnabled(burnPreviewEffectsMode === "on");
+    cinematicRenderer?.setFirePreviewEffectsEnabled(firePreviewEffectsMode === "on");
+    updateCommandConsoleModeControls();
+    redraw();
+  }
+
+  function getGameMenuAccentsLabel(): string {
+    return `ACCENTS ${getGameMenuAccentsMode().toUpperCase()}`;
   }
 
   function getGameMenuMusicLabel(): string {
@@ -3066,10 +3301,16 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
     fpsCounterSampleStartedAt = performance.now();
     fpsCounterFrames = 0;
+    fpsCounterLastFrameAt = null;
+    fpsCounterPacingWindowStartedAt = fpsCounterSampleStartedAt;
+    fpsCounterLongestFrameMs = 0;
+    fpsCounterFramesOver20Ms = 0;
+    fpsCounterFramesOver30Ms = 0;
     fpsCounterFrame = window.requestAnimationFrame(updateFpsCounter);
   }
 
   function updateFpsCounter(now: number): void {
+    recordFpsCounterFramePacing(now);
     syncBeatSynchronizedCssAnimations(now);
     fpsCounterFrames += 1;
     const sampleMs = now - fpsCounterSampleStartedAt;
@@ -3087,16 +3328,51 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       fpsCounterSampleStartedAt = now;
       fpsCounterFrames = 0;
 
-      if (!header.classList.contains("is-hidden")) {
-        updateDebugFps();
+      // Keep the lightweight FPS probe current even when Trailer Mode hides the debug header.
+      // This gives automated capture tests frame-pacing data without making debug UI visible.
+      updateDebugFps();
 
-        if (isPerformanceDiagnosticsEnabled()) {
-          updateDebugPanel();
-        }
+      if (!header.classList.contains("is-hidden") && isPerformanceDiagnosticsEnabled()) {
+        updateDebugPanel();
       }
     }
 
     fpsCounterFrame = window.requestAnimationFrame(updateFpsCounter);
+  }
+
+  function recordFpsCounterFramePacing(now: number): void {
+    const previousFrameAt = fpsCounterLastFrameAt;
+    fpsCounterLastFrameAt = now;
+
+    if (previousFrameAt === null) {
+      return;
+    }
+
+    const intervalMs = now - previousFrameAt;
+
+    if (intervalMs >= fpsCounterPauseIgnoreMs) {
+      fpsCounterPacingWindowStartedAt = now;
+      fpsCounterLongestFrameMs = 0;
+      fpsCounterFramesOver20Ms = 0;
+      fpsCounterFramesOver30Ms = 0;
+      return;
+    }
+
+    if (now - fpsCounterPacingWindowStartedAt >= fpsCounterPacingWindowMs) {
+      fpsCounterPacingWindowStartedAt = now;
+      fpsCounterLongestFrameMs = intervalMs;
+      fpsCounterFramesOver20Ms = 0;
+      fpsCounterFramesOver30Ms = 0;
+    } else {
+      fpsCounterLongestFrameMs = Math.max(fpsCounterLongestFrameMs, intervalMs);
+    }
+
+    if (intervalMs >= 20) {
+      fpsCounterFramesOver20Ms += 1;
+    }
+    if (intervalMs >= 30) {
+      fpsCounterFramesOver30Ms += 1;
+    }
   }
 
   function syncBeatSynchronizedCssAnimations(now: number): void {
@@ -3817,6 +4093,63 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   function updateDebugFps(): void {
     debugFps.textContent = `FPS ${smoothedFps > 0 ? smoothedFps.toFixed(1) : "sampling…"}`;
+    const stats = lastCinematicPerformanceStats;
+    document.body.dataset["trailerFps"] = smoothedFps > 0 ? smoothedFps.toFixed(3) : "";
+    document.body.dataset["trailerLongestFrameMs"] = fpsCounterLongestFrameMs.toFixed(3);
+    document.body.dataset["trailerFramesOver20Ms"] = String(fpsCounterFramesOver20Ms);
+    document.body.dataset["trailerFramesOver30Ms"] = String(fpsCounterFramesOver30Ms);
+
+    if (stats === null) {
+      delete debugFps.dataset["frameMs"];
+      delete debugFps.dataset["longestFrameMs"];
+      delete debugFps.dataset["framesOver20Ms"];
+      delete debugFps.dataset["framesOver30Ms"];
+      delete debugFps.dataset["syncSceneMs"];
+      delete debugFps.dataset["sceneRenderMs"];
+      document.body.dataset["trailerFrameMs"] =
+        smoothedFps > 0 ? (1000 / smoothedFps).toFixed(3) : "";
+      delete document.body.dataset["trailerSyncSceneMs"];
+      delete document.body.dataset["trailerSceneRenderMs"];
+      delete document.body.dataset["trailerReplayPreviewMs"];
+      delete document.body.dataset["trailerPresentationOnlyMs"];
+      delete document.body.dataset["trailerEffectAnimationMs"];
+      delete document.body.dataset["trailerMissileAnimationMs"];
+      delete document.body.dataset["trailerTacticalMs"];
+      delete document.body.dataset["trailerInteractionMs"];
+      delete document.body.dataset["trailerBurnPresentationMs"];
+      delete document.body.dataset["trailerFirePresentationMs"];
+      delete document.body.dataset["trailerLabelsMs"];
+      delete document.body.dataset["trailerSlowestSection"];
+      delete document.body.dataset["trailerPerformanceMode"];
+      return;
+    }
+
+    debugFps.dataset["frameMs"] = stats.sections.frame.averageMs.toFixed(3);
+    debugFps.dataset["longestFrameMs"] = stats.framePacing.longestIntervalMs.toFixed(3);
+    debugFps.dataset["framesOver20Ms"] = String(stats.framePacing.framesOver20Ms);
+    debugFps.dataset["framesOver30Ms"] = String(stats.framePacing.framesOver30Ms);
+    debugFps.dataset["syncSceneMs"] = stats.sections.syncScene.averageMs.toFixed(3);
+    debugFps.dataset["sceneRenderMs"] = stats.sections.sceneRender.averageMs.toFixed(3);
+    document.body.dataset["trailerFrameMs"] = stats.sections.frame.averageMs.toFixed(3);
+    document.body.dataset["trailerSyncSceneMs"] = stats.sections.syncScene.averageMs.toFixed(3);
+    document.body.dataset["trailerSceneRenderMs"] = stats.sections.sceneRender.averageMs.toFixed(3);
+    document.body.dataset["trailerReplayPreviewMs"] =
+      stats.sections.replayPreview.averageMs.toFixed(3);
+    document.body.dataset["trailerPresentationOnlyMs"] =
+      stats.sections.presentationOnly.averageMs.toFixed(3);
+    document.body.dataset["trailerEffectAnimationMs"] =
+      stats.sections.effectAnimation.averageMs.toFixed(3);
+    document.body.dataset["trailerMissileAnimationMs"] =
+      stats.sections.missileAnimation.averageMs.toFixed(3);
+    document.body.dataset["trailerTacticalMs"] = stats.sections.tactical.averageMs.toFixed(3);
+    document.body.dataset["trailerInteractionMs"] = stats.sections.interaction.averageMs.toFixed(3);
+    document.body.dataset["trailerBurnPresentationMs"] =
+      stats.sections.burnPresentation.averageMs.toFixed(3);
+    document.body.dataset["trailerFirePresentationMs"] =
+      stats.sections.firePresentation.averageMs.toFixed(3);
+    document.body.dataset["trailerLabelsMs"] = stats.sections.labels.averageMs.toFixed(3);
+    document.body.dataset["trailerSlowestSection"] = stats.slowestSection;
+    document.body.dataset["trailerPerformanceMode"] = stats.mode;
   }
 
   function updateCommandConsole(): void {
@@ -5208,6 +5541,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function renderCommandTranscriptFromTimeline(): void {
+    isTrailerReplayLogCacheValid = false;
+    trailerReplayLogLineCache = [];
+    trailerReplayLogBlockCache = [];
+    commandScrollbackPlayingEventId = undefined;
     commandTranscriptFollowsTail = true;
     commandTranscript.innerHTML = "";
     commandTranscript.classList.toggle("has-scrollback", commandTimelineEntries.length > 0);
@@ -8793,6 +9130,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     const liveHash = hashReplayState(liveState);
 
     isReplayMode = true;
+    userReplayFocusTargetKeys = [];
     replayCancelRequested = false;
     replayIndicator.textContent = "REPLAY";
     isTurnTransitionActive = false;
@@ -8819,7 +9157,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
         const transitionIndex = firstTransitionIndex + offset;
         setCommandScrollbackPlayingEvent(getCommandLogEventIdNearReviewPosition(transitionIndex));
-        focusReplayCameraForTransition(transition);
+        if (userReplayFocusTargetKeys.length > 0) {
+          focusReplayCameraForTransition(transition, userReplayFocusTargetKeys);
+        } else {
+          focusReplayCameraForTransition(transition);
+        }
         await cinematicRenderer.animateReplayTransition(transition.from, transition.to);
       }
     } finally {
@@ -8838,6 +9180,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       cinematicRenderer.setSnapshot(liveSnapshot);
       cinematicRenderer.restoreCameraState(replayEndCameraState);
       isReplayMode = false;
+      userReplayFocusTargetKeys = [];
       replayCancelRequested = false;
       replayIndicator.textContent = "REPLAY";
       setCommandScrollbackPlayingEvent(null);
@@ -8986,6 +9329,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       staticFocusTargetSignature: null
     };
     isReplayMode = true;
+    userReplayFocusTargetKeys = liveCameraFocusTargetKeys;
     replayCancelRequested = false;
     replayIndicator.textContent = "REWIND";
     replayIndicator.classList.remove("is-hidden");
@@ -9008,6 +9352,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       cinematicRenderer.restoreCameraState(capturedLiveCameraState);
       syncLogReviewStaticFocusTargetKeys(liveCameraFocusTargetKeys);
     }
+    beginTrailerReplayLogRewrite(commandLogTimeReviewState.currentPosition);
     return commandLogTimeReviewState;
   }
 
@@ -9051,11 +9396,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
-    const distance = Math.abs(clampedTarget - startPosition);
     const isRewind = clampedTarget < startPosition;
-    const durationMs = isRewind
-      ? getAdaptiveRewindDurationMs(distance)
-      : clampNumber(distance * commandLogTimeReviewDurations.replayTurnMs, 120, 6200);
+    const durationMs = getFixedTimelineReviewDurationMs(
+      startPosition,
+      clampedTarget,
+      commandLogTimeReviewDurations.replayTurnMs
+    );
     const startedAt = performance.now();
     isCommandLogTimeReviewAnimating = true;
     replayCancelRequested = false;
@@ -9089,16 +9435,16 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       const tick = () => {
         const linearProgress =
           durationMs <= 0 ? 1 : clampNumber((performance.now() - startedAt) / durationMs, 0, 1);
-        const positionProgress = isRewind
-          ? easeAdaptiveRewindProgress(linearProgress)
-          : linearProgress;
-        const position = startPosition + (clampedTarget - startPosition) * positionProgress;
-        setCommandLogReviewPosition(position, targetEventId);
 
         if (linearProgress >= 1) {
           finish();
           return;
         }
+
+        const position = startPosition + (clampedTarget - startPosition) * linearProgress;
+        setCommandLogReviewPosition(position, targetEventId, {
+          deferRender: true
+        });
 
         commandLogTimeReviewAnimationFrame = window.requestAnimationFrame(tick);
       };
@@ -9146,7 +9492,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return Promise.resolve();
     }
 
-    const durationMs = getFixedTimelineReviewDurationMs(startPosition, clampedTarget);
+    const durationMs = getFixedTimelineReviewDurationMs(
+      startPosition,
+      clampedTarget,
+      commandLogTimeReviewDurations.replayTurnMs
+    );
     const startedAt = performance.now();
     const includePresentationEffects = direction === "REPLAY";
     isCommandLogTimeReviewAnimating = true;
@@ -9177,17 +9527,24 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
       const tick = () => {
         const elapsedMs = performance.now() - startedAt;
-        const position = sampleFixedTimelineReviewPosition(startPosition, clampedTarget, elapsedMs);
-        const eventId = getCommandLogEventIdNearReviewPosition(position);
-        setCommandScrollbackPlayingEvent(eventId);
-        setCommandLogReviewPosition(position, eventId, {
-          includePresentationEffects
-        });
 
         if (elapsedMs >= durationMs) {
           finish();
           return;
         }
+
+        const position = sampleFixedTimelineReviewPosition(
+          startPosition,
+          clampedTarget,
+          elapsedMs,
+          commandLogTimeReviewDurations.replayTurnMs
+        );
+        const eventId = getCommandLogEventIdNearReviewPosition(position);
+        setCommandScrollbackPlayingEvent(eventId);
+        setCommandLogReviewPosition(position, eventId, {
+          deferRender: true,
+          includePresentationEffects
+        });
 
         commandLogTimeReviewAnimationFrame = window.requestAnimationFrame(tick);
       };
@@ -9240,21 +9597,20 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     const clampedTarget = clampCommandLogReviewPosition(targetPosition);
 
     if (clampedTarget <= reviewState.currentPosition + 0.001) {
-      setCommandLogReviewPosition(clampedTarget, targetEventId);
+      setCommandLogReviewPosition(clampedTarget, targetEventId, {
+        includePresentationEffects: true
+      });
       return;
     }
 
-    const startTransitionIndex = clampNumber(
-      Math.floor(reviewState.currentPosition),
-      0,
-      Math.max(0, replayTape.transitions.length - 1)
+    const startPosition = reviewState.currentPosition;
+    const durationMs = getFixedTimelineReviewDurationMs(
+      startPosition,
+      clampedTarget,
+      commandLogTimeReviewDurations.replayTurnMs
     );
-    const endTransitionExclusive = clampNumber(
-      Math.ceil(clampedTarget),
-      0,
-      replayTape.transitions.length
-    );
-
+    const startedAt = performance.now();
+    let lastFocusedTransitionIndex = -1;
     isCommandLogTimeReviewAnimating = true;
     replayCancelRequested = false;
     replayIndicator.textContent = "REPLAY";
@@ -9265,54 +9621,67 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     reviewState.staticFocusTargetSignature = null;
     cinematicRenderer.clearPresentationEffects();
 
-    try {
-      for (let index = startTransitionIndex; index < endTransitionExclusive; index += 1) {
-        if (replayCancelRequested || commandLogTimeReviewState !== reviewState) {
+    return new Promise((resolve) => {
+      const finish = () => {
+        commandLogTimeReviewAnimationFrame = null;
+        commandLogTimeReviewAnimationResolve = null;
+        isCommandLogTimeReviewAnimating = false;
+        const eventId = getCommandLogEventIdNearReviewPosition(clampedTarget) ?? targetEventId;
+        setCommandScrollbackPlayingEvent(eventId);
+        setCommandLogReviewPosition(clampedTarget, eventId, {
+          includePresentationEffects: true
+        });
+
+        if (clampedTarget >= replayTape.transitions.length) {
+          restoreCommandLogTimeReviewToLive({ preserveCurrentCamera: true });
+        } else {
+          replayIndicator.textContent = "REPLAY";
+        }
+        resolve();
+      };
+
+      const tick = () => {
+        const elapsedMs = performance.now() - startedAt;
+
+        if (elapsedMs >= durationMs) {
+          finish();
           return;
         }
 
-        const transition = replayTape.transitions[index];
-
-        if (transition === undefined) {
-          break;
-        }
-
-        const eventId = getCommandLogEventIdNearReviewPosition(index) ?? targetEventId;
-        reviewState.currentPosition = index;
-        reviewState.transitionIndex = index;
-        reviewState.eventId = eventId;
-        setCommandScrollbackPlayingEvent(eventId);
-        if (options.preserveCurrentFocus !== true) {
-          focusReplayCameraForTransition(transition, focusTargetKeys);
-        }
-        await cinematicRenderer.animateReplayTransition(
-          transition.from,
-          transition.to,
+        const position = sampleFixedTimelineReviewPosition(
+          startPosition,
+          clampedTarget,
+          elapsedMs,
           commandLogTimeReviewDurations.replayTurnMs
         );
-        reviewState.currentPosition = index + 1;
-        reviewState.transitionIndex = Math.min(
-          index + 1,
+        const transitionIndex = Math.min(
+          Math.floor(position),
           Math.max(0, replayTape.transitions.length - 1)
         );
-      }
-    } finally {
-      if (commandLogTimeReviewState === reviewState) {
-        isCommandLogTimeReviewAnimating = false;
-      }
-    }
+        const transition = replayTape.transitions[transitionIndex];
 
-    if (commandLogTimeReviewState !== reviewState) {
-      return;
-    }
+        if (
+          transition !== undefined &&
+          transitionIndex !== lastFocusedTransitionIndex &&
+          options.preserveCurrentFocus !== true
+        ) {
+          focusReplayCameraForTransition(transition, focusTargetKeys);
+          lastFocusedTransitionIndex = transitionIndex;
+        }
 
-    if (clampedTarget >= replayTape.transitions.length) {
-      restoreCommandLogTimeReviewToLive({ preserveCurrentCamera: true });
-      return;
-    }
+        const eventId = getCommandLogEventIdNearReviewPosition(position);
+        setCommandScrollbackPlayingEvent(eventId);
+        setCommandLogReviewPosition(position, eventId, {
+          deferRender: true,
+          includePresentationEffects: true
+        });
 
-    setCommandLogReviewPosition(clampedTarget, targetEventId);
-    replayIndicator.textContent = "REPLAY";
+        commandLogTimeReviewAnimationFrame = window.requestAnimationFrame(tick);
+      };
+
+      commandLogTimeReviewAnimationResolve = resolve;
+      tick();
+    });
   }
 
   function setCommandLogReviewPosition(
@@ -9333,8 +9702,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       Math.floor(clampedPosition),
       Math.max(0, replayTape.transitions.length - 1)
     );
-    renderCommandLogReviewPosition(clampedPosition, options);
     syncLogReviewStaticFocusTargetKeys(reviewState.focusTargetKeys);
+    renderCommandLogReviewPosition(clampedPosition, options);
+    syncTrailerReplayCommandLog(clampedPosition);
   }
 
   function syncLogReviewStaticFocusTargetKeys(targetKeys: readonly string[]): void {
@@ -9372,7 +9742,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
       if (lastTransition !== undefined) {
         cinematicRenderer.previewReplayTransition(lastTransition.from, lastTransition.to, 1, {
+          deferRender: options.deferRender === true,
           followTrackedFocus: (commandLogTimeReviewState?.focusTargetKeys.length ?? 0) > 0,
+          trackedFocusTargetKeys: commandLogTimeReviewState?.focusTargetKeys ?? [],
           includePresentationEffects: options.includePresentationEffects === true,
           destructionTimeline: {
             transitions: replayTape.transitions,
@@ -9396,7 +9768,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       transition.to,
       position - transitionIndex,
       {
+        deferRender: options.deferRender === true,
         followTrackedFocus: (commandLogTimeReviewState?.focusTargetKeys.length ?? 0) > 0,
+        trackedFocusTargetKeys: commandLogTimeReviewState?.focusTargetKeys ?? [],
         includePresentationEffects: options.includePresentationEffects === true,
         destructionTimeline: {
           transitions: replayTape.transitions,
@@ -9434,7 +9808,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   function handleCommandLogTransportHotkey(event: KeyboardEvent): boolean {
     if (
-      isTrailerModeActive ||
+      isTrailerCaptureActive ||
       event.metaKey ||
       event.altKey ||
       event.ctrlKey ||
@@ -9497,11 +9871,13 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     if (reviewState === null || cinematicRenderer === null) {
       commandLogTimeReviewState = null;
       isReplayMode = false;
+      userReplayFocusTargetKeys = [];
       replayCancelRequested = false;
       replayIndicator.textContent = "REPLAY";
       replayIndicator.classList.add("is-hidden");
       setCommandLogReviewPromptDimmed(false);
       setCommandScrollbackPlayingEvent(null);
+      endTrailerReplayLogRewrite();
       updateInteractionLocks();
       return;
     }
@@ -9515,6 +9891,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         : options.preserveCurrentFocusTracking === true
           ? currentCameraState
           : detachCinematicCameraTracking(currentCameraState);
+    const shouldResizeRestoredView = currentView !== reviewState.liveCurrentView;
     state = reviewState.liveState;
     snapshot = reviewState.liveSnapshot;
     selectedTargetKey = reviewState.liveSelectedTargetKey;
@@ -9523,23 +9900,27 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     viewSelect.value = reviewState.liveCurrentView;
     cinematicFrame.classList.toggle("is-hidden", reviewState.liveCurrentView !== "cinematic3d");
     tacticalCanvas.classList.toggle("is-hidden", reviewState.liveCurrentView !== "tactical2d");
-    cinematicRenderer.setSnapshot(reviewState.liveSnapshot);
+    cinematicRenderer.setSnapshot(reviewState.liveSnapshot, { deferRender: true });
     cinematicRenderer.syncReplayDestructionTimeline(
       replayTape.transitions,
       replayTape.transitions.length
     );
-    cinematicRenderer.restoreCameraState(cameraStateToRestore);
+    cinematicRenderer.restoreCameraState(cameraStateToRestore, { deferRender: true });
     validateReplayStateIntegrity(reviewState.liveHash, reviewState.liveState, state);
     commandLogTimeReviewState = null;
     isReplayMode = false;
+    userReplayFocusTargetKeys = [];
     replayCancelRequested = false;
     replayIndicator.textContent = "REPLAY";
     replayIndicator.classList.add("is-hidden");
     setCommandScrollbackPlayingEvent(null);
+    endTrailerReplayLogRewrite();
     updateInteractionLocks();
-    resizeActiveView();
+    if (shouldResizeRestoredView) {
+      resizeActiveView();
+    }
     syncFocusSelectToTarget(selectedTargetKey);
-    redraw();
+    updateStatus();
   }
 
   function setCommandLogReviewPromptDimmed(isReviewingPast: boolean): void {
@@ -9613,7 +9994,17 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function getReplayPositionForResolutionEventId(eventId: string): number | null {
-    return getReplayTransitionIndexForResolutionEventId(eventId);
+    for (const [transitionIndex, transition] of replayTape.transitions.entries()) {
+      const replayEntry = transition.entries.find((entry) => {
+        return entry.logLink?.resolutionEventId === eventId;
+      });
+
+      if (replayEntry !== undefined) {
+        return transitionIndex + getReplayEntryVisualProgress(replayEntry);
+      }
+    }
+
+    return null;
   }
 
   function getReplayPositionForCommandScrollbackTarget(targetId: string): number | null {
@@ -9652,10 +10043,157 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
     const transitionIndex = clampNumber(Math.floor(position), 0, replayTape.transitions.length - 1);
     const transition = replayTape.transitions[transitionIndex];
-    return (
-      transition?.entries.find((entry) => entry.logLink !== undefined)?.logLink
-        ?.resolutionEventId ?? null
-    );
+    const localProgress = position - transitionIndex;
+    const reachedEntry = transition?.entries
+      .filter((entry) => {
+        return (
+          entry.logLink !== undefined &&
+          getReplayEntryVisualProgress(entry) <= localProgress + 0.001
+        );
+      })
+      .at(-1);
+    return reachedEntry?.logLink?.resolutionEventId ?? null;
+  }
+
+  function getReplayEntryVisualProgress(entry: ReplayEntry): number {
+    switch (entry.type) {
+      case "CONTESTED_UPKEEP_PAID":
+      case "CONTESTED_UPKEEP_FAILED":
+        return contestedUpkeepImpactVisualProgress;
+      case "FIRE_LAUNCHED":
+      case "BURN_DEPARTED":
+      case "BURN_FAILED":
+        return replayOrderLaunchVisualProgress;
+      case "TRITIUM_INCOME":
+      case "SHIPYARD_PROGRESS":
+      case "SHIP_PRODUCED":
+        return replayWorkVisualProgress;
+      case "MANDATORY_LAUNCH":
+      case "MANDATORY_LAUNCH_DESTROYED":
+        return replayMandatoryLaunchVisualProgress;
+      case "EVADE":
+      case "EVADE_BLOCKED":
+      case "AI_EVADE_FAILED":
+      case "MISSILE_SOLUTION_BROKEN":
+        return replayMissileDefenseVisualProgress;
+      case "BURN_ARRIVED":
+        return replayBurnArrivalVisualProgress;
+      case "MISSILE_IMPACT":
+      case "MISSILE_MISSED":
+      case "SHIP_DESTROYED":
+        return missileImpactVisualProgress;
+      default:
+        return 0.5;
+    }
+  }
+
+  function beginTrailerReplayLogRewrite(position: number): void {
+    if (!isTrailerModeActive || isTrailerCaptureActive) {
+      return;
+    }
+
+    isTrailerReplayLogRewriteActive = true;
+    lastTrailerReplayLogPosition = null;
+    renderCommandTranscriptFromTimeline();
+    commandTranscript.classList.add("is-trailer-replay-rewriting");
+    rebuildTrailerReplayLogCache();
+    syncTrailerReplayCommandLog(position);
+  }
+
+  function rebuildTrailerReplayLogCache(): void {
+    trailerReplayLogLineCache = [
+      ...commandTranscript.querySelectorAll<HTMLElement>(".command-console__line[data-entry-id]")
+    ].map((line) => {
+      const targetId = line.dataset["eventId"] ?? line.dataset["entryId"];
+      return {
+        line,
+        revealPosition:
+          targetId === undefined ? null : getReplayPositionForCommandScrollbackTarget(targetId)
+      };
+    });
+    trailerReplayLogBlockCache = [
+      ...commandTranscript.querySelectorAll<HTMLElement>(".command-console__block--snapshot")
+    ].map((block) => ({
+      block,
+      timedLines: [...block.querySelectorAll<HTMLElement>(".command-console__line[data-entry-id]")]
+    }));
+    isTrailerReplayLogCacheValid = true;
+  }
+
+  function syncTrailerReplayCommandLog(position: number): void {
+    if (!isTrailerReplayLogRewriteActive) {
+      return;
+    }
+
+    if (!isTrailerReplayLogCacheValid) {
+      rebuildTrailerReplayLogCache();
+    }
+
+    const isMovingForward =
+      lastTrailerReplayLogPosition !== null && position > lastTrailerReplayLogPosition + 0.0001;
+    let visibilityChanged = false;
+
+    for (const { line, revealPosition } of trailerReplayLogLineCache) {
+      const shouldHide = revealPosition !== null && revealPosition > position + 0.001;
+      const wasHidden = line.classList.contains("is-trailer-replay-future");
+
+      if (wasHidden === shouldHide) {
+        continue;
+      }
+
+      visibilityChanged = true;
+      line.classList.toggle("is-trailer-replay-future", shouldHide);
+
+      if (shouldHide) {
+        line.classList.remove("is-trailer-replay-revealing");
+      } else if (wasHidden && isMovingForward) {
+        line.classList.add("is-trailer-replay-revealing");
+      }
+    }
+
+    if (visibilityChanged) {
+      for (const { block, timedLines } of trailerReplayLogBlockCache) {
+        const shouldHide =
+          timedLines.length > 0 &&
+          timedLines.every((line) => line.classList.contains("is-trailer-replay-future"));
+
+        if (block.classList.contains("is-trailer-replay-future") !== shouldHide) {
+          block.classList.toggle("is-trailer-replay-future", shouldHide);
+        }
+      }
+    }
+
+    if (visibilityChanged && isMovingForward) {
+      commandTranscriptFollowsTail = true;
+      scrollCommandTranscriptToEnd();
+    }
+
+    lastTrailerReplayLogPosition = position;
+  }
+
+  function handleTrailerReplayLogRevealAnimationEnd(event: AnimationEvent): void {
+    if (event.animationName !== "command-trailer-replay-reveal") {
+      return;
+    }
+
+    if (event.target instanceof HTMLElement) {
+      event.target.classList.remove("is-trailer-replay-revealing");
+    }
+  }
+
+  function endTrailerReplayLogRewrite(): void {
+    if (!isTrailerReplayLogRewriteActive) {
+      return;
+    }
+
+    isTrailerReplayLogRewriteActive = false;
+    lastTrailerReplayLogPosition = null;
+    isTrailerReplayLogCacheValid = false;
+    trailerReplayLogLineCache = [];
+    trailerReplayLogBlockCache = [];
+    commandTranscript.classList.remove("is-trailer-replay-rewriting");
+    renderCommandTranscriptFromTimeline();
+    updateCommandConsole();
   }
 
   function clampReplayStartTransitionIndex(index: number): number {
@@ -10027,6 +10565,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function setCommandScrollbackPlayingEvent(eventId: string | null): void {
+    if (commandScrollbackPlayingEventId === eventId) {
+      return;
+    }
+
+    commandScrollbackPlayingEventId = eventId;
+
     for (const line of commandTranscript.querySelectorAll<HTMLElement>(
       ".command-console__line--linked-event"
     )) {
@@ -10065,7 +10609,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function getCinematicPerformanceMode(): CinematicPerformanceMode {
-    return "full";
+    return isTrailerModeActive ? "auto" : "full";
   }
 
   function getStoredTrajectoryReflectionMode(): CinematicTrajectoryReflectionMode {
@@ -10126,6 +10670,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     cinematicRenderer = new CinematicSolarSystemRenderer(cinematicFrame, {
       onSelectionChange(selection: CinematicSelection | null) {
         if (isReplayMode) {
+          if (selection !== null) {
+            cinematicRenderer?.focusTargetWithoutZoom(selection.targetKey);
+            setUserReplayFocusTarget(selection.targetKey);
+          }
           return;
         }
 
@@ -10153,6 +10701,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         updateStatus();
         updateCommandConsole();
       },
+      onUserFocusChange(targetKey: string) {
+        setUserReplayFocusTarget(targetKey);
+      },
       isTargetInputAllowed(targetKey: string) {
         return (
           !isCinematicGameplayInputLocked() &&
@@ -10166,7 +10717,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         handleTutorialContextHoverInterestChange(targetKey);
       },
       onInputGesture(gesture) {
-        if (isTrailerModeActive) {
+        if (isTrailerCaptureActive) {
           isTrailerCameraAutomationInterrupted = true;
         }
         handleTutorialInputGesture(gesture);
@@ -10242,10 +10793,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         return getFirePlanFailureReason(originNodeId, targetNodeId);
       },
       getSnapshotAtTurn(turn: number) {
-        if (isReplayMode) {
-          return snapshot;
-        }
-
+        // Historical and future trajectory anchors must use the orbital phase of the requested
+        // turn. Returning the live snapshot during time review detached BURN/FIRE geometry from
+        // the rewound bodies because every off-frame lookup reused the current orbital phase.
         return createSolarSystemSnapshot(content, {
           ...state,
           turn
@@ -10356,9 +10906,25 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     cinematicRenderer.setLowBloomProfileEnabled(lowBloomProfileMode === "on");
     cinematicRenderer.setHeatDistortionEnabled(heatDistortionMode === "on");
     cinematicRenderer.setTrajectoryReflectionMode(trajectoryReflectionMode);
-    cinematicRenderer.setCameraInputEnabled(!isGameMenuDemoActive);
+    cinematicRenderer.setCameraInputEnabled(!isGameMenuOpen());
     cinematicRenderer.setBillboardsVisible(!isGameMenuDemoActive);
     resizeActiveView();
+  }
+
+  function setUserReplayFocusTarget(targetKey: string): void {
+    if (!isReplayMode) {
+      return;
+    }
+
+    userReplayFocusTargetKeys = [targetKey];
+    const reviewState = commandLogTimeReviewState;
+
+    if (reviewState === null) {
+      return;
+    }
+
+    reviewState.focusTargetKeys = [targetKey];
+    reviewState.staticFocusTargetSignature = null;
   }
 
   function disposeCinematicRenderer(): void {
@@ -11931,7 +12497,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     const isMatchEnded = postMatchReportText !== null;
     const isTutorialInputLocked = tutorialState?.inputLocked === true;
     nextTurnButton.disabled =
-      isGameMenuDemoActive ||
+      isGameMenuOpen() ||
       isReplayMode ||
       isMatchEnded ||
       isCommandConsoleResolving ||
@@ -11968,8 +12534,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     threePlayerModeButton.disabled =
       isReplayMode || isMandatoryLaunchLocked || isTurnTransitionActive;
     gameMenuModeButton.disabled =
-      isGameMenuDemoActive || isReplayMode || isMandatoryLaunchLocked || isTurnTransitionActive;
+      isGameMenuOpen() || isReplayMode || isMandatoryLaunchLocked || isTurnTransitionActive;
     trailerModeButton.disabled =
+      isTrailerModeActive || isReplayMode || isMandatoryLaunchLocked || isTurnTransitionActive;
+    trailerCaptureButton.disabled =
       isTrailerModeActive || isReplayMode || isMandatoryLaunchLocked || isTurnTransitionActive;
     aiVsAiModeButton.disabled = isReplayMode || isMandatoryLaunchLocked || isTurnTransitionActive;
     aiVsAiVsAiModeButton.disabled =
@@ -11989,7 +12557,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   async function executeCurrentTurn(): Promise<void> {
-    if (isGameMenuDemoActive) {
+    if (isGameMenuOpen()) {
       return;
     }
 
@@ -12395,7 +12963,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   });
 
   trailerModeButton.addEventListener("click", () => {
-    void activateTrailerMode();
+    activateTrailerMode();
+  });
+
+  trailerCaptureButton.addEventListener("click", () => {
+    void activateTrailerCapture();
   });
 
   aiVsAiModeButton.addEventListener("click", () => {
@@ -13055,6 +13627,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   commandTranscript.addEventListener("pointermove", handleCommandTranscriptPointerMove);
   commandTranscript.addEventListener("pointerup", handleCommandTranscriptPointerUp);
   commandTranscript.addEventListener("pointercancel", handleCommandTranscriptPointerUp);
+  commandTranscript.addEventListener("animationend", handleTrailerReplayLogRevealAnimationEnd);
   commandLiveRows.addEventListener("pointerdown", handleCommandTranscriptPointerDown);
   commandLiveRows.addEventListener("pointermove", handleCommandTranscriptPointerMove);
   commandLiveRows.addEventListener("pointerup", handleCommandTranscriptPointerUp);
@@ -13333,7 +13906,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         return;
       }
 
-      if (isGameMenuDemoActive) {
+      if (isGameMenuOpen()) {
         stopGameMenuDemo();
       }
 
@@ -18350,7 +18923,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   postMatchReport.addEventListener("click", dismissPostMatchReport);
 
   tacticalCanvas.addEventListener("pointerdown", (event) => {
-    if (isGameMenuDemoActive || currentView !== "tactical2d" || event.button !== 2) {
+    if (isGameMenuOpen() || currentView !== "tactical2d" || event.button !== 2) {
       return;
     }
 
@@ -18363,7 +18936,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   });
 
   tacticalCanvas.addEventListener("pointermove", (event) => {
-    if (isGameMenuDemoActive || dragStart === null || currentView !== "tactical2d") {
+    if (isGameMenuOpen() || dragStart === null || currentView !== "tactical2d") {
       return;
     }
 
@@ -18394,8 +18967,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   });
 
   tacticalCanvas.addEventListener("wheel", (event) => {
-    if (currentView !== "tactical2d" || isGameMenuDemoActive) {
-      if (isGameMenuDemoActive) {
+    if (currentView !== "tactical2d" || isGameMenuOpen()) {
+      if (isGameMenuOpen()) {
         event.preventDefault();
       }
       return;
@@ -18418,7 +18991,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   });
 
   tacticalCanvas.addEventListener("dblclick", (event) => {
-    if (isGameMenuDemoActive || currentView !== "tactical2d") {
+    if (isGameMenuOpen() || currentView !== "tactical2d") {
       return;
     }
 
@@ -18440,7 +19013,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   });
 
   window.addEventListener("keydown", (event) => {
-    if (isTrailerModeActive) {
+    if (isTrailerCaptureActive) {
       const key = event.key.toLowerCase();
       const target = event.target;
       const isEditableTarget =
@@ -18498,6 +19071,15 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
+    if (isInGameMenuActive) {
+      if (event.key === "Escape") {
+        resumeGameFromMenu();
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+      return;
+    }
+
     if (handleCommandLogTransportHotkey(event)) {
       return;
     }
@@ -18520,7 +19102,16 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
-    if (isGameMenuDemoActive && event.key.toLowerCase() === "f") {
+    if (event.key === "Escape") {
+      if (!isGameMenuDemoActive) {
+        openInGameMenu();
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+      return;
+    }
+
+    if (isGameMenuDemoActive) {
       event.preventDefault();
       return;
     }
@@ -18544,53 +19135,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       } else if (selectedTargetKey !== null) {
         focusTarget(selectedTargetKey);
       }
-    }
-
-    if (event.key === "Escape") {
-      const selectedNodeId = getNodeIdFromTargetKey(selectedTargetKey);
-      const hasSelectedPendingBurn =
-        selectedNodeId !== null &&
-        snapshot.pendingBurnOrders.some((order) => order.originNodeId === selectedNodeId);
-      const hasSelectedPendingFire =
-        selectedNodeId !== null &&
-        snapshot.pendingFireOrders.some((order) => order.originNodeId === selectedNodeId);
-
-      if (
-        hasSelectedPendingFire ||
-        snapshot.pendingFireOrders.length > 0 ||
-        hasSelectedPendingBurn ||
-        snapshot.pendingBurnOrders.length > 0
-      ) {
-        state = applyCommand(
-          state,
-          hasSelectedPendingFire && selectedNodeId !== null
-            ? {
-                type: "CANCEL_PENDING_FIRE_ORDER",
-                originNodeId: selectedNodeId
-              }
-            : snapshot.pendingFireOrders.length > 0
-              ? {
-                  type: "CANCEL_PENDING_FIRE_ORDER"
-                }
-              : hasSelectedPendingBurn && selectedNodeId !== null
-                ? {
-                    type: "CANCEL_PENDING_BURN_ORDER",
-                    originNodeId: selectedNodeId
-                  }
-                : {
-                    type: "CANCEL_PENDING_BURN_ORDER"
-                  }
-        );
-        snapshot = createSolarSystemSnapshot(content, state);
-        sfxEngine.play("queue.remove");
-        redraw();
-        return;
-      }
-
-      cinematicRenderer?.clearFocus();
-      fitSystem();
-      sfxEngine.play("ui.cancel");
-      redraw();
     }
   });
 

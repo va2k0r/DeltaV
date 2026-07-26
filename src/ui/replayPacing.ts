@@ -1,33 +1,12 @@
-const shortRewindDurationMs = 640;
-const rewindDistanceGrowthMs = 190;
-const maximumRewindDurationMs = 1800;
-export const fixedTimelineReviewTurnDurationMs = 860;
+import { replayTimelineSecondsPerTurn } from "../renderers/cinematic3d/replayDestructionTimeline";
 
-export function getAdaptiveRewindDurationMs(distanceTurns: number): number {
-  if (!Number.isFinite(distanceTurns) || distanceTurns <= 0) {
-    return 0;
-  }
-
-  const durationMs =
-    shortRewindDurationMs + rewindDistanceGrowthMs * (Math.sqrt(distanceTurns) - 1);
-
-  return Math.min(maximumRewindDurationMs, Math.max(shortRewindDurationMs, durationMs));
-}
-
-export function easeAdaptiveRewindProgress(progress: number): number {
-  const clampedProgress = Math.min(1, Math.max(0, progress));
-  return (
-    clampedProgress *
-    clampedProgress *
-    clampedProgress *
-    (clampedProgress * (clampedProgress * 6 - 15) + 10)
-  );
-}
+export const fixedTimelineReviewReplayTurnDurationMs = replayTimelineSecondsPerTurn * 1_000;
+export const fixedTimelineReviewRewindTurnDurationMs = fixedTimelineReviewReplayTurnDurationMs;
 
 export function getFixedTimelineReviewDurationMs(
   startPosition: number,
   targetPosition: number,
-  turnDurationMs = fixedTimelineReviewTurnDurationMs
+  turnDurationMs = fixedTimelineReviewReplayTurnDurationMs
 ): number {
   if (
     !Number.isFinite(startPosition) ||
@@ -45,7 +24,7 @@ export function sampleFixedTimelineReviewPosition(
   startPosition: number,
   targetPosition: number,
   elapsedMs: number,
-  turnDurationMs = fixedTimelineReviewTurnDurationMs
+  turnDurationMs = fixedTimelineReviewReplayTurnDurationMs
 ): number {
   const durationMs = getFixedTimelineReviewDurationMs(
     startPosition,

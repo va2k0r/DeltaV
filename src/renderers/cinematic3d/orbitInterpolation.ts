@@ -46,6 +46,20 @@ export function alignMissileFlightProgressToImpactPresentation(
   return startProgress + (1 - startProgress) * impactProgress;
 }
 
+export function getMissileDefenseInterceptionFlightProgress(
+  missile: Pick<ActiveMissile, "issuedTurn" | "missileEtaTurns">,
+  fromTurn: number,
+  toTurn: number
+): number {
+  const defenseVisualTurn = fromTurn + (toTurn - fromTurn) * replayMissileDefenseVisualProgress;
+  return alignMissileFlightProgressToImpactPresentation(
+    missile,
+    fromTurn,
+    toTurn,
+    defenseVisualTurn
+  );
+}
+
 export function createOrbitalTransitionSnapshot(
   from: SolarSystemSnapshot,
   to: SolarSystemSnapshot,
@@ -428,11 +442,11 @@ function getReversibleReplayActiveMissiles(
   const missiles = new Map(from.activeMissiles.map((missile) => [missile.id, missile]));
   const fromIds = new Set(missiles.keys());
 
-  if (progress >= replayOrderLaunchVisualProgress) {
-    for (const missile of to.activeMissiles) {
-      if (!fromIds.has(missile.id)) {
-        missiles.set(missile.id, missile);
-      }
+  // Start the physical launch at the beginning of the turn, as Execute does. The committed FIRE
+  // order can remain visible until its resolution cue while the missile drifts from the launcher.
+  for (const missile of to.activeMissiles) {
+    if (!fromIds.has(missile.id)) {
+      missiles.set(missile.id, missile);
     }
   }
 

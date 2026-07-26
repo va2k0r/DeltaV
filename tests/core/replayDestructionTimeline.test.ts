@@ -78,7 +78,8 @@ describe("reversible replay destruction timeline", () => {
     expect(destruction).toMatchObject({
       id: "reversible-impact:impact:5",
       source: "missile-impact",
-      impactTimelinePosition: missileImpactVisualProgress
+      impactTimelinePosition: missileImpactVisualProgress,
+      impactTurn: missile.impactTurn
     });
 
     if (destruction === undefined) {
@@ -99,10 +100,10 @@ describe("reversible replay destruction timeline", () => {
     const rewindAges = [...forwardAges].reverse();
 
     expect(forwardAges[0]).toBe(0);
-    expect(forwardAges[1]).toBeCloseTo(0.43);
-    expect(forwardAges[2]).toBeCloseTo(0.86);
-    expect(rewindAges[0]).toBeCloseTo(0.86);
-    expect(rewindAges[1]).toBeCloseTo(0.43);
+    expect(forwardAges[1]).toBeCloseTo(replayDestructionSecondsPerTurn * 0.5);
+    expect(forwardAges[2]).toBeCloseTo(replayDestructionSecondsPerTurn);
+    expect(rewindAges[0]).toBeCloseTo(replayDestructionSecondsPerTurn);
+    expect(rewindAges[1]).toBeCloseTo(replayDestructionSecondsPerTurn * 0.5);
     expect(rewindAges[2]).toBe(0);
   });
 

@@ -23,6 +23,7 @@ export type ReplayShipDestruction = Readonly<{
   source: "missile-impact" | "contested-upkeep";
   transitionIndex: number;
   impactTimelinePosition: number;
+  impactTurn?: number;
   anchorTurn: number;
 }>;
 
@@ -31,7 +32,10 @@ export type ReplayShipDestructionFrame = Readonly<{
   ageSeconds: number;
 }>;
 
-export const replayDestructionSecondsPerTurn = 0.86;
+// Time review runs only a little slower than the ordinary 1.15 s Execute transition. Keeping
+// the multiplier modest preserves readable motion without turning replay into slow motion.
+export const replayTimelineSecondsPerTurn = 1.45;
+export const replayDestructionSecondsPerTurn = replayTimelineSecondsPerTurn;
 
 export function createReplayShipDestructionTimeline(
   transitions: readonly ReplayDestructionTransition[]
@@ -77,6 +81,7 @@ export function createReplayShipDestructionTimeline(
           source: "missile-impact",
           transitionIndex,
           impactTimelinePosition: transitionIndex + missileImpactVisualProgress,
+          impactTurn: missile?.impactTurn ?? transition.to.turn,
           anchorTurn: transition.from.turn
         });
         continue;

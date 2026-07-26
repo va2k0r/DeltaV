@@ -3,6 +3,7 @@ import {
   clampMapPlaneFocusToBounds,
   computeAdaptivePanWorldUnitsPerPixel,
   computeFocusedPanReferenceDistance,
+  computeMoonShadowConeFarRadius,
   defaultCinematic3dVisualTuning,
   getBurnPreviewLaunchKey,
   getCanonicalBodyTargetKey,
@@ -12,7 +13,37 @@ import {
 } from "../../src/renderers/cinematic3d";
 
 describe("Cinematic 3D interaction helpers", () => {
-  it("slows pan progressively at extreme close zoom while preserving normal response", () => {
+  it("keeps strategic moon-shadow tips legible without flattening their taper", () => {
+    expect(
+      computeMoonShadowConeFarRadius({
+        baseFarRadius: 0.08,
+        bodyScreenRadiusPixels: 8,
+        minimumScreenRadiusPixels: 3.2,
+        maximumFarRadiusRatio: 0.68,
+        nearRadius: 1
+      })
+    ).toBeCloseTo(0.4);
+    expect(
+      computeMoonShadowConeFarRadius({
+        baseFarRadius: 0.08,
+        bodyScreenRadiusPixels: 2,
+        minimumScreenRadiusPixels: 3.2,
+        maximumFarRadiusRatio: 0.68,
+        nearRadius: 1
+      })
+    ).toBeCloseTo(0.68);
+    expect(
+      computeMoonShadowConeFarRadius({
+        baseFarRadius: 0.82,
+        bodyScreenRadiusPixels: 40,
+        minimumScreenRadiusPixels: 3.2,
+        maximumFarRadiusRatio: 0.68,
+        nearRadius: 1
+      })
+    ).toBeCloseTo(0.82);
+  });
+
+  it("keeps close-zoom pan responsive enough for cinematic camera moves", () => {
     const extremeClose = computeAdaptivePanWorldUnitsPerPixel({
       distance: 70,
       viewportHeight: 720,
@@ -34,8 +65,10 @@ describe("Cinematic 3D interaction helpers", () => {
       tuning: defaultCinematic3dVisualTuning
     });
 
-    expect(extremeClose).toBeLessThan(70 / 720);
-    expect(close).toBeLessThan(140 / 720);
+    expect(extremeClose).toBeGreaterThan((70 / 720) * 0.8);
+    expect(extremeClose).toBeLessThanOrEqual(70 / 720);
+    expect(close).toBeGreaterThan((140 / 720) * 0.9);
+    expect(close).toBeLessThanOrEqual(140 / 720);
     expect(extremeClose).toBeLessThan(close);
     expect(close).toBeLessThan(normal);
     expect(normal).toBeCloseTo(420 / 720);

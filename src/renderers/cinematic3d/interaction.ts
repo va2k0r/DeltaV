@@ -56,6 +56,14 @@ export type MapPlanePanClampContext = Readonly<{
   visibleHalfWidth: number;
 }>;
 
+export type MoonShadowConeFarRadiusContext = Readonly<{
+  baseFarRadius: number;
+  bodyScreenRadiusPixels: number;
+  minimumScreenRadiusPixels: number;
+  maximumFarRadiusRatio: number;
+  nearRadius: number;
+}>;
+
 export function computeAdaptivePanWorldUnitsPerPixel(context: AdaptivePanContext): number {
   const baseScale = context.distance / Math.max(1, context.viewportHeight);
   const closeProgress = clamp(
@@ -71,6 +79,19 @@ export function computeAdaptivePanWorldUnitsPerPixel(context: AdaptivePanContext
     adaptiveScale,
     context.tuning.panMinWorldUnitsPerPixel,
     context.tuning.panMaxWorldUnitsPerPixel
+  );
+}
+
+export function computeMoonShadowConeFarRadius(context: MoonShadowConeFarRadiusContext): number {
+  const nearRadius = Math.max(0.001, context.nearRadius);
+  const screenSpaceFloor =
+    Math.max(0, context.minimumScreenRadiusPixels) /
+    Math.max(0.001, context.bodyScreenRadiusPixels);
+  const taperedMaximum = nearRadius * clamp(context.maximumFarRadiusRatio, 0, 1);
+  return clamp(
+    Math.max(context.baseFarRadius, Math.min(screenSpaceFloor, taperedMaximum)),
+    0,
+    nearRadius
   );
 }
 
