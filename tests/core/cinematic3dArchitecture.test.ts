@@ -4617,6 +4617,14 @@ describe("Cinematic 3D architecture boundary", () => {
 
   it("adds held arrow-key cinematic camera controls without stealing editable input", () => {
     const source = readFileSync(join(process.cwd(), "src/renderers/cinematic3d/index.ts"), "utf8");
+    const keyboardHandlerStart = source.indexOf(
+      "  private handleKeyboardCameraKey(event: KeyboardEvent, isPressed: boolean): void {"
+    );
+    const keyboardReleaseStart = source.indexOf(
+      "  private releaseKeyboardCameraArrowKey(key: string): boolean {",
+      keyboardHandlerStart
+    );
+    const keyboardHandlerSource = source.slice(keyboardHandlerStart, keyboardReleaseStart);
 
     expect(source).toContain("keyboardCinematicOrbitRadiansPerSecond");
     expect(source).toContain("keyboardCinematicPanPixelsPerSecond");
@@ -4624,6 +4632,8 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("const keyboardCinematicOrbitRadiansPerSecond = 0.36");
     expect(source).toContain("const keyboardCinematicPanPixelsPerSecond = 240");
     expect(source).toContain("const keyboardCinematicZoomDistanceRatePerSecond = 1.1");
+    expect(source).toContain("keyboardCinematicReleaseTimeConstantMs");
+    expect(source).toContain("resolveDampedCameraControlVelocity({");
     expect(source).toContain("keyboardCameraControls");
     expect(source).toContain('event.key === "ArrowUp"');
     expect(source).toContain('event.key === "ArrowDown"');
@@ -4660,23 +4670,58 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("this.keyboardCameraControls.panLeft = isPanKey");
     expect(source).toContain("this.keyboardCameraControls.orbitCounterClockwise = !isPanKey");
     expect(source).toContain("this.keyboardCameraControls.panRight = isPanKey");
-    expect(source).toContain(
-      "zoomDirection * keyboardCinematicZoomDistanceRatePerSecond * deltaSeconds"
-    );
+    expect(source).toContain("target: zoomDirection * keyboardCinematicZoomDistanceRatePerSecond");
+    expect(source).toContain("this.keyboardCameraVelocity.zoomLogDistancePerSecond * deltaSeconds");
     expect(source).toContain("this.refreshDisplayScaleForWheelZoom();");
-    expect(source).toContain(
-      "-orbitDirection * keyboardCinematicOrbitRadiansPerSecond * deltaSeconds"
-    );
+    expect(source).toContain("target: -orbitDirection * keyboardCinematicOrbitRadiansPerSecond");
+    expect(source).toContain("this.keyboardCameraVelocity.orbitRadiansPerSecond * deltaSeconds");
     expect(source).toContain("this.yaw += yawDelta");
     expect(source).toContain("this.offsetActiveCameraTransitionRotation(yawDelta, 0)");
     expect(source).toContain("const diagonalScale = panXDirection !== 0 && panYDirection !== 0");
-    expect(source).toContain("keyboardCinematicPanPixelsPerSecond * deltaSeconds * diagonalScale");
+    expect(source).toContain("panXDirection * keyboardCinematicPanPixelsPerSecond * diagonalScale");
+    expect(source).toContain("panYPixelsPerSecond * deltaSeconds");
     expect(source).toContain("this.panByScreenDelta({");
     expect(source).toContain("using the current camera distance");
     expect(source).toContain(
       "this.offsetActiveCameraTransitionFocus(this.focus.clone().sub(previousFocus))"
     );
     expect(source).toContain("this.isKeyboardCameraControlActive()");
+    expect(keyboardHandlerStart).toBeGreaterThanOrEqual(0);
+    expect(keyboardReleaseStart).toBeGreaterThan(keyboardHandlerStart);
+    expect(keyboardHandlerSource).toContain("this.updateKeyboardCameraControls(performance.now())");
+    expect(
+      keyboardHandlerSource.lastIndexOf("this.updateKeyboardCameraControls(performance.now())")
+    ).toBeLessThan(keyboardHandlerSource.indexOf("this.releaseKeyboardCameraArrowKey(event.key)"));
+  });
+
+  it("toggles a wrapped Sun-relative camera reference without overriding manual orbit", () => {
+    const source = readFileSync(join(process.cwd(), "src/renderers/cinematic3d/index.ts"), "utf8");
+    const referenceSource = readFileSync(
+      join(process.cwd(), "src/renderers/cinematic3d/cameraReference.ts"),
+      "utf8"
+    );
+    const updateStart = source.indexOf("  private updateSunRelativeCameraYaw(): void {");
+    const bearingStart = source.indexOf(
+      "  private getTrackedFocusSunBearing(): number | null {",
+      updateStart
+    );
+    const updateSource = source.slice(updateStart, bearingStart);
+
+    expect(source).toContain(
+      'private cameraReferenceMode: CinematicCameraReferenceMode = "inertial"'
+    );
+    expect(source).toContain('event.key.toLowerCase() === "c" && !event.repeat');
+    expect(source).toContain("this.toggleCameraReferenceMode()");
+    expect(source).toContain(
+      'this.cameraReferenceMode === "inertial" ? "sun-relative" : "inertial"'
+    );
+    expect(source).toContain("this.updateSunRelativeCameraYaw();");
+    expect(updateSource).toContain("this.sunRelativeCameraTargetKey !== targetKey");
+    expect(updateSource).toContain("this.focusPanTransition !== null");
+    expect(updateSource).toContain("this.arrivalChaseCamera !== null");
+    expect(updateSource).toContain("advanceSunRelativeCameraYaw(");
+    expect(updateSource).not.toContain("this.yaw = nextBearing");
+    expect(referenceSource).toContain("normalizeRadians(nextSunBearing - previousSunBearing)");
   });
 
   it("keeps strategic shadow connectors alongside analytic per-fragment solar visibility", () => {

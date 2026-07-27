@@ -29,6 +29,8 @@ import {
   resolveArrivalOrbitHandoffProgress,
   resolveWheelZoomStep
 } from "./cameraZoom";
+import { advanceSunRelativeCameraYaw, type CinematicCameraReferenceMode } from "./cameraReference";
+import { resolveDampedCameraControlVelocity } from "./cameraControls";
 import {
   buildFirePreviewGeometry,
   buildTrajectoryPlaneReflectionPoints,
@@ -1124,6 +1126,10 @@ const smoothWheelZoomSnapEpsilon = 0.025;
 const keyboardCinematicZoomDistanceRatePerSecond = 1.1;
 const keyboardCinematicOrbitRadiansPerSecond = 0.36;
 const keyboardCinematicPanPixelsPerSecond = 240;
+const keyboardCinematicAccelerationTimeConstantMs = 48;
+const keyboardCinematicReleaseTimeConstantMs = 115;
+const keyboardCinematicAngularVelocityStopEpsilon = 0.0005;
+const keyboardCinematicPanVelocityStopEpsilon = 0.2;
 const trajectoryLabelCameraSettleMs = 150;
 // Drawing-buffer reallocations are substantially more expensive than ordinary presentation work.
 // Keep them outside the short settling tail of a camera gesture so an adaptive-mode change cannot
@@ -2338,6 +2344,9 @@ export class CinematicSolarSystemRenderer {
   private yaw = 0;
   private pitch = maxPitch;
   private distance = maxDistance;
+  private cameraReferenceMode: CinematicCameraReferenceMode = "inertial";
+  private sunRelativeCameraTargetKey: string | null = null;
+  private sunRelativeCameraBearing: number | null = null;
   private readonly keyboardCameraControls = {
     zoomIn: false,
     zoomOut: false,
@@ -2347,6 +2356,12 @@ export class CinematicSolarSystemRenderer {
     panRight: false,
     panUp: false,
     panDown: false
+  };
+  private readonly keyboardCameraVelocity = {
+    zoomLogDistancePerSecond: 0,
+    orbitRadiansPerSecond: 0,
+    panXPixelsPerSecond: 0,
+    panYPixelsPerSecond: 0
   };
   private keyboardCameraLastUpdatedAt = performance.now();
   private smoothWheelZoomTargetDistance: number | null = null;
@@ -3793,6 +3808,7 @@ export class CinematicSolarSystemRenderer {
     this.clearSmoothWheelZoomTarget();
     this.clearArrivalChaseCamera();
     this.clearShipyardAssemblyChaseCamera();
+    this.rebaseSunRelativeCameraReference();
     this.refreshDisplayScale();
     this.updateCamera();
     if (options.deferRender !== true) {
@@ -3979,6 +3995,7 @@ export class CinematicSolarSystemRenderer {
     this.focusedTargetKey = cameraState.focusedTargetKey;
     this.trackedFocusTargetKey = cameraState.trackedFocusTargetKey;
     this.restoreManualPanDisplayScaleContext(cameraState);
+    this.rebaseSunRelativeCameraReference();
   }
 
   previewCommandLogCueCamera(nodeIds: readonly string[], durationMs = 190): boolean {
@@ -11313,6 +11330,10 @@ export class CinematicSolarSystemRenderer {
     this.keyboardCameraControls.orbitClockwise = false;
     this.keyboardCameraControls.orbitCounterClockwise = false;
     this.clearKeyboardPanControls();
+    this.keyboardCameraVelocity.zoomLogDistancePerSecond = 0;
+    this.keyboardCameraVelocity.orbitRadiansPerSecond = 0;
+    this.keyboardCameraVelocity.panXPixelsPerSecond = 0;
+    this.keyboardCameraVelocity.panYPixelsPerSecond = 0;
   };
 
   private handleKeyboardCameraKey(event: KeyboardEvent, isPressed: boolean): void {
@@ -11324,7 +11345,9 @@ export class CinematicSolarSystemRenderer {
     }
 
     if (event.key === "Shift" && !isPressed) {
+      this.updateKeyboardCameraControls(performance.now());
       this.clearKeyboardPanControls();
+      event.preventDefault();
       return;
     }
 
@@ -11343,9 +11366,17 @@ export class CinematicSolarSystemRenderer {
     const isPanKey = isPressed && event.shiftKey;
 
     if (!isPressed) {
+      if (this.isKeyboardCameraArrowKey(event.key)) {
+        // Integrate the small interval between the last animation frame and the physical key-up
+        // before clearing the held state. Otherwise the release frame can visibly fall back to
+        // the previous sampled pose, especially in a close focused orbit.
+        this.updateKeyboardCameraControls(performance.now());
+      }
       if (!this.releaseKeyboardCameraArrowKey(event.key)) {
         return;
       }
+    } else if (event.key.toLowerCase() === "c" && !event.repeat) {
+      this.toggleCameraReferenceMode();
     } else if (event.key === "ArrowUp") {
       this.keyboardCameraControls.zoomIn = !isPanKey;
       this.keyboardCameraControls.panUp = isPanKey;
@@ -12448,14 +12479,22 @@ export class CinematicSolarSystemRenderer {
 
     const zoomDirection =
       (this.keyboardCameraControls.zoomOut ? 1 : 0) - (this.keyboardCameraControls.zoomIn ? 1 : 0);
+    this.keyboardCameraVelocity.zoomLogDistancePerSecond = resolveDampedCameraControlVelocity({
+      current: this.keyboardCameraVelocity.zoomLogDistancePerSecond,
+      target: zoomDirection * keyboardCinematicZoomDistanceRatePerSecond,
+      deltaSeconds,
+      accelerationTimeConstantMs: keyboardCinematicAccelerationTimeConstantMs,
+      releaseTimeConstantMs: keyboardCinematicReleaseTimeConstantMs,
+      stopEpsilon: keyboardCinematicAngularVelocityStopEpsilon
+    });
     let didMoveCamera = false;
 
-    if (zoomDirection !== 0) {
+    if (this.keyboardCameraVelocity.zoomLogDistancePerSecond !== 0) {
       const minimumDistance = this.getMinimumCameraDistance();
       const zoomOutLimit = this.getZoomOutLimit();
       const baseDistance = clamp(this.distance, minimumDistance, zoomOutLimit);
       const zoomFactor = Math.exp(
-        zoomDirection * keyboardCinematicZoomDistanceRatePerSecond * deltaSeconds
+        this.keyboardCameraVelocity.zoomLogDistancePerSecond * deltaSeconds
       );
       const nextDistance = clamp(baseDistance * zoomFactor, minimumDistance, zoomOutLimit);
 
@@ -12469,9 +12508,17 @@ export class CinematicSolarSystemRenderer {
     const orbitDirection =
       (this.keyboardCameraControls.orbitCounterClockwise ? 1 : 0) -
       (this.keyboardCameraControls.orbitClockwise ? 1 : 0);
+    this.keyboardCameraVelocity.orbitRadiansPerSecond = resolveDampedCameraControlVelocity({
+      current: this.keyboardCameraVelocity.orbitRadiansPerSecond,
+      target: -orbitDirection * keyboardCinematicOrbitRadiansPerSecond,
+      deltaSeconds,
+      accelerationTimeConstantMs: keyboardCinematicAccelerationTimeConstantMs,
+      releaseTimeConstantMs: keyboardCinematicReleaseTimeConstantMs,
+      stopEpsilon: keyboardCinematicAngularVelocityStopEpsilon
+    });
 
-    if (orbitDirection !== 0) {
-      const yawDelta = -orbitDirection * keyboardCinematicOrbitRadiansPerSecond * deltaSeconds;
+    if (this.keyboardCameraVelocity.orbitRadiansPerSecond !== 0) {
+      const yawDelta = this.keyboardCameraVelocity.orbitRadiansPerSecond * deltaSeconds;
       this.yaw += yawDelta;
       this.offsetActiveCameraTransitionRotation(yawDelta, 0);
       didMoveCamera = true;
@@ -12482,16 +12529,34 @@ export class CinematicSolarSystemRenderer {
       (this.keyboardCameraControls.panRight ? 1 : 0);
     const panYDirection =
       (this.keyboardCameraControls.panUp ? 1 : 0) - (this.keyboardCameraControls.panDown ? 1 : 0);
+    const diagonalScale = panXDirection !== 0 && panYDirection !== 0 ? Math.SQRT1_2 : 1;
+    this.keyboardCameraVelocity.panXPixelsPerSecond = resolveDampedCameraControlVelocity({
+      current: this.keyboardCameraVelocity.panXPixelsPerSecond,
+      target: panXDirection * keyboardCinematicPanPixelsPerSecond * diagonalScale,
+      deltaSeconds,
+      accelerationTimeConstantMs: keyboardCinematicAccelerationTimeConstantMs,
+      releaseTimeConstantMs: keyboardCinematicReleaseTimeConstantMs,
+      stopEpsilon: keyboardCinematicPanVelocityStopEpsilon
+    });
+    this.keyboardCameraVelocity.panYPixelsPerSecond = resolveDampedCameraControlVelocity({
+      current: this.keyboardCameraVelocity.panYPixelsPerSecond,
+      target: panYDirection * keyboardCinematicPanPixelsPerSecond * diagonalScale,
+      deltaSeconds,
+      accelerationTimeConstantMs: keyboardCinematicAccelerationTimeConstantMs,
+      releaseTimeConstantMs: keyboardCinematicReleaseTimeConstantMs,
+      stopEpsilon: keyboardCinematicPanVelocityStopEpsilon
+    });
 
-    if (panXDirection !== 0 || panYDirection !== 0) {
+    if (
+      this.keyboardCameraVelocity.panXPixelsPerSecond !== 0 ||
+      this.keyboardCameraVelocity.panYPixelsPerSecond !== 0
+    ) {
       const previousFocus = this.focus.clone();
-      const diagonalScale = panXDirection !== 0 && panYDirection !== 0 ? Math.SQRT1_2 : 1;
       // Screen-space speed is converted to world units using the current camera distance.
       // This keeps pan relative to zoom.
-      const panPixels = keyboardCinematicPanPixelsPerSecond * deltaSeconds * diagonalScale;
       this.panByScreenDelta({
-        x: panXDirection * panPixels,
-        y: panYDirection * panPixels
+        x: this.keyboardCameraVelocity.panXPixelsPerSecond * deltaSeconds,
+        y: this.keyboardCameraVelocity.panYPixelsPerSecond * deltaSeconds
       });
       this.offsetActiveCameraTransitionFocus(this.focus.clone().sub(previousFocus));
       didMoveCamera = true;
@@ -12512,7 +12577,11 @@ export class CinematicSolarSystemRenderer {
       this.keyboardCameraControls.panLeft ||
       this.keyboardCameraControls.panRight ||
       this.keyboardCameraControls.panUp ||
-      this.keyboardCameraControls.panDown
+      this.keyboardCameraControls.panDown ||
+      this.keyboardCameraVelocity.zoomLogDistancePerSecond !== 0 ||
+      this.keyboardCameraVelocity.orbitRadiansPerSecond !== 0 ||
+      this.keyboardCameraVelocity.panXPixelsPerSecond !== 0 ||
+      this.keyboardCameraVelocity.panYPixelsPerSecond !== 0
     );
   }
 
@@ -19480,6 +19549,8 @@ export class CinematicSolarSystemRenderer {
   }
 
   private updateCamera(): void {
+    this.updateSunRelativeCameraYaw();
+
     if (this.pitch >= maxPitch - topDownPitchEpsilon) {
       this.camera.position.set(this.focus.x, this.focus.y + this.distance, this.focus.z);
       this.camera.up.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
@@ -19498,6 +19569,66 @@ export class CinematicSolarSystemRenderer {
     // camera-dependent endpoint in the same update transaction as orbit/pan/zoom so the line
     // cannot trail the destination between tactical-presentation rebuilds.
     this.syncScreenStableBurnTransferFieldConnectors();
+  }
+
+  private toggleCameraReferenceMode(): void {
+    this.cameraReferenceMode =
+      this.cameraReferenceMode === "inertial" ? "sun-relative" : "inertial";
+    this.rebaseSunRelativeCameraReference();
+    this.noteTrajectoryLabelCameraMotion();
+  }
+
+  private rebaseSunRelativeCameraReference(): void {
+    this.sunRelativeCameraTargetKey = this.trackedFocusTargetKey;
+    this.sunRelativeCameraBearing = this.getTrackedFocusSunBearing();
+  }
+
+  private updateSunRelativeCameraYaw(): void {
+    if (this.cameraReferenceMode !== "sun-relative") {
+      this.sunRelativeCameraTargetKey = null;
+      this.sunRelativeCameraBearing = null;
+      return;
+    }
+
+    const targetKey = this.trackedFocusTargetKey;
+    const previousBearing = this.sunRelativeCameraBearing;
+    const nextBearing = this.getTrackedFocusSunBearing();
+
+    if (targetKey === null || nextBearing === null) {
+      this.sunRelativeCameraTargetKey = targetKey;
+      this.sunRelativeCameraBearing = nextBearing;
+      return;
+    }
+
+    const shouldOnlyRebase =
+      this.sunRelativeCameraTargetKey !== targetKey ||
+      previousBearing === null ||
+      this.focusPanTransition !== null ||
+      this.arrivalChaseCamera !== null ||
+      this.shipyardAssemblyChaseCamera !== null ||
+      this.hasTutorialCameraAssist();
+
+    if (!shouldOnlyRebase) {
+      this.yaw = advanceSunRelativeCameraYaw(this.yaw, previousBearing, nextBearing);
+    }
+
+    this.sunRelativeCameraTargetKey = targetKey;
+    this.sunRelativeCameraBearing = nextBearing;
+  }
+
+  private getTrackedFocusSunBearing(): number | null {
+    if (this.trackedFocusTargetKey === null) {
+      return null;
+    }
+
+    const toSun = this.sunPosition.clone().sub(this.focus);
+    toSun.y = 0;
+
+    if (toSun.lengthSq() <= 0.0001) {
+      return null;
+    }
+
+    return Math.atan2(toSun.x, toSun.z);
   }
 
   private updateLabels(): void {
