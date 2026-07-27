@@ -4009,11 +4009,14 @@ describe("Cinematic 3D architecture boundary", () => {
     const focusWithoutZoomStart = source.indexOf(
       "  focusTargetWithoutZoom(targetKey: string, options: FocusTargetWithoutZoomOptions = {}): void {"
     );
-    const focusSelectedStart = source.indexOf("  focusSelected(): void {");
-    const focusWithoutZoomSource = source.slice(focusWithoutZoomStart, focusSelectedStart);
+    const focusIfOffScreenStart = source.indexOf(
+      "  focusTargetIfOffScreenWithoutZoom(targetKey: string): boolean {",
+      focusWithoutZoomStart
+    );
+    const focusWithoutZoomSource = source.slice(focusWithoutZoomStart, focusIfOffScreenStart);
 
     expect(focusWithoutZoomStart).toBeGreaterThanOrEqual(0);
-    expect(focusSelectedStart).toBeGreaterThan(focusWithoutZoomStart);
+    expect(focusIfOffScreenStart).toBeGreaterThan(focusWithoutZoomStart);
     expect(focusWithoutZoomSource).toContain('targetKey === "body:sun"');
     expect(focusWithoutZoomSource).toContain("previousFocusedTargetKey");
     expect(focusWithoutZoomSource).toContain("trackedFocusTargetKey = targetKey");
@@ -6591,6 +6594,12 @@ describe("Cinematic 3D architecture boundary", () => {
       join(process.cwd(), "src/renderers/cinematic3d/index.ts"),
       "utf8"
     );
+    const replayFocusStart = rendererSource.indexOf("  private applyReplayTimelineFocus(");
+    const replayFocusEnd = rendererSource.indexOf(
+      "  private getActiveMovingTargetPosition(",
+      replayFocusStart
+    );
+    const replayFocusSource = rendererSource.slice(replayFocusStart, replayFocusEnd);
 
     expect(uiSource).toContain("onUserFocusChange(targetKey: string)");
     expect(uiSource).toContain("setUserReplayFocusTarget(targetKey)");
@@ -6602,7 +6611,12 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(rendererSource).toContain("this.getActiveMovingTargetPosition(targetKey)");
     expect(rendererSource).toContain("descriptor.originTargetKey");
     expect(rendererSource).toContain("descriptor.destinationTargetKey");
-    expect(rendererSource).toContain("this.applyReplayMovingFocusFraming(");
+    expect(rendererSource).not.toContain("applyReplayMovingFocusFraming");
+    expect(rendererSource).toContain("this.distance = this.getFocusTargetSafeCameraDistance(");
+    expect(replayFocusStart).toBeGreaterThanOrEqual(0);
+    expect(replayFocusEnd).toBeGreaterThan(replayFocusStart);
+    expect(replayFocusSource).not.toContain("this.yaw =");
+    expect(replayFocusSource).not.toContain("this.pitch =");
     expect(rendererSource).toContain("this.activeMissileTargetDirections.set(");
     expect(rendererSource).toContain("this.syncReplayTransientTimeline(");
     expect(rendererSource).toContain("this.syncReplayDestructionTimeline(");
@@ -6848,7 +6862,12 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(playReplaySource).toContain("clearPresentationEffects()");
     expect(playReplaySource).toContain("focusReplayCameraForTransition(transition)");
     expect(playReplaySource).toContain("captureCameraState()");
+    expect(playReplaySource).toContain("getTimelineReviewCameraFocusTargetKeys(liveCameraState)");
+    expect(playReplaySource).toContain("userReplayFocusTargetKeys = liveReplayFocusTargetKeys");
     expect(playReplaySource).toContain("replayEndCameraState");
+    expect(playReplaySource).toContain(
+      "userReplayFocusTargetKeys.length > 0\n          ? capturedReplayEndCameraState"
+    );
     expect(playReplaySource).toContain("restoreCameraState(replayEndCameraState)");
     expect(playReplaySource).not.toContain("restoreCameraState(liveCameraState)");
     expect(playReplaySource).not.toContain("applyCommand");
@@ -7318,8 +7337,8 @@ describe("Cinematic 3D architecture boundary", () => {
 
     expect(source).toContain("burnPreviewLaunchNoseClearanceModelLengthRatio");
     expect(source).toContain("burnPreviewLaunchNoseClearanceScreenPadding");
-    expect(source).toContain("burnPreviewLaunchNoseClearanceModelLengthRatio = 0.48");
-    expect(source).toContain("burnPreviewLaunchNoseClearanceScreenPadding = 1");
+    expect(source).toContain("burnPreviewLaunchNoseClearanceModelLengthRatio = 0.62");
+    expect(source).toContain("burnPreviewLaunchNoseClearanceScreenPadding = 6");
     expect(resolveStart).toBeGreaterThanOrEqual(0);
     expect(renderStart).toBeGreaterThan(resolveStart);
     expect(clearanceStart).toBeGreaterThanOrEqual(0);

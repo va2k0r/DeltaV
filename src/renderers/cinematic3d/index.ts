@@ -1670,8 +1670,8 @@ const wreckageChunkShipScale = 0.6;
 const shipMarkerApproxVisualLength = 1.87;
 // Start BURN/FIRE tracers at the readable nose instead of leaving a zoom-amplified gap. Keep the
 // ribbon at constant width: collapsing it to a point here makes the first dash read as a funnel.
-const burnPreviewLaunchNoseClearanceModelLengthRatio = 0.48;
-const burnPreviewLaunchNoseClearanceScreenPadding = 1;
+const burnPreviewLaunchNoseClearanceModelLengthRatio = 0.62;
+const burnPreviewLaunchNoseClearanceScreenPadding = 6;
 const wreckageChunkApproxVisualLength = 1.22;
 const wreckageChunkScreenPixelMultiplier =
   (shipMarkerApproxVisualLength * wreckageChunkShipScale) / wreckageChunkApproxVisualLength;
@@ -2268,7 +2268,6 @@ export class CinematicSolarSystemRenderer {
   private readonly activeMissileTargetDirections = new Map<string, THREE.Vector3>();
   private readonly transientTargetLastKnownPositions = new Map<string, THREE.Vector3>();
   private readonly replayMovingFocusDescriptors = new Map<string, ReplayMovingFocusDescriptor>();
-  private replayMovingFocusLastUpdatedAt = Number.NEGATIVE_INFINITY;
   private readonly activeBurnLaunchPositions = new Map<string, THREE.Vector3>();
   private readonly activeBurnLaunchOriginFrames = new Map<string, LaunchOriginPresentationFrame>();
   private readonly activeBurnLaunchAngles = new Map<string, number>();
@@ -2880,7 +2879,6 @@ export class CinematicSolarSystemRenderer {
     this.pendingReplayPreview = null;
     this.clearReplayDestructionTimelineCache();
     this.replayMovingFocusDescriptors.clear();
-    this.replayMovingFocusLastUpdatedAt = Number.NEGATIVE_INFINITY;
     this.clearSmoothWheelZoomTarget();
     this.clearArrivalChaseCamera();
     this.clearShipyardAssemblyChaseCamera();
@@ -4756,7 +4754,6 @@ export class CinematicSolarSystemRenderer {
         this.focusedTargetKey = this.getPresentationFocusTargetKey(targetKey);
         this.trackedFocusTargetKey = targetKey;
         this.focus.copy(activePosition);
-        this.applyReplayMovingFocusFraming(targetKey, activePosition);
         if (focusChanged) {
           this.refreshDisplayScale();
         }
@@ -4779,6 +4776,11 @@ export class CinematicSolarSystemRenderer {
         this.focusedTargetKey = this.getPresentationFocusTargetKey(fallbackTargetKey);
         this.trackedFocusTargetKey = fallbackTargetKey;
         this.focus.copy(fallbackPosition);
+        this.distance = this.getFocusTargetSafeCameraDistance(
+          fallbackTargetKey,
+          fallbackPosition,
+          this.distance
+        );
         if (focusChanged) {
           this.refreshDisplayScale();
         }
@@ -4989,26 +4991,6 @@ export class CinematicSolarSystemRenderer {
     return (
       missileId !== null && snapshot.activeMissiles.some((candidate) => candidate.id === missileId)
     );
-  }
-
-  private applyReplayMovingFocusFraming(targetKey: string, targetPosition: THREE.Vector3): void {
-    const direction =
-      this.activeBurnTargetDirections.get(targetKey) ??
-      this.activeMissileTargetDirections.get(targetKey);
-
-    if (direction === undefined) {
-      return;
-    }
-
-    const now = performance.now();
-    const deltaMs = Number.isFinite(this.replayMovingFocusLastUpdatedAt)
-      ? clamp(now - this.replayMovingFocusLastUpdatedAt, 0, 80)
-      : 16;
-    this.replayMovingFocusLastUpdatedAt = now;
-    const smoothing = 1 - Math.exp(-deltaMs / arrivalChaseYawTimeConstantMs);
-    const chaseYaw = this.getBacklitChaseYaw(targetPosition, direction);
-    this.yaw = lerpRadians(this.yaw, chaseYaw, smoothing);
-    this.noteTrajectoryLabelCameraMotion(now);
   }
 
   private isWorldPositionOnScreen(position: THREE.Vector3): boolean {
@@ -8843,9 +8825,16 @@ export class CinematicSolarSystemRenderer {
       return true;
     }
 
+    const targetDistance = this.getFocusTargetSafeCameraDistance(
+      destinationTargetKey,
+      targetPosition,
+      this.distance
+    );
     this.focusPanTransition = {
       from: this.focus.clone(),
       to: targetPosition.clone(),
+      fromDistance: this.distance,
+      toDistance: targetDistance,
       startedAt: performance.now(),
       durationMs: this.tuning.focusPanDurationMs,
       allowDuringTurnTransition: true

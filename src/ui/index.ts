@@ -9128,9 +9128,14 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     const liveLockedMandatoryLaunchId = lockedMandatoryLaunchId;
     const liveCurrentView = currentView;
     const liveHash = hashReplayState(liveState);
+    const liveCameraState = cinematicRenderer.captureCameraState();
+    const liveReplayFocusTargetKeys =
+      liveCurrentView === "cinematic3d"
+        ? getTimelineReviewCameraFocusTargetKeys(liveCameraState)
+        : [];
 
     isReplayMode = true;
-    userReplayFocusTargetKeys = [];
+    userReplayFocusTargetKeys = liveReplayFocusTargetKeys;
     replayCancelRequested = false;
     replayIndicator.textContent = "REPLAY";
     isTurnTransitionActive = false;
@@ -9165,9 +9170,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         await cinematicRenderer.animateReplayTransition(transition.from, transition.to);
       }
     } finally {
-      const replayEndCameraState = detachCinematicCameraTracking(
-        cinematicRenderer.captureCameraState()
-      );
+      const capturedReplayEndCameraState = cinematicRenderer.captureCameraState();
+      const replayEndCameraState =
+        userReplayFocusTargetKeys.length > 0
+          ? capturedReplayEndCameraState
+          : detachCinematicCameraTracking(capturedReplayEndCameraState);
 
       state = liveState;
       snapshot = liveSnapshot;
