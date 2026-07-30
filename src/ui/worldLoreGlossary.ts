@@ -419,10 +419,9 @@ export const worldLoreGlossaryEntries = [
     id: "life-support",
     label: "LIFE SUPPORT",
     aliases: ["LIFE SUPPORT", "HABITATION", "HABITATION MODULE"],
-    short:
-      "A 150-day closed-loop system sized for the crew aboard now and the crews not yet launched.",
+    short: "A closed-loop system sized for the active crew and the reserve crews not yet launched.",
     detail: [
-      "Water and oxygen recycle; food, filters and medical stock set the hard campaign clock.",
+      "Water and oxygen recycle; food, filters and medical stock determine mission endurance.",
       "The first ship carries reserve complements for hulls expected to be commissioned during the operation.",
       "Storm shelter, bunks and exercise volume are shared by people who may later become separate crews.",
       "When the reserve departs, living space increases. Redundancy decreases."
@@ -675,10 +674,10 @@ export const worldLoreGlossaryEntries = [
     ],
     short: "The first openly attributable destruction beyond the protected corridor.",
     detail: [
-      "The conflict did not begin with the first sabotage. Drones had failed strangely, cargo had drifted and software had lied for years.",
-      "It began when one registered ship deliberately closed a firing solution on another and preserved the telemetry.",
-      "Deniability ended before governments agreed what collective response was lawful.",
-      "That timestamp begins the 150-day Saturn crisis."
+      "No registered operator has previously used a ship weapon against another registered vessel.",
+      "The incident begins when one ship deliberately closes a firing solution and the complete telemetry survives.",
+      "Authorities classify the record as intentional lethal action while the event is still in progress.",
+      "That timestamp is the first confirmed armed exchange in the incident record."
     ]
   },
   {

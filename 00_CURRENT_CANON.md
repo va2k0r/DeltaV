@@ -356,3 +356,18 @@ Planets, moons, ships, and trajectories cross the static frame as the demo advan
 
 This composition is the player’s opening view of DeltaV and should remain legible as a moving
 banner rather than behaving like a gameplay focus camera.
+
+## 16. Log lore style and conflict duration
+
+Extended log entries are intradiegetic except for the existing control instructions.
+
+```text
+Write lore as a terse technical manual.
+Use direct, factual statements.
+Do not use slogans, aphorisms, punchlines, dramatic parallelism, or trailer-style phrasing.
+```
+
+The 2079 Saturn incident is the first confirmed use of a registered ship weapon against another
+registered vessel. No fixed duration is canonical for the conflict that follows. Match length,
+turn count, and provisional development estimates must not be converted into an in-world campaign
+duration.

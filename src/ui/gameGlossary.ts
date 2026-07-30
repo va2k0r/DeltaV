@@ -214,7 +214,7 @@ const mechanicGlossaryEntries = [
       "Ships are manned. Automation reduces watch size; it does not hold legal responsibility for lethal release.",
       "A minimum independent complement is twelve: command, flight, reactor, weapons, systems and medicine.",
       "A typical opening ship carries four complements—48 people—to crew itself and three expected SHIPYARD outputs.",
-      "Reserve teams share the parent ship's 150-day life support until commissioning.",
+      "Reserve teams use the parent ship's life-support capacity until commissioning.",
       "CREW has no separate game statistic. SIGNAL LOST means those people were not recovered."
     ]
   },
@@ -517,7 +517,7 @@ const mechanicGlossaryEntries = [
       "Operational unit: each TURN resolves as WORK, EVADE, BURN or FIRE, subject to CONTESTED restrictions.",
       "A docking spine carries replaceable habitat, reactor, radiator and weapon modules.",
       "The weapon section mounts one rapid-fire turret and approximately ten to twelve nuclear missile-drones.",
-      "Life support is provisioned for 150 days and for reserve crews expected to commission new hulls.",
+      "Life support is provisioned for the active complement and the reserve crews expected to commission new hulls.",
       "Ships physically carry canisters and reaction mass, but the game exposes no local inventory.",
       "Every cost is paid from global faction ΔV."
     ]
@@ -576,11 +576,9 @@ const mechanicGlossaryEntries = [
     detail: [
       "Fusion power is mature; AI-scale compute expands until electricity, fabrication and discarded heat become the limits.",
       "Robotic mines, atmospheric skimmers and tritium plants have made the first outer systems independent of terrestrial fuel.",
-      "Earth and MOON remain PROTECTED. Their law reaches every registered ship; their force does not.",
+      "Earth and MOON remain PROTECTED. Registered ships remain under terrestrial jurisdiction; enforcement assets are concentrated in the corridor.",
       "Corporate FACTIONS own the only complete industrial fleets near the gas and ice giants.",
-      "The first attributable hostile action occurs near Saturn. Debate, sanctions and warrants begin on Earth the same day.",
-      "The Saturn campaign spans roughly 150 days—enough for the conflict to end, not for a new public fleet to reach it.",
-      "By day 150, Earth is still debating an enforcement architecture for a war its participants already consider settled."
+      "The first attributable hostile action occurs near Saturn. Terrestrial authorities begin legal and diplomatic review after receiving the telemetry."
     ]
   },
   {
@@ -870,22 +868,6 @@ function createDynamicGameGlossaryEntry(id: string): GameGlossaryEntry | undefin
   }
 
   if (kind === "days") {
-    if (raw.replace("~", "") === "150") {
-      return {
-        id,
-        label: raw,
-        aliases: [],
-        short:
-          "The operational horizon: long enough to finish the war, too short to send a new fleet.",
-        detail: [
-          "Ships embark food, filters, medical stock and reserve crews for roughly 150 days.",
-          "The Saturn theatre can exchange telemetry with Earth in hours; physical reinforcement remains a transfer problem.",
-          "Courts, sanctions and emergency summits move while the already-deployed fleets fight.",
-          "By the time Earth agrees who should enforce the law, TRITIUM viability has already decided the conflict."
-        ]
-      };
-    }
-
     return {
       id,
       label: raw,

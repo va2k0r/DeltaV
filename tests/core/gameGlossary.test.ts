@@ -150,7 +150,9 @@ describe("game glossary", () => {
 
   it("records manned ship, missile and contested-orbit doctrine", () => {
     expect(getGameGlossaryEntry("crew")?.detail.join(" ")).toMatch(/twelve.*48/iu);
-    expect(getGameGlossaryEntry("ship")?.detail.join(" ")).toMatch(/150 days/iu);
+    expect(getGameGlossaryEntry("ship")?.detail.join(" ")).toMatch(
+      /active complement.*reserve crews/iu
+    );
     expect(getGameGlossaryEntry("missile")?.detail.join(" ")).toMatch(
       /ten to twelve.*blind angle/iu
     );
@@ -173,8 +175,16 @@ describe("game glossary", () => {
     expect(getGameGlossaryEntry("jurisdiction")?.detail.join(" ")).toMatch(
       /Murder near Saturn.*prosecutable.*marshal/iu
     );
-    expect(getGameGlossaryEntry("value:days:150")?.detail.join(" ")).toMatch(
-      /Courts, sanctions.*already-deployed fleets/iu
+  });
+
+  it("does not assign a canonical duration to the first armed conflict", () => {
+    const playerCopy = gameGlossaryEntries
+      .flatMap((entry) => [entry.label, entry.short, ...entry.detail])
+      .join(" ");
+
+    expect(playerCopy).not.toMatch(/\b150[- ]days?\b/iu);
+    expect(playerCopy).not.toContain(
+      "Their law reaches every registered ship; their force does not."
     );
   });
 
