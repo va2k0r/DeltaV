@@ -2,11 +2,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { astronomicalGlossaryEntries } from "../../src/ui/astronomicalGlossary";
 import {
   gameGlossaryEntries,
   getGameGlossaryEntry,
   tokenizeGameGlossaryText
 } from "../../src/ui/gameGlossary";
+import { worldLoreGlossaryEntries } from "../../src/ui/worldLoreGlossary";
 
 describe("game glossary", () => {
   it("reserves the first activation for context and closes it before the log action", () => {
@@ -123,6 +125,108 @@ describe("game glossary", () => {
     expect(getGameGlossaryEntry("contested")?.detail.join(" ")).toContain("2 ΔV");
   });
 
+  it("keeps atomic commands mechanical while routing physical phrases into lore", () => {
+    const burn = getGameGlossaryEntry("burn");
+    const burnCopy = [burn?.short, ...(burn?.detail ?? [])].join(" ");
+    const doctrineIds = tokenizeGameGlossaryText(
+      "Fusion torch drives burn tritium under continuous acceleration. Hard-kill kinetic point defense."
+    ).flatMap((token) =>
+      token.glossaryId === undefined || token.glossaryId.startsWith("word:")
+        ? []
+        : [token.glossaryId]
+    );
+
+    expect(burnCopy).not.toMatch(/crew|corporation|fusion|tritium/iu);
+    expect(doctrineIds).toEqual([
+      "fusion-torch",
+      "burn",
+      "tritium",
+      "continuous-acceleration",
+      "hard-kill",
+      "kinetic",
+      "point-defense"
+    ]);
+  });
+
+  it("records manned ship, missile and contested-orbit doctrine", () => {
+    expect(getGameGlossaryEntry("crew")?.detail.join(" ")).toMatch(/twelve.*48/iu);
+    expect(getGameGlossaryEntry("ship")?.detail.join(" ")).toMatch(/150 days/iu);
+    expect(getGameGlossaryEntry("missile")?.detail.join(" ")).toMatch(
+      /ten to twelve.*blind angle/iu
+    );
+    expect(getGameGlossaryEntry("point-defense")?.detail.join(" ")).toMatch(
+      /spiral-zeroing.*1 ΔV.*Two coordinated missiles/iu
+    );
+    expect(getGameGlossaryEntry("contested")?.detail.join(" ")).toMatch(
+      /circle.*support ship.*second attack vector/iu
+    );
+  });
+
+  it("covers the fusion, compute and delayed-enforcement setting", () => {
+    expect(getGameGlossaryEntry("nuclear")?.detail.join(" ")).toMatch(
+      /Fusion stations.*server farms.*Earth-Moon/iu
+    );
+    expect(getGameGlossaryEntry("artificial-intelligence")?.detail.join(" ")).toMatch(
+      /materials.*compute.*eighty-minute/iu
+    );
+    expect(getGameGlossaryEntry("tritium")?.detail.join(" ")).toMatch(/lithium-6.*12.3-year/iu);
+    expect(getGameGlossaryEntry("jurisdiction")?.detail.join(" ")).toMatch(
+      /Murder near Saturn.*prosecutable.*marshal/iu
+    );
+    expect(getGameGlossaryEntry("value:days:150")?.detail.join(" ")).toMatch(
+      /Courts, sanctions.*already-deployed fleets/iu
+    );
+  });
+
+  it("hides a sparse, linked chronology inside relevant lore", () => {
+    const milestoneYears = ["2043", "2058", "2069", "2076"];
+
+    for (const year of milestoneYears) {
+      const token = tokenizeGameGlossaryText(year)[0];
+      const entry =
+        token?.glossaryId === undefined ? undefined : getGameGlossaryEntry(token.glossaryId);
+
+      expect(token?.glossaryId).toBe(`year-${year}`);
+      expect(entry?.detail.join(" ")).toContain("2079");
+      expect(entry?.detail.length).toBe(3);
+    }
+
+    expect(getGameGlossaryEntry("artificial-intelligence")?.detail.join(" ")).toContain("2043");
+    expect(getGameGlossaryEntry("fusion")?.detail.join(" ")).toContain("2058");
+    expect(getGameGlossaryEntry("server-farm")?.detail.join(" ")).toContain("2069");
+    expect(getGameGlossaryEntry("automated-mining")?.detail.join(" ")).toContain("2076");
+  });
+
+  it("keeps lore pages terse, bounded and deliberately varied", () => {
+    const lineCounts = new Set<number>();
+
+    for (const entry of worldLoreGlossaryEntries) {
+      lineCounts.add(entry.detail.length);
+      expect(entry.detail.length).toBeGreaterThanOrEqual(2);
+      expect(entry.detail.length).toBeLessThanOrEqual(5);
+      expect(Math.max(...entry.detail.map((line) => line.length))).toBeLessThanOrEqual(160);
+      expect(entry.detail.reduce((sum, line) => sum + line.length, 0)).toBeLessThanOrEqual(650);
+    }
+
+    expect(lineCounts.size).toBeGreaterThanOrEqual(3);
+  });
+
+  it("adapts dense copy to the fixed, non-scrolling lore column", () => {
+    const controllerSource = readFileSync(
+      join(process.cwd(), "src/ui/gameGlossaryController.ts"),
+      "utf8"
+    );
+    const styles = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
+    const detailStyleStart = styles.indexOf(".command-glossary-detail {\n  top:");
+    const detailStyleEnd = styles.indexOf("}", detailStyleStart);
+    const detailStyle = styles.slice(detailStyleStart, detailStyleEnd);
+
+    expect(controllerSource).toContain('detailPanel.dataset["density"]');
+    expect(styles).toContain('.command-glossary-detail[data-density="dense"]');
+    expect(detailStyle).toContain("overflow-y: hidden;");
+    expect(detailStyle).not.toContain("overflow-y: auto;");
+  });
+
   it("links the scenario year, astronomical bodies and contextual telemetry", () => {
     const text = "2079 TURN 01 PLAYER 50 ΔV -> 46 ΔV Moon T+3 1/5 ~3 days";
     const tokens = tokenizeGameGlossaryText(text);
@@ -151,7 +255,7 @@ describe("game glossary", () => {
     ]);
   });
 
-  it("gives every active astronomical name a dossier and keeps Moon within one fixed column", () => {
+  it("gives every active astronomical name a dossier without assigning procedural roles", () => {
     const bodyNames = [
       "Sun",
       "Mercury",
@@ -179,9 +283,36 @@ describe("game glossary", () => {
     }
 
     const moon = getGameGlossaryEntry("moon");
-    expect(moon?.detail).toHaveLength(7);
-    expect(moon?.detail.join(" ")).toContain("GDP");
-    expect(moon?.detail.join(" ")).toContain("TRITIUM");
+    const astronomicalCopy = astronomicalGlossaryEntries
+      .flatMap((entry) => [entry.short, ...entry.detail])
+      .join(" ");
+
+    expect(moon?.detail).toHaveLength(5);
+    expect(moon?.detail.join(" ")).toContain("registries");
+    expect(astronomicalCopy).not.toMatch(
+      /\b(?:canonical|v10|node|shipyard|barren|work output|gravity modifier)\b/iu
+    );
+    expect(
+      astronomicalGlossaryEntries.every(
+        (entry) =>
+          entry.detail.length >= 4 &&
+          entry.detail.length <= 5 &&
+          entry.detail.every((line) => line.length <= 160)
+      )
+    ).toBe(true);
+  });
+
+  it("keeps expanded world lore intradiegetic", () => {
+    const year = getGameGlossaryEntry("year-2079");
+    const worldCopy = [
+      ...worldLoreGlossaryEntries.flatMap((entry) => [entry.short, ...entry.detail]),
+      year?.short ?? "",
+      ...(year?.detail ?? [])
+    ].join(" ");
+
+    expect(worldCopy).not.toMatch(
+      /\b(?:the game|gameplay|renderer|scenario|v10|canonical map|simulation state|one match)\b/iu
+    );
   });
 
   it("never invents slash headers inside player-facing glossary copy", () => {

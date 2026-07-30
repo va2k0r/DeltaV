@@ -14,12 +14,14 @@ import {
 import {
   createTutorialConfirmTransferBurnLiveRows,
   createTutorialEnemyContactVictoryWarningRows,
+  createTutorialFirstBurnTimeCostRows,
   createTutorialOpeningCameraControlLiveRows,
   createTutorialOverlayLiveHintRow,
   createTutorialPostVictoryActionRows,
   createTutorialPostVictoryAutomaticBehaviorRows,
   createTutorialSelectShipLiveRows,
   createTutorialShipyardContestedRuleRows,
+  createTutorialShipyardFirePromptRows,
   createTutorialShipyardProductionRows,
   createTutorialSpacerRow,
   createTutorialZoomFocusLiveRows,
@@ -98,6 +100,27 @@ describe("tutorial support production destinations", () => {
 });
 
 describe("tutorial row modules", () => {
+  it("explains that BURN and FIRE markers point to future positions", () => {
+    expect(createTutorialFirstBurnTimeCostRows("player-highlight")).toContainEqual({
+      parts: [
+        { text: "The arrival marker shows where the destination will be at " },
+        { text: "ARRIVAL", className: "player-highlight" },
+        { text: ", not where it is now." }
+      ],
+      className: tutorialLineClassName,
+      key: "tutorial:first-burn-arrival-marker"
+    });
+    expect(createTutorialShipyardFirePromptRows()).toContainEqual({
+      parts: [
+        { text: "The X marks the target's predicted position at " },
+        { text: "IMPACT", className: "command-console__event-contested" },
+        { text: ", not its current position." }
+      ],
+      className: tutorialLineClassName,
+      key: "tutorial:shipyard-fire-impact-marker"
+    });
+  });
+
   it("keeps arrival pans active after the opening turn", () => {
     expect(shouldPanTutorialTarget({ isFirstTurn: false, isArrival: true })).toBe(true);
     expect(shouldPanTutorialTarget({ isFirstTurn: false, isArrival: false })).toBe(false);
@@ -334,6 +357,12 @@ describe("tutorial row modules", () => {
   it("builds the post-replay enemy contact warning with only the warning prefix in red", () => {
     expect(createTutorialEnemyContactVictoryWarningRows()).toEqual([
       createTutorialSpacerRow("tutorial:first-enemy-kill-victory-warning:before"),
+      {
+        parts: [{ text: "TUTORIAL COMPLETE. NORMAL MATCH CONTROL RESTORED." }],
+        className: tutorialCompleteHintClassName,
+        key: "tutorial:first-enemy-kill-handoff"
+      },
+      createTutorialSpacerRow("tutorial:first-enemy-kill-victory-warning:handoff-spacer"),
       {
         parts: [
           { text: "WARNING:", className: "command-console__event-contested" },

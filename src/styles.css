@@ -826,6 +826,7 @@ select {
 
 .command-console {
   --command-console-line-right-gutter: clamp(24px, 3.2vw, 84px);
+  --command-console-tail-snap-padding: 0px;
   --command-console-transcript-headroom: clamp(112px, 15vh, 220px);
   position: fixed;
   top: clamp(16px, 2vh, 32px);
@@ -886,7 +887,7 @@ select {
   overscroll-behavior: contain;
   overflow-anchor: none;
   padding-top: 0.35em;
-  padding-bottom: 0.45em;
+  padding-bottom: calc(0.45em + var(--command-console-tail-snap-padding));
   scrollbar-width: none;
   color: rgba(224, 230, 234, 0.86);
   pointer-events: auto;
@@ -1072,6 +1073,27 @@ select {
   display: grid;
   gap: 0.18em;
   max-width: 54ch;
+}
+
+.command-glossary-detail[data-density="brief"] {
+  line-height: 1.28;
+}
+
+.command-glossary-detail[data-density="brief"] .command-glossary-detail__body {
+  gap: 0.24em;
+}
+
+.command-glossary-detail[data-density="dense"] {
+  font-size: clamp(11px, 0.82vw, 14px);
+  line-height: 1.18;
+}
+
+.command-glossary-detail[data-density="dense"] .command-glossary-detail__label {
+  margin-bottom: 0.52em;
+}
+
+.command-glossary-detail[data-density="dense"] .command-glossary-detail__body {
+  gap: 0.12em;
 }
 
 .command-glossary-detail__line {

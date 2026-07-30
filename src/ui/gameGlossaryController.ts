@@ -351,6 +351,7 @@ export function createGameGlossaryController(
     }
     detailPanel.classList.remove("is-hidden");
     detailPanel.classList.add("is-visible", "is-typewriting");
+    detailPanel.dataset["density"] = getGlossaryDetailDensity(entry);
     detailPanel.setAttribute("aria-hidden", "false");
     detailLabel.textContent = entry.label;
     detailBody.innerHTML = "";
@@ -451,6 +452,7 @@ export function createGameGlossaryController(
     cancelDetailAnimation();
     detailPanel.removeAttribute("data-glossary-id");
     detailPanel.removeAttribute("data-source-line-key");
+    detailPanel.removeAttribute("data-density");
     detailPanel.classList.remove("is-visible", "is-typewriting");
     detailPanel.classList.add("is-hidden");
     detailPanel.setAttribute("aria-hidden", "true");
@@ -580,6 +582,20 @@ function getGlossaryDetailTypewriterDuration(text: string): number {
     gameGlossaryDetailMinDurationMs,
     Math.min(gameGlossaryDetailMaxDurationMs, text.length * gameGlossaryDetailMsPerCharacter)
   );
+}
+
+function getGlossaryDetailDensity(entry: GameGlossaryEntry): "brief" | "standard" | "dense" {
+  const characterCount = entry.detail.reduce((sum, line) => sum + line.length, 0);
+
+  if (entry.detail.length <= 3 && characterCount <= 320) {
+    return "brief";
+  }
+
+  if (entry.detail.length >= 7 || characterCount >= 700) {
+    return "dense";
+  }
+
+  return "standard";
 }
 
 function clampGlossaryProgress(value: number): number {

@@ -712,6 +712,7 @@ type BurnTrajectoryDetailMode = "full" | "simple";
 
 type TrajectoryPlaneReflectionOptions = Readonly<{
   accentSpeed: number;
+  continuousSilhouette?: number;
   enabled: boolean;
   elapsed: number;
   points?: readonly THREE.Vector3[];
@@ -1161,7 +1162,7 @@ const futureFireImpactArmMinimumLengthOuterRadiusRatio = 0.42;
 const futureFireImpactArmMaximumLengthOuterRadiusRatio = 0.54;
 const futureFireImpactFallbackSmallestOrbitRadius = 7;
 const futureFireImpactArmLengthScale = 0.9;
-const futureFireImpactTickMinimumOuterRadiusPixels = 7.2;
+const futureFireImpactTickMinimumOuterRadiusPixels = 11;
 const futureFireImpactTickThicknessPixels = 1.35;
 const futureFireImpactArmDashCycle = 1;
 const futureFireImpactArmDashLength = futureFireImpactArmDashCycle * 0.58;
@@ -1351,8 +1352,8 @@ const minimalActiveMissileTrajectoryLimit = 2;
 const tacticalReadabilityFullUpdateSeconds = 1 / 30;
 const tacticalReadabilityReducedUpdateSeconds = 1 / 24;
 const tacticalReadabilityMinimalUpdateSeconds = 1 / 18;
-const detailedBodyAnimationReducedUpdateSeconds = 1 / 60;
-const detailedBodyAnimationMinimalUpdateSeconds = 1 / 60;
+const detailedBodyAnimationReducedUpdateSeconds = 1 / 45;
+const detailedBodyAnimationMinimalUpdateSeconds = 1 / 30;
 const labelPresentationReducedUpdateSeconds = 1 / 60;
 const labelPresentationMinimalUpdateSeconds = 1 / 60;
 const performanceSectionKeys = [
@@ -2217,6 +2218,7 @@ export class CinematicSolarSystemRenderer {
   private readonly burnTrajectoryPresentationKeysInUse = new Set<string>();
   private readonly activeBurnResolvedTrajectories = new Map<string, ResolvedBurnTrajectory>();
   private readonly activeMissileResolvedTrajectories = new Map<string, ResolvedFireTrajectory>();
+  private readonly pendingFireResolvedTrajectories = new Map<string, ResolvedFireTrajectory>();
   private readonly firePreviewGroup = new THREE.Group();
   private readonly firePreviewEffectGroup = new THREE.Group();
   private readonly confirmedFireEffectGroup = new THREE.Group();
@@ -14480,64 +14482,60 @@ export class CinematicSolarSystemRenderer {
         continue;
       }
 
-      setShaderUniformNumber(bodyObject.mesh.material, "time", elapsed);
-      setShaderUniformNumber(bodyObject.mesh.material, "beatElapsed", beatElapsedSeconds);
-      setShaderUniformNumber(
-        bodyObject.mesh.material,
-        "beatSeconds",
-        beatPulse?.secondsPerPulse ?? 1
-      );
-      setShaderUniformNumber(bodyObject.mesh.material, "beatSync", beatPulse === null ? 0 : 1);
-      setShaderUniformVector(bodyObject.mesh.material, "sunPosition", this.sunPosition);
-      if (bodyObject.cloudMesh !== null) {
-        setShaderUniformNumber(bodyObject.cloudMesh.material, "time", elapsed);
-        setShaderUniformNumber(bodyObject.cloudMesh.material, "beatElapsed", beatElapsedSeconds);
+      if (shouldUpdateDetailedBodyAnimation) {
+        setShaderUniformNumber(bodyObject.mesh.material, "time", elapsed);
+        setShaderUniformNumber(bodyObject.mesh.material, "beatElapsed", beatElapsedSeconds);
         setShaderUniformNumber(
-          bodyObject.cloudMesh.material,
+          bodyObject.mesh.material,
           "beatSeconds",
           beatPulse?.secondsPerPulse ?? 1
         );
-        setShaderUniformNumber(
-          bodyObject.cloudMesh.material,
-          "beatSync",
-          beatPulse === null ? 0 : 1
-        );
-        setShaderUniformVector(bodyObject.cloudMesh.material, "sunPosition", this.sunPosition);
-      }
-      if (shouldUpdateDetailedBodyAnimation) {
-        this.syncTritiumExtractionSurfaceGlowUniforms(bodyObject, body, elapsed);
-      }
-
-      if (body.visualClass === "star") {
-        const sunSurfaceSpeed = this.tuning.sunSurfaceAnimationSpeed;
-        bodyObject.mesh.rotation.y = getBeatSynchronizedCycleAngle(
-          elapsed,
-          sunSurfaceSpeed,
-          beatPulse
-        );
-        if (shouldUpdateDetailedBodyAnimation) {
-          this.syncSunGlowPresentation(bodyObject, body);
-        }
-      }
-
-      if (body.visualClass !== "star") {
-        const bodySelfRotation = getBeatSynchronizedCycleAngle(
-          elapsed,
-          getBodySelfRotationSpeed(body, this.tuning),
-          beatPulse
-        );
-        bodyObject.mesh.rotation.y = bodySelfRotation;
-        bodyObject.industrialLights.rotation.y = bodySelfRotation;
+        setShaderUniformNumber(bodyObject.mesh.material, "beatSync", beatPulse === null ? 0 : 1);
+        setShaderUniformVector(bodyObject.mesh.material, "sunPosition", this.sunPosition);
         if (bodyObject.cloudMesh !== null) {
-          bodyObject.cloudMesh.rotation.y = getBeatSynchronizedCycleAngle(
+          setShaderUniformNumber(bodyObject.cloudMesh.material, "time", elapsed);
+          setShaderUniformNumber(bodyObject.cloudMesh.material, "beatElapsed", beatElapsedSeconds);
+          setShaderUniformNumber(
+            bodyObject.cloudMesh.material,
+            "beatSeconds",
+            beatPulse?.secondsPerPulse ?? 1
+          );
+          setShaderUniformNumber(
+            bodyObject.cloudMesh.material,
+            "beatSync",
+            beatPulse === null ? 0 : 1
+          );
+          setShaderUniformVector(bodyObject.cloudMesh.material, "sunPosition", this.sunPosition);
+        }
+        this.syncTritiumExtractionSurfaceGlowUniforms(bodyObject, body, elapsed);
+
+        if (body.visualClass === "star") {
+          const sunSurfaceSpeed = this.tuning.sunSurfaceAnimationSpeed;
+          bodyObject.mesh.rotation.y = getBeatSynchronizedCycleAngle(
             elapsed,
-            this.tuning.earthCloudRotationSpeed,
+            sunSurfaceSpeed,
             beatPulse
           );
+          this.syncSunGlowPresentation(bodyObject, body);
         }
-      }
 
-      if (shouldUpdateDetailedBodyAnimation) {
+        if (body.visualClass !== "star") {
+          const bodySelfRotation = getBeatSynchronizedCycleAngle(
+            elapsed,
+            getBodySelfRotationSpeed(body, this.tuning),
+            beatPulse
+          );
+          bodyObject.mesh.rotation.y = bodySelfRotation;
+          bodyObject.industrialLights.rotation.y = bodySelfRotation;
+          if (bodyObject.cloudMesh !== null) {
+            bodyObject.cloudMesh.rotation.y = getBeatSynchronizedCycleAngle(
+              elapsed,
+              this.tuning.earthCloudRotationSpeed,
+              beatPulse
+            );
+          }
+        }
+
         this.syncSunlitPresentation(bodyObject, body, bodyObject.group.position, bodiesById);
         this.syncJupiterRingAnimation(bodyObject, body, elapsed);
         this.syncNeptuneRingAnimation(bodyObject, elapsed);
@@ -21942,7 +21940,7 @@ export class CinematicSolarSystemRenderer {
         : dimColor(this.getBurnTrajectoryColor(hoverPlan), 0.58);
       this.showHoverTrajectoryLabel(
         this.getBurnDestinationBillboardAnchor(hoverPlan) ?? labelAnchor,
-        `T+${hoverPlan.etaTurns} -${hoverPlan.burnCost} ΔV`,
+        `ARRIVAL T+${hoverPlan.etaTurns} -${hoverPlan.burnCost} ΔV`,
         "burn-hover",
         isHoverPlanAffordable ? 1 : 0.72,
         hoverLabelTint
@@ -22957,6 +22955,7 @@ export class CinematicSolarSystemRenderer {
     this.fireTrajectoryPresentationKeysInUse.clear();
     this.resolvedFireTrajectoryPathKeysInUse.clear();
     this.activeMissileResolvedTrajectories.clear();
+    this.pendingFireResolvedTrajectories.clear();
     this.pruneActiveMissileLaunchSamples(snapshot);
     this.activeMissileTargetPositions.clear();
     this.activeMissileTargetDirections.clear();
@@ -22980,6 +22979,9 @@ export class CinematicSolarSystemRenderer {
     for (const order of pendingFireOrders) {
       const weight = getFireTrajectoryVisualWeight(getFireEtaTurns(order, this.visualTurn));
       const resolvedTrajectory = this.resolveFireTrajectory(order, undefined, "orbit-center");
+      if (resolvedTrajectory !== null) {
+        this.pendingFireResolvedTrajectories.set(order.id, resolvedTrajectory);
+      }
       const labelAnchor = this.renderFireArc(
         order,
         this.pendingFireGroup,
@@ -23093,7 +23095,7 @@ export class CinematicSolarSystemRenderer {
     if (labelAnchor !== null) {
       this.showHoverTrajectoryLabel(
         this.getFireImpactBillboardAnchor(hoverPlan) ?? labelAnchor,
-        `T-${hoverPlan.missileEtaTurns}`,
+        `IMPACT T-${hoverPlan.missileEtaTurns}`,
         "fire"
       );
     }
@@ -23219,7 +23221,10 @@ export class CinematicSolarSystemRenderer {
       let previousImpactTurn: number | null = null;
 
       for (const impact of impactChronology) {
-        const resolvedTrajectory = this.resolveFireTrajectory(impact, undefined, "orbit-center");
+        const resolvedTrajectory =
+          this.pendingFireResolvedTrajectories.get(impact.id) ??
+          this.activeMissileResolvedTrajectories.get(impact.id) ??
+          this.resolveFireTrajectory(impact, undefined, "orbit-center");
         const futureTarget =
           resolvedTrajectory?.target ??
           this.getDisplayNodeRenderDataAtTurn(targetNodeId, impact.impactTurn);
@@ -23840,6 +23845,7 @@ export class CinematicSolarSystemRenderer {
       anchorEndDash,
       {
         accentSpeed: this.tuning.firePreviewEffectFlowSpeed,
+        continuousSilhouette: isPreview ? 0.18 : activeProgress === undefined ? 0.1 : 0,
         enabled: hasPlaneReflection,
         elapsed: this.presentationElapsed,
         ...(renderedReflectionPoints === undefined ? {} : { points: renderedReflectionPoints }),
@@ -26242,8 +26248,7 @@ export class CinematicSolarSystemRenderer {
           presentationBasePoints,
           destination.center,
           destinationLoopStart,
-          destinationLoopDirection,
-          flightPath === null
+          destinationLoopDirection
         )
       : presentationBasePoints;
     const reflectionSourcePoints =
@@ -36101,6 +36106,11 @@ function createBurnTrajectoryMesh(
       ? (planeReflection.elapsed * planeReflection.accentSpeed) % 1
       : 0
   );
+  setObjectShaderUniformNumber(
+    dashGroup,
+    "trajectoryContinuousSilhouette",
+    clamp(planeReflection.continuousSilhouette ?? 0, 0, 0.4)
+  );
 
   for (const child of [...group.children]) {
     if (child === dashGroup) {
@@ -36833,7 +36843,8 @@ function createBurnTrajectoryDashMaterial(
       ribbonHalfWidth: { value: Math.max(0.001, halfWidth) },
       ribbonVerticalBias: { value: clamp(verticalBias, 0, 1) },
       trajectoryAccentPhase: { value: 0 },
-      trajectoryAccentStrength: { value: 0 }
+      trajectoryAccentStrength: { value: 0 },
+      trajectoryContinuousSilhouette: { value: 0 }
     },
     transparent: true,
     // A trajectory can be viewed almost edge-on when the camera is lowered to the orbital
@@ -36892,6 +36903,7 @@ function createBurnTrajectoryDashMaterial(
       uniform float dashTerminalAnchorProgress;
       uniform float trajectoryAccentPhase;
       uniform float trajectoryAccentStrength;
+      uniform float trajectoryContinuousSilhouette;
       varying vec2 vDashUv;
 
       void main() {
@@ -36926,7 +36938,13 @@ function createBurnTrajectoryDashMaterial(
         float accentCross = pow(max(0.0, 1.0 - lateral), 5.0);
         float accentMask =
           accent * accentCross * visibleMask * trajectoryAccentStrength;
-        float combinedMask = clamp(dashMask + accentMask * 1.15, 0.0, 1.35);
+        float continuousMask =
+          lateralMask * visibleMask * trajectoryContinuousSilhouette;
+        float combinedMask = clamp(
+          max(dashMask, continuousMask) + accentMask * 1.15,
+          0.0,
+          1.35
+        );
 
         if (combinedMask <= 0.01) {
           discard;
@@ -38798,8 +38816,7 @@ export function closeBurnPreviewDestinationLoop(
   points: readonly THREE.Vector3[],
   destinationCenter: THREE.Vector3,
   loopStartPoint: THREE.Vector3,
-  direction: -1 | 1,
-  forceFullRevolution = false
+  direction: -1 | 1
 ): THREE.Vector3[] {
   const closedPoints = points.map((point) => point.clone());
   const loopEndPoint = closedPoints[closedPoints.length - 1];
@@ -38808,7 +38825,7 @@ export function closeBurnPreviewDestinationLoop(
     return closedPoints;
   }
 
-  if (!forceFullRevolution && loopEndPoint.distanceToSquared(loopStartPoint) <= 0.0001) {
+  if (loopEndPoint.distanceToSquared(loopStartPoint) <= 0.0001) {
     closedPoints[closedPoints.length - 1] = loopStartPoint.clone();
     return closedPoints;
   }
@@ -38825,14 +38842,10 @@ export function closeBurnPreviewDestinationLoop(
 
   const startAngle = Math.atan2(startOffset.z, startOffset.x);
   const endAngle = Math.atan2(endOffset.z, endOffset.x);
-  let signedArc =
+  const signedArc =
     direction < 0
       ? -positiveModulo(endAngle - startAngle, Math.PI * 2)
       : positiveModulo(startAngle - endAngle, Math.PI * 2);
-
-  if (forceFullRevolution && Math.abs(signedArc) <= 0.0001) {
-    signedArc = direction * Math.PI * 2;
-  }
 
   const sampleCount = Math.max(3, Math.ceil(Math.abs(signedArc) / (Math.PI / 18)));
 

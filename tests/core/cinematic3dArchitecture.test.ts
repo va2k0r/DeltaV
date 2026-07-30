@@ -825,7 +825,9 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(styles).toContain("overflow-anchor: none");
     expect(styles).toContain("scrollbar-width: none");
     expect(styles).not.toContain("mask-image: linear-gradient");
-    expect(styles).toContain("padding-bottom: 0.45em");
+    expect(styles).toContain(
+      "padding-bottom: calc(0.45em + var(--command-console-tail-snap-padding))"
+    );
     expect(styles).toContain("justify-content: flex-start");
     expect(styles).toContain("pointer-events: auto");
     expect(styles).toContain("display: none;");
@@ -3632,7 +3634,7 @@ describe("Cinematic 3D architecture boundary", () => {
 
     expect(source).toContain("futureFireImpactFallbackSmallestOrbitRadius = 7");
     expect(source).toContain("futureFireImpactArmLengthScale = 0.9");
-    expect(source).toContain("futureFireImpactTickMinimumOuterRadiusPixels = 7.2");
+    expect(source).toContain("futureFireImpactTickMinimumOuterRadiusPixels = 11");
     expect(source).toContain("private getFutureFireImpactArmOuterRadiusWorld(scale = 1)");
     expect(source).toContain(
       "private getFireImpactArmHalfWidthWorld(trajectory: ResolvedFireTrajectory)"
@@ -3829,7 +3831,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain('"future-fire-impact-diagonal-ticks"');
     expect(source).toContain('"future-fire-impact-target-point"');
     expect(source).toContain("targetPoint.rotation.x = -Math.PI / 2");
-    expect(source).toContain("futureFireImpactTickMinimumOuterRadiusPixels = 7.2");
+    expect(source).toContain("futureFireImpactTickMinimumOuterRadiusPixels = 11");
     expect(source).toContain("futureFireImpactTickThicknessPixels = 1.35");
     expect(source).toContain("futureFireImpactFallbackSmallestOrbitRadius = 7");
     expect(source).toContain("minimumTickOuterRadiusWorld");
@@ -4636,7 +4638,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("const worldPadding = clamp(destination.ringRadius * 0.04");
     expect(source).not.toContain("const screenPadding = getWorldUnitsForScreenPixels");
     expect(source).toContain("`T+${order.etaTurns} -${order.burnCost} ΔV`");
-    expect(source).toContain("`T+${hoverPlan.etaTurns} -${hoverPlan.burnCost} ΔV`");
+    expect(source).toContain("`ARRIVAL T+${hoverPlan.etaTurns} -${hoverPlan.burnCost} ΔV`");
     expect(source).toContain('return "weapons offline";');
     expect(source).toContain('return "shipyard";');
     expect(source).toContain('return "tritium";');
@@ -6591,9 +6593,9 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(scrollSource).toContain("if (!commandTranscriptFollowsTail) {");
     expect(scrollSource).toContain("function snapCommandTranscriptToLiveTail(): void");
     expect(scrollSource).toContain("commandTranscriptFollowsTail = true;");
-    expect(scrollSource).toContain(
-      "commandTranscript.scrollTop = getCommandTranscriptScrollEnd();"
-    );
+    expect(scrollSource).toContain("snapCommandTranscriptTailWithoutClippedLine();");
+    expect(scrollSource).toContain('"--command-console-tail-snap-padding"');
+    expect(scrollSource).toContain('querySelectorAll<HTMLElement>(".command-console__line")');
     expect(scrollSource).toContain("function isCommandTranscriptAtEnd(): boolean");
     expect(wheelSource).toContain("commandTranscriptFollowsTail = isCommandTranscriptAtEnd();");
     expect(
@@ -6688,7 +6690,11 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(rendererSource).toContain("const performanceReplayFrameBudgetMinimalMs = 8.75");
     expect(rendererSource).toContain("const performanceFrameSpikeMinimalMs = 12.5");
     expect(rendererSource).toContain("const performanceRecoveryFrameMs = 7.3");
-    expect(rendererSource).toContain("const detailedBodyAnimationMinimalUpdateSeconds = 1 / 60");
+    expect(rendererSource).toContain("const detailedBodyAnimationReducedUpdateSeconds = 1 / 45");
+    expect(rendererSource).toContain("const detailedBodyAnimationMinimalUpdateSeconds = 1 / 30");
+    expect(rendererSource).toContain(
+      'if (shouldUpdateDetailedBodyAnimation) {\n        setShaderUniformNumber(bodyObject.mesh.material, "time", elapsed);'
+    );
     expect(rendererSource).toContain("const labelPresentationMinimalUpdateSeconds = 1 / 60");
     expect(rendererSource).toContain(
       'private tacticalPresentationUpdatePhase: "all" | "burn" | "fire" = "all"'
@@ -6704,6 +6710,8 @@ describe("Cinematic 3D architecture boundary", () => {
     );
     expect(rendererSource).toContain("const minimalActiveMissileTrajectoryLimit = 2");
     expect(rendererSource).toContain("missileIndex < minimalActiveMissileTrajectoryLimit");
+    expect(rendererSource).toContain("private readonly pendingFireResolvedTrajectories");
+    expect(rendererSource).toContain("this.pendingFireResolvedTrajectories.get(impact.id) ??");
     expect(uiSource).toContain(
       "cinematicRenderer.setSnapshot(reviewState.liveSnapshot, { deferRender: true })"
     );
@@ -8362,6 +8370,8 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("float glintCenter = trajectoryAccentPhase");
     expect(source).toContain('"trajectoryAccentSpeed"');
     expect(source).toContain("trajectoryAccentStrength");
+    expect(source).toContain("uniform float trajectoryContinuousSilhouette");
+    expect(source).toContain("max(dashMask, continuousMask)");
     expect(source).toContain("planeReflection.showAnimatedAccent ? 1.2 : 0");
     expect(source).toContain("showAnimatedAccent: isPreview");
     expect(source).toContain("const isBurnHoverPreview = group === this.burnPreviewGroup");
@@ -8375,6 +8385,9 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(renderFireArcSource).toContain("createBurnTrajectoryMesh(");
     expect(renderFireArcSource).toContain("const isPreview = group === this.firePreviewGroup");
     expect(renderFireArcSource).toContain("accentSpeed: this.tuning.firePreviewEffectFlowSpeed");
+    expect(renderFireArcSource).toContain(
+      "continuousSilhouette: isPreview ? 0.18 : activeProgress === undefined ? 0.1 : 0"
+    );
     expect(renderFireArcSource).toContain("readability: isPreview ? 1 : 0");
     expect(renderFireArcSource).toContain("showAnimatedAccent: isPreview");
     expect(renderBurnArcSource).toContain("createBurnTrajectoryMesh(");

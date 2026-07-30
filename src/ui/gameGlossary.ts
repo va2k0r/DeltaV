@@ -1,4 +1,5 @@
 import { astronomicalGlossaryEntries } from "./astronomicalGlossary";
+import { worldLoreGlossaryEntries } from "./worldLoreGlossary";
 
 export type GameGlossaryEntry = Readonly<{
   id: string;
@@ -208,20 +209,25 @@ const mechanicGlossaryEntries = [
     id: "crew",
     label: "CREW",
     aliases: ["CREW"],
-    short: "The human complement implied by a ship and its production or loss reports.",
+    short: "The people operating this ship—and the reserve complements for hulls not yet launched.",
     detail: [
-      "CREW has no separate unit, statistic or order in the current simulation.",
-      "It appears in SHIPYARD commissioning and SIGNAL LOST language only."
+      "Ships are manned. Automation reduces watch size; it does not hold legal responsibility for lethal release.",
+      "A minimum independent complement is twelve: command, flight, reactor, weapons, systems and medicine.",
+      "A typical opening ship carries four complements—48 people—to crew itself and three expected SHIPYARD outputs.",
+      "Reserve teams share the parent ship's 150-day life support until commissioning.",
+      "CREW has no separate game statistic. SIGNAL LOST means those people were not recovered."
     ]
   },
   {
     id: "hull",
     label: "HULL",
-    aliases: ["HULL", "HULLS"],
+    aliases: ["DISASSEMBLED HULLS", "DISASSEMBLED HULL", "HULL", "HULLS", "DISASSEMBLED"],
     short: "A disassembled ship body completed by five eligible SHIPYARD work steps.",
     detail: [
-      "HULL is production language, not a separate inventory object.",
-      "At 5/5 the completed output becomes one ordinary SHIP."
+      "SHIPYARDS park pressure sections, docking spines, radiators and drive modules as protected subassemblies.",
+      "WORK mates, tests and fuels them. At 5/5 the output becomes one ordinary SHIP.",
+      "Crew, tritium canisters and command keys arrive from the incumbent ship during commissioning.",
+      "HULL is production language, not a separate game inventory."
     ]
   },
   {
@@ -248,7 +254,7 @@ const mechanicGlossaryEntries = [
     id: "execute",
     label: "EXECUTE",
     aliases: ["EXECUTE", "EXECUTED", "EXECUTES"],
-    short: "Commit the planned orders and resolve the current turn in canonical phase order.",
+    short: "Commit the planned orders and resolve the current turn in its fixed phase order.",
     detail: [
       "Freeze every queued order. Advance the deterministic simulation one TURN.",
       "01  CONTESTED upkeep.",
@@ -277,13 +283,14 @@ const mechanicGlossaryEntries = [
     aliases: ["CONTESTED", "CONTEST", "CONTESTS", "CONTESTING"],
     short: "Two opposing factions share an orbit: both are physically locked and pay upkeep.",
     detail: [
-      "Ships from two FACTIONS occupy one NODE.",
-      "Physical lock. Not damage. Maximum: one SHIP per faction, two ships total.",
+      "Two FACTIONS occupy one NODE. Physical lock, not damage; maximum one SHIP per faction.",
       "2 ΔV upkeep per contested ship and faction, paid first each TURN.",
       "WORK, FIRE, EVADE and INTERCEPT are blocked.",
       "STAY and BURN OUT remain legal.",
-      "A same-turn arrival contests immediately, but only after that turn's MISSILE IMPACT.",
-      "Ships outside the lock may FIRE into it or INTERCEPT movement when legal."
+      "Physically, both ships circle for the other's blind angle, kill exposed drones and spend thrust denying a clean terminal geometry.",
+      "The duel consumes every outward weapon and defensive schedule; neither side can perform a separate action.",
+      "A support ship outside the lock adds the second attack vector one turret cannot cover.",
+      "Same-turn arrival contests only after MISSILE IMPACT; outside ships may FIRE into the lock."
     ]
   },
   {
@@ -378,11 +385,12 @@ const mechanicGlossaryEntries = [
     aliases: ["TRITIUM"],
     short: "The productive resource that restores ΔV and ultimately determines victory.",
     detail: [
-      "Fuel economy, strategic viability and VICTORY condition.",
-      "One eligible WORK result produces +2 ΔV.",
-      "Income resolves in the economy phase, after movement and actions.",
-      "Stored in the global faction reserve. No cargo, convoy or logistics network.",
-      "CONTESTED state or a conflicting ship outcome prevents income.",
+      "One eligible WORK result produces +2 ΔV during the economy phase.",
+      "Stored as global faction reserve; the simulation tracks no canister, convoy or local inventory.",
+      "The physical output is certified D-T fusion fuel, reaction mass and breeder margin compressed into one number.",
+      "Natural tritium exists only in traces. Gas-giant skimmers harvest deuterium; lithium-6 blankets breed the tritium.",
+      "Its 12.3-year half-life makes stockpiles perishable and bookkeeping strategic.",
+      "CONTESTED state or BURN, FIRE and EVADE prevent income.",
       "Losing every viable short-window route to tritium causes TRITIUM COLLAPSE."
     ]
   },
@@ -396,8 +404,8 @@ const mechanicGlossaryEntries = [
       "Progress increases by 1/5 per eligible WORK turn.",
       "Progress belongs to the node, not the faction. It can be captured and continued.",
       "BURN, FIRE, EVADE, CONTESTED state or same-turn ARRIVAL prevents progress.",
-      "At 5/5, one assembled ship remains at the shipyard.",
-      "The incumbent ship must perform MANDATORY LAUNCH.",
+      "Stored hull modules are mated around a docking spine; the incumbent supplies fuel and one reserve crew.",
+      "At 5/5, the assembled ship remains at the yard and the incumbent performs MANDATORY LAUNCH.",
       "Production itself costs 0 ΔV."
     ]
   },
@@ -407,8 +415,10 @@ const mechanicGlossaryEntries = [
     aliases: ["PROTECTED"],
     short: "An orbit where warfare and contesting are disabled.",
     detail: [
-      "PROTECTED nodes represent the enforced Earth-Moon corridor. They cannot be contested and weapons are offline there.",
-      "Protection is a node rule. It does not belong to the renderer and does not extend to ordinary destinations outside the protected corridor."
+      "PROTECTED nodes represent the enforced Earth-Moon corridor. They cannot be contested; weapons are offline.",
+      "Here law and force share a clock: launches are registered, nuclear packages remain safed and interceptors are already present.",
+      "Outside the corridor the same law persists, but a public enforcement ship may be months or years away.",
+      "Protection is a node rule and does not extend to ordinary destinations."
     ]
   },
   {
@@ -427,8 +437,11 @@ const mechanicGlossaryEntries = [
     aliases: ["MISSILE", "MISSILES"],
     short: "A delayed FIRE threat travelling toward one target ship and one future impact.",
     detail: [
-      "A MISSILE is created by FIRE and follows a deterministic ETA. It does not disable the target while travelling.",
-      "At impact the target automatically EVADES if it is not CONTESTED and its faction can pay. BURN before impact breaks the firing solution."
+      "FIRE launches one autonomous nuclear missile-drone from a magazine of roughly ten to twelve.",
+      "It attacks predicted geometry, watches defensive tracers and jinks toward the single turret's blind angle.",
+      "The deterministic ETA creates no immediate damage.",
+      "At IMPACT a non-CONTESTED target automatically EVADES if its faction can pay 1 ΔV.",
+      "BURN before impact breaks the firing solution; no affordable geometry means the ship is destroyed."
     ]
   },
   {
@@ -499,10 +512,14 @@ const mechanicGlossaryEntries = [
     id: "ship",
     label: "SHIP",
     aliases: ["SHIP", "SHIPS"],
-    short: "The single operational unit that can work, evade, burn or fire.",
+    short: "A manned fusion vessel, weapons platform and carrier for the crews of future ships.",
     detail: [
-      "A SHIP is the game's operational unit. Each turn its outcome is WORK, EVADE, BURN or FIRE, subject to timing and CONTESTED restrictions.",
-      "Ships do not carry separate resource inventories. Their faction pays every ΔV cost from one global reserve."
+      "Operational unit: each TURN resolves as WORK, EVADE, BURN or FIRE, subject to CONTESTED restrictions.",
+      "A docking spine carries replaceable habitat, reactor, radiator and weapon modules.",
+      "The weapon section mounts one rapid-fire turret and approximately ten to twelve nuclear missile-drones.",
+      "Life support is provisioned for 150 days and for reserve crews expected to commission new hulls.",
+      "Ships physically carry canisters and reaction mass, but the game exposes no local inventory.",
+      "Every cost is paid from global faction ΔV."
     ]
   },
   {
@@ -511,8 +528,11 @@ const mechanicGlossaryEntries = [
     aliases: ["FACTION", "FACTIONS", "PLAYER", "ENEMY"],
     short: "One side in the conflict, sharing ships, production and a global ΔV reserve.",
     detail: [
-      "A FACTION owns ships and pays all ΔV costs from one reserve. Multiple ships therefore compete for the same future movement and survival budget.",
-      "Faction viability, rather than score, determines victory."
+      "A FACTION is one corporate industrial network: ships, yards, breeder banks, compute and command authority.",
+      "All ships pay from one ΔV reserve, so they compete for the same future movement and survival budget.",
+      "On Earth the corporation remains subject to law, tax, sanctions and arrest.",
+      "In the outer system no government owns a comparable fleet already close enough to intervene.",
+      "Faction viability, rather than score or formal sovereignty, determines VICTORY."
     ]
   },
   {
@@ -541,7 +561,10 @@ const mechanicGlossaryEntries = [
     aliases: ["SIGNAL LOST", "CREW LOST"],
     short: "The log has confirmed that a ship was destroyed or irrecoverably lost.",
     detail: [
-      "SIGNAL LOST is the player-facing destruction report. The surrounding log entries explain whether the cause was missile impact, failed EVADE, contested upkeep or another resolved rule.",
+      "SIGNAL LOST confirms destruction; the surrounding entries preserve the resolved mechanical cause.",
+      "Ships are manned. A normal loss kills at least one twelve-person watch and may erase several reserve complements.",
+      "The first openly attributable loss near Saturn converted industrial competition into a murder investigation and armed conflict.",
+      "Earth receives the telemetry in about eighty minutes. No enforcement fleet can arrive on that clock.",
       "The message is a consequence, not a separate action."
     ]
   },
@@ -549,15 +572,15 @@ const mechanicGlossaryEntries = [
     id: "year-2079",
     label: "2079",
     aliases: ["2079"],
-    short:
-      "The current scenario year: corporate war begins beyond the protected Earth-Moon corridor.",
+    short: "The year corporate war begins beyond the protected Earth-Moon corridor.",
     detail: [
-      "Current scenario year.",
-      "Human activity extends across the Solar System.",
-      "Earth and MOON remain PROTECTED.",
-      "Corporate FACTIONS fight beyond that corridor for continuing access to TRITIUM.",
-      "No government, population, currency, treaty continuity or exact historical chronology beyond these facts is specified by current game canon.",
-      "2079 is setting information. It changes no BURN cost, ETA, production rule or TURN order."
+      "Fusion power is mature; AI-scale compute expands until electricity, fabrication and discarded heat become the limits.",
+      "Robotic mines, atmospheric skimmers and breeder banks have made the first outer systems independent of terrestrial fuel.",
+      "Earth and MOON remain PROTECTED. Their law reaches every registered ship; their force does not.",
+      "Corporate FACTIONS own the only complete industrial fleets near the gas and ice giants.",
+      "The first attributable hostile action occurs near Saturn. Debate, sanctions and warrants begin on Earth the same day.",
+      "The Saturn campaign spans roughly 150 days—enough for the conflict to end, not for a new public fleet to reach it.",
+      "By day 150, Earth is still debating an enforcement architecture for a war its participants already consider settled."
     ]
   },
   {
@@ -574,6 +597,7 @@ const mechanicGlossaryEntries = [
 
 export const gameGlossaryEntries = [
   ...mechanicGlossaryEntries,
+  ...worldLoreGlossaryEntries,
   ...astronomicalGlossaryEntries
 ] as const satisfies readonly GameGlossaryEntry[];
 
@@ -846,6 +870,22 @@ function createDynamicGameGlossaryEntry(id: string): GameGlossaryEntry | undefin
   }
 
   if (kind === "days") {
+    if (raw.replace("~", "") === "150") {
+      return {
+        id,
+        label: raw,
+        aliases: [],
+        short:
+          "The operational horizon: long enough to finish the war, too short to send a new fleet.",
+        detail: [
+          "Ships embark food, filters, medical stock and reserve crews for roughly 150 days.",
+          "The Saturn theatre can exchange telemetry with Earth in hours; physical reinforcement remains a transfer problem.",
+          "Courts, sanctions and emergency summits move while the already-deployed fleets fight.",
+          "By the time Earth agrees who should enforce the law, TRITIUM viability has already decided the conflict."
+        ]
+      };
+    }
+
     return {
       id,
       label: raw,

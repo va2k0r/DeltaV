@@ -1,5 +1,6 @@
 import {
   createTutorialSpacerRow,
+  tutorialCompleteHintClassName,
   tutorialLineClassName,
   type TutorialCommandTimelineRow
 } from "./rowCore";
@@ -33,6 +34,15 @@ export function createTutorialFirstBurnTimeCostRows(
       ],
       className: tutorialLineClassName,
       key: "tutorial:first-burn-time-cost"
+    },
+    {
+      parts: [
+        { text: "The arrival marker shows where the destination will be at " },
+        { text: "ARRIVAL", className: playerClassName },
+        { text: ", not where it is now." }
+      ],
+      className: tutorialLineClassName,
+      key: "tutorial:first-burn-arrival-marker"
     }
   ];
 }
@@ -153,6 +163,15 @@ export function createTutorialShipyardFirePromptRows(): readonly TutorialCommand
         { text: "Ships in transit can be targeted by firing at their destination." }
       ],
       className: tutorialLineClassName
+    },
+    {
+      parts: [
+        { text: "The X marks the target's predicted position at " },
+        { text: "IMPACT", className: "command-console__event-contested" },
+        { text: ", not its current position." }
+      ],
+      className: tutorialLineClassName,
+      key: "tutorial:shipyard-fire-impact-marker"
     }
   ];
 }
@@ -160,6 +179,12 @@ export function createTutorialShipyardFirePromptRows(): readonly TutorialCommand
 export function createTutorialEnemyContactVictoryWarningRows(): readonly TutorialCommandTimelineRow[] {
   return [
     createTutorialSpacerRow("tutorial:first-enemy-kill-victory-warning:before"),
+    {
+      parts: [{ text: "TUTORIAL COMPLETE. NORMAL MATCH CONTROL RESTORED." }],
+      className: tutorialCompleteHintClassName,
+      key: "tutorial:first-enemy-kill-handoff"
+    },
+    createTutorialSpacerRow("tutorial:first-enemy-kill-victory-warning:handoff-spacer"),
     {
       parts: [
         { text: "WARNING:", className: "command-console__event-contested" },

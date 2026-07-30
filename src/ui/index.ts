@@ -7486,7 +7486,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
-    commandTranscript.scrollTop = getCommandTranscriptScrollEnd();
+    snapCommandTranscriptTailWithoutClippedLine();
 
     if (commandTranscriptScrollFrame !== null) {
       return;
@@ -7499,14 +7499,36 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         return;
       }
 
-      commandTranscript.scrollTop = getCommandTranscriptScrollEnd();
+      snapCommandTranscriptTailWithoutClippedLine();
     });
   }
 
   function snapCommandTranscriptToLiveTail(): void {
     commandTranscriptFollowsTail = true;
-    commandTranscript.scrollTop = getCommandTranscriptScrollEnd();
     scrollCommandTranscriptToEnd();
+  }
+
+  function snapCommandTranscriptTailWithoutClippedLine(): void {
+    commandTranscript.style.setProperty("--command-console-tail-snap-padding", "0px");
+    commandTranscript.scrollTop = getCommandTranscriptScrollEnd();
+    const transcriptTop = commandTranscript.getBoundingClientRect().top;
+    const partiallyVisibleLine = Array.from(
+      commandTranscript.querySelectorAll<HTMLElement>(".command-console__line")
+    ).find((line) => {
+      const bounds = line.getBoundingClientRect();
+      return bounds.top < transcriptTop - 0.5 && bounds.bottom > transcriptTop + 0.5;
+    });
+
+    if (partiallyVisibleLine === undefined) {
+      return;
+    }
+
+    const visibleRemainder = partiallyVisibleLine.getBoundingClientRect().bottom - transcriptTop;
+    commandTranscript.style.setProperty(
+      "--command-console-tail-snap-padding",
+      `${Math.max(0, visibleRemainder)}px`
+    );
+    commandTranscript.scrollTop = getCommandTranscriptScrollEnd();
   }
 
   function getCommandTranscriptScrollEnd(): number {
