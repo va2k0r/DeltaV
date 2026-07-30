@@ -160,7 +160,7 @@ describe("Cinematic 3D future orbit timing", () => {
     ).toBe(true);
   });
 
-  it("does not manufacture a destination revolution when the preview has no insertion arc", () => {
+  it("adds a full closed revolution when the hover preview has no insertion arc", () => {
     const destinationCenter = new THREE.Vector3(0, 0, 0);
     const loopStart = new THREE.Vector3(12, 0.2, 0);
     const previewPoints = [new THREE.Vector3(-20, 3, 0), loopStart.clone()];
@@ -168,14 +168,20 @@ describe("Cinematic 3D future orbit timing", () => {
       previewPoints,
       destinationCenter,
       loopStart,
-      -1
+      -1,
+      true
     );
 
-    expect(closedPreview).toHaveLength(previewPoints.length);
+    expect(closedPreview).toHaveLength(previewPoints.length + 36);
     expect(closedPreview.at(-1)).toEqual(loopStart);
+    expect(
+      closedPreview
+        .slice(previewPoints.length)
+        .every((point) => Math.abs(Math.hypot(point.x, point.z) - 12) < 0.0001)
+    ).toBe(true);
   });
 
-  it("keeps the inferred arrival direction without adding a synthetic hover loop", () => {
+  it("continues the hover transfer into the destination loop without reversing tangent", () => {
     const destinationCenter = new THREE.Vector3(0, 0, 0);
     const previous = new THREE.Vector3(-1, 0.2, 10);
     const arrival = new THREE.Vector3(0, 0.2, 10);
@@ -190,10 +196,16 @@ describe("Cinematic 3D future orbit timing", () => {
       transferPoints,
       destinationCenter,
       arrival,
-      direction
+      direction,
+      true
     );
+    const incoming = arrival.clone().sub(previous).normalize();
+    const outgoing = (closedPreview[transferPoints.length] ?? arrival)
+      .clone()
+      .sub(arrival)
+      .normalize();
 
     expect(direction).toBe(-1);
-    expect(closedPreview).toEqual(transferPoints);
+    expect(incoming.dot(outgoing)).toBeGreaterThan(0.99);
   });
 });

@@ -26248,7 +26248,8 @@ export class CinematicSolarSystemRenderer {
           presentationBasePoints,
           destination.center,
           destinationLoopStart,
-          destinationLoopDirection
+          destinationLoopDirection,
+          flightPath === null
         )
       : presentationBasePoints;
     const reflectionSourcePoints =
@@ -38816,7 +38817,8 @@ export function closeBurnPreviewDestinationLoop(
   points: readonly THREE.Vector3[],
   destinationCenter: THREE.Vector3,
   loopStartPoint: THREE.Vector3,
-  direction: -1 | 1
+  direction: -1 | 1,
+  forceFullRevolution = false
 ): THREE.Vector3[] {
   const closedPoints = points.map((point) => point.clone());
   const loopEndPoint = closedPoints[closedPoints.length - 1];
@@ -38825,7 +38827,7 @@ export function closeBurnPreviewDestinationLoop(
     return closedPoints;
   }
 
-  if (loopEndPoint.distanceToSquared(loopStartPoint) <= 0.0001) {
+  if (!forceFullRevolution && loopEndPoint.distanceToSquared(loopStartPoint) <= 0.0001) {
     closedPoints[closedPoints.length - 1] = loopStartPoint.clone();
     return closedPoints;
   }
@@ -38842,10 +38844,14 @@ export function closeBurnPreviewDestinationLoop(
 
   const startAngle = Math.atan2(startOffset.z, startOffset.x);
   const endAngle = Math.atan2(endOffset.z, endOffset.x);
-  const signedArc =
+  let signedArc =
     direction < 0
       ? -positiveModulo(endAngle - startAngle, Math.PI * 2)
       : positiveModulo(startAngle - endAngle, Math.PI * 2);
+
+  if (forceFullRevolution && Math.abs(signedArc) <= 0.0001) {
+    signedArc = direction * Math.PI * 2;
+  }
 
   const sampleCount = Math.max(3, Math.ceil(Math.abs(signedArc) / (Math.PI / 18)));
 
