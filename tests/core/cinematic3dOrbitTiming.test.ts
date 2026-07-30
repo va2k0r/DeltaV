@@ -5,6 +5,7 @@ import {
   clipOrbitTimingPolylineStartToClearance,
   createOrbitTimingDottedTrackPoints,
   filterOrbitTimingDottedTrackPointsAroundPaths,
+  getBurnPreviewDestinationLoopDirection,
   getFutureOrbitTimingSampleTurns,
   getOrbitTimingEndpointClearance,
   getOrbitTimingGhostCenterClearance
@@ -178,5 +179,33 @@ describe("Cinematic 3D future orbit timing", () => {
         .slice(previewPoints.length)
         .every((point) => Math.abs(Math.hypot(point.x, point.z) - 12) < 0.0001)
     ).toBe(true);
+  });
+
+  it("continues the hover transfer into the destination loop without reversing tangent", () => {
+    const destinationCenter = new THREE.Vector3(0, 0, 0);
+    const previous = new THREE.Vector3(-1, 0.2, 10);
+    const arrival = new THREE.Vector3(0, 0.2, 10);
+    const transferPoints = [new THREE.Vector3(-20, 3, 10), previous, arrival];
+    const direction = getBurnPreviewDestinationLoopDirection(
+      undefined,
+      transferPoints,
+      destinationCenter,
+      1
+    );
+    const closedPreview = closeBurnPreviewDestinationLoop(
+      transferPoints,
+      destinationCenter,
+      arrival,
+      direction,
+      true
+    );
+    const incoming = arrival.clone().sub(previous).normalize();
+    const outgoing = (closedPreview[transferPoints.length] ?? arrival)
+      .clone()
+      .sub(arrival)
+      .normalize();
+
+    expect(direction).toBe(-1);
+    expect(incoming.dot(outgoing)).toBeGreaterThan(0.99);
   });
 });

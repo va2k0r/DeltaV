@@ -4,15 +4,12 @@ import {
   applyTutorialCameraHintDisplayLimits,
   removeTutorialCameraHintRows
 } from "../../src/ui/tutorial/cameraHintDisplay";
+import { shouldPanTutorialTarget } from "../../src/ui/tutorial/cameraPolicy";
 import { findFirstTutorialEnemyKillResolutionEvent } from "../../src/ui/tutorial/firstEnemyKillReplay";
 import {
   getTutorialRequiredShipSelectionRecoveryTargetKey,
   isTutorialTargetInputAllowed
 } from "../../src/ui/tutorial/selectionGate";
-import {
-  createTutorialContextualHoverCopy,
-  getTutorialContextProgressiveText
-} from "../../src/ui/tutorial/contextualHoverHelp";
 import {
   createTutorialConfirmTransferBurnLiveRows,
   createTutorialEnemyContactVictoryWarningRows,
@@ -45,53 +42,22 @@ import {
   shouldInterruptTutorialForMandatoryLaunch,
   shouldRestoreTutorialAutoAdvanceLock
 } from "../../src/ui/tutorial/runtimeState";
+import { getTutorialAiPlanningFactionIds } from "../../src/ui/tutorial/turnControl";
 
 describe("tutorial row modules", () => {
-  it("explains burn and fire previews from the hovered destination", () => {
-    const commonNode = {
-      kind: "node" as const,
-      name: "NEREID TRANSFER",
-      bodyName: "NEPTUNE",
-      nodeType: "barren" as const,
-      occupancy: "unoccupied",
-      isContested: false,
-      isWorking: false,
-      workingFactionName: null,
-      tritiumOutput: 0,
-      shipyardProgress: 0
-    };
-    const burn = createTutorialContextualHoverCopy({
-      ...commonNode,
-      action: {
-        kind: "burn",
-        originName: "TRITON",
-        destinationName: "NEREID TRANSFER",
-        etaTurns: 3,
-        burnCost: 4,
-        failureReason: null
-      }
-    });
-    const fire = createTutorialContextualHoverCopy({
-      ...commonNode,
-      action: {
-        kind: "fire",
-        originName: "TRITON",
-        targetName: "NEREID TRANSFER",
-        etaTurns: 2,
-        failureReason: null
-      }
-    });
-
-    expect(burn.text).toContain("closed destination loop");
-    expect(burn.text).toContain("dotted connector");
-    expect(fire.text).toContain("geometric centre");
-    expect(fire.text).toContain("stops just before the X");
+  it("keeps arrival pans active after the opening turn", () => {
+    expect(shouldPanTutorialTarget({ isFirstTurn: false, isArrival: true })).toBe(true);
+    expect(shouldPanTutorialTarget({ isFirstTurn: false, isArrival: false })).toBe(false);
+    expect(shouldPanTutorialTarget({ isFirstTurn: true, isArrival: false })).toBe(true);
   });
 
-  it("types from the top and rapidly erases back toward it", () => {
-    expect(getTutorialContextProgressiveText("ABCDE", 0.4, "type")).toBe("AB");
-    expect(getTutorialContextProgressiveText("ABCDE", 0.4, "erase")).toBe("ABC");
-    expect(getTutorialContextProgressiveText("ABCDE", 1, "erase")).toBe("");
+  it("never gives a human tutorial faction to the AI planner", () => {
+    expect(
+      getTutorialAiPlanningFactionIds([
+        { id: "player", controlType: "human" },
+        { id: "opponent", controlType: "ai" }
+      ])
+    ).toEqual(["opponent"]);
   });
 
   it("accepts only the player ship while the tutorial awaits its initial selection", () => {

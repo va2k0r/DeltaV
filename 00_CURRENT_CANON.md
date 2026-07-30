@@ -342,3 +342,17 @@ The large solar luminance field, sparse stars, thin orbital construction, and is
 accents are part of DeltaV's identity. Preserve this relationship at every camera scale, including
 wide system views and close-ups. Bloom may express the solar radiance, but must not switch the
 whole scene to a different color pipeline or erase the graphite-blue background and neutral shadows.
+
+The canonical main-menu banner is the detached top-down “planets crossing space” composition:
+
+```text
+Reference viewport: 2560 × 1440
+Procedural reference seed: proc-ms3v4bl9-10thvw5
+Opening orbital phase: turn 76
+Camera does not track a body
+Sun is offset left; the menu occupies negative space on the right
+Planets, moons, ships, and trajectories cross the static frame as the demo advances
+```
+
+This composition is the player’s opening view of DeltaV and should remain legible as a moving
+banner rather than behaving like a gameplay focus camera.

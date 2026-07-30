@@ -920,6 +920,18 @@ select {
   padding-bottom: 4px;
 }
 
+.command-console__pinned-row {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 0;
+  min-width: 0;
+  padding-bottom: 2px;
+}
+
+.command-console__pinned-row:empty {
+  display: none;
+}
+
 .command-console__mode-label {
   order: 0;
   color: rgba(142, 158, 170, 0.62);
@@ -969,36 +981,20 @@ select {
   filter: saturate(0.55);
 }
 
-.tutorial-context-help {
+.command-glossary-hover,
+.command-glossary-detail {
   position: fixed;
-  top: calc(clamp(16px, 2vh, 32px) + clamp(250px, 34vh, 460px) + clamp(18px, 2.5vh, 34px));
-  right: clamp(4px, 0.65vw, 14px);
-  z-index: 6;
-  width: min(clamp(310px, 22vw, 500px), calc(100vw - 24px));
-  height: min(
-    clamp(190px, 28vh, 310px),
-    calc(
-      100vh - (clamp(16px, 2vh, 32px) + clamp(250px, 34vh, 460px) + clamp(18px, 2.5vh, 34px)) - 18px
-    )
-  );
+  z-index: 8;
   box-sizing: border-box;
-  contain: layout paint style;
-  overflow: hidden;
-  border-left: 1px solid rgba(159, 232, 255, 0.28);
-  background: linear-gradient(
-    90deg,
-    rgba(5, 12, 18, 0.3) 0,
-    rgba(5, 12, 18, 0.12) 42%,
-    rgba(5, 12, 18, 0) 100%
-  );
-  color: rgba(224, 230, 234, 0.88);
+  width: min(clamp(310px, 22vw, 500px), calc(100vw - 24px));
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: rgba(224, 230, 234, 0.9);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: clamp(11px, 0.78vw, 14px);
+  font-size: clamp(12px, 0.9vw, 15px);
   font-weight: 430;
   line-height: 1.42;
-  opacity: 0;
-  padding: 2px clamp(12px, 1vw, 18px);
-  pointer-events: none;
   text-shadow:
     -1px -1px 0 rgba(0, 0, 0, 0.92),
     0 -1px 0 rgba(0, 0, 0, 0.92),
@@ -1009,22 +1005,30 @@ select {
     0 1px 0 rgba(0, 0, 0, 0.92),
     1px 1px 0 rgba(0, 0, 0, 0.92),
     0 0 5px rgba(0, 0, 0, 0.72);
-  transition: opacity 90ms ease-out;
   user-select: none;
   -webkit-font-smoothing: antialiased;
   -webkit-user-select: none;
 }
 
-.tutorial-context-help.is-enabled.is-visible {
+.command-glossary-hover {
+  top: clamp(16px, 2vh, 32px);
+  right: calc(
+    clamp(4px, 0.65vw, 14px) + min(clamp(310px, 22vw, 500px), calc(100vw - 24px)) +
+      clamp(18px, 2vw, 38px)
+  );
+  min-height: 4.5em;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
+  transition: opacity 90ms ease-out;
+}
+
+.command-glossary-hover.is-visible {
   opacity: 1;
 }
 
-.tutorial-context-help.is-erasing {
-  opacity: 0.82;
-  transition-duration: 55ms;
-}
-
-.tutorial-context-help__label {
+.command-glossary-hover__label,
+.command-glossary-detail__label {
   min-height: 1.35em;
   color: rgba(159, 232, 255, 0.72);
   font-size: 0.8em;
@@ -1033,12 +1037,12 @@ select {
   text-transform: uppercase;
 }
 
-.tutorial-context-help__text {
-  max-width: 52ch;
+.command-glossary-hover__text {
+  max-width: 48ch;
   white-space: pre-wrap;
 }
 
-.tutorial-context-help.is-typewriting .tutorial-context-help__text::after {
+.command-glossary-hover.is-typewriting .command-glossary-hover__text::after {
   content: "";
   display: inline-block;
   width: 0.48em;
@@ -1049,6 +1053,61 @@ select {
   vertical-align: -0.14em;
   animation: command-type-cursor-blink var(--beat-command-cursor-duration, 620ms) steps(1, end)
     infinite;
+}
+
+.command-glossary-detail {
+  top: calc(clamp(16px, 2vh, 32px) + clamp(250px, 34vh, 460px) + clamp(18px, 2.5vh, 34px));
+  right: clamp(4px, 0.65vw, 14px);
+  max-height: calc(
+    100vh - (clamp(16px, 2vh, 32px) + clamp(250px, 34vh, 460px) + clamp(18px, 2.5vh, 34px)) - 18px
+  );
+  overflow-x: hidden;
+  overflow-y: hidden;
+  padding: 0 var(--command-console-line-right-gutter, clamp(24px, 3.2vw, 84px)) 10px 0;
+  pointer-events: auto;
+  line-height: 1.24;
+}
+
+.command-glossary-detail__body {
+  display: grid;
+  gap: 0.18em;
+  max-width: 54ch;
+}
+
+.command-glossary-detail__line {
+  min-height: 1.42em;
+  overflow-wrap: anywhere;
+  position: relative;
+}
+
+.command-glossary-detail.is-typewriting {
+  text-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.94),
+    1px 0 1px rgba(0, 0, 0, 0.72),
+    -1px 0 1px rgba(0, 0, 0, 0.72),
+    0 0 8px rgba(0, 0, 0, 0.72),
+    0 0 7px rgba(159, 232, 255, 0.14);
+}
+
+.command-glossary-token {
+  color: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  user-select: none;
+  text-decoration: none;
+  transition:
+    color 100ms ease,
+    text-shadow 100ms ease;
+  -webkit-user-select: none;
+}
+
+.command-glossary-token:hover,
+.command-glossary-token:focus-visible {
+  color: rgba(249, 252, 255, 0.98);
+  outline: none;
+  text-shadow:
+    0 0 8px rgba(159, 232, 255, 0.22),
+    0 1px 8px rgba(0, 0, 0, 0.48);
 }
 
 .game-menu {
@@ -1132,6 +1191,47 @@ select {
   padding-right: var(--command-console-line-right-gutter);
   text-align: left;
   pointer-events: none;
+}
+
+.trailer-screen-title,
+.trailer-cta-screen {
+  position: fixed;
+  top: 28%;
+  left: 74.25vw;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  color: #eff2d9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: clamp(15px, 1.15vw, 24px);
+  font-weight: 430;
+  letter-spacing: normal;
+  line-height: 1.08;
+  pointer-events: none;
+  text-align: left;
+  text-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.96),
+    0 0 4px rgba(0, 0, 0, 0.68),
+    0 0 6px rgba(190, 207, 148, 0.1);
+  user-select: none;
+}
+
+.trailer-screen-title__line,
+.trailer-cta-screen__line,
+.trailer-cta-screen__action {
+  font: inherit;
+  white-space: nowrap;
+}
+
+.trailer-cta-screen__title {
+  display: flex;
+  flex-direction: column;
+}
+
+.trailer-cta-screen__action {
+  margin-top: 1.75em;
+  color: #f4f7dc;
+  font-weight: 600;
 }
 
 .game-menu__columns {
@@ -1425,13 +1525,21 @@ select {
     max-height: min(32vh, 260px);
   }
 
-  .tutorial-context-help {
+  .command-glossary-hover {
+    top: clamp(8px, 1vh, 12px);
+    right: calc(
+      clamp(6px, 1vw, 10px) + min(clamp(255px, 38vw, 315px), calc(100vw - 16px)) +
+        clamp(8px, 1.5vw, 16px)
+    );
+    width: min(clamp(210px, 34vw, 280px), calc(62vw - 30px));
+  }
+
+  .command-glossary-detail {
     top: calc(clamp(8px, 1vh, 12px) + min(32vh, 260px) + clamp(14px, 2vh, 22px));
     right: clamp(6px, 1vw, 10px);
     width: min(clamp(255px, 38vw, 315px), calc(100vw - 16px));
-    height: min(
-      clamp(170px, 26vh, 240px),
-      calc(100vh - (clamp(8px, 1vh, 12px) + min(32vh, 260px) + clamp(14px, 2vh, 22px)) - 14px)
+    max-height: calc(
+      100vh - (clamp(8px, 1vh, 12px) + min(32vh, 260px) + clamp(14px, 2vh, 22px)) - 14px
     );
   }
 
@@ -1508,26 +1616,6 @@ select {
   position: relative;
   white-space: normal;
   word-break: normal;
-}
-
-.command-console__transcript.is-trailer-replay-rewriting .is-trailer-replay-future {
-  display: none;
-}
-
-.command-console__line.is-trailer-replay-revealing {
-  animation: command-trailer-replay-reveal 420ms steps(14, end) both;
-}
-
-@keyframes command-trailer-replay-reveal {
-  from {
-    clip-path: inset(0 100% 0 0);
-    opacity: 0;
-  }
-
-  to {
-    clip-path: inset(0 0 0 0);
-    opacity: 1;
-  }
 }
 
 .command-console__line > span {
@@ -2016,7 +2104,9 @@ select {
 }
 
 .app-shell.is-trailer-capture,
-.app-shell.is-trailer-capture * {
+.app-shell.is-trailer-capture *,
+.app-shell.is-trailer-screen,
+.app-shell.is-trailer-screen * {
   cursor: none !important;
 }
 
@@ -2026,6 +2116,15 @@ select {
 .app-shell.is-trailer-capture .ai-report,
 .app-shell.is-trailer-capture .debug-recording-indicator,
 .app-shell.is-trailer-capture .debug-fps {
+  display: none !important;
+}
+
+.app-shell.is-trailer-screen .debug-drawer,
+.app-shell.is-trailer-screen .debug-toggle,
+.app-shell.is-trailer-screen .debug-panel,
+.app-shell.is-trailer-screen .ai-report,
+.app-shell.is-trailer-screen .debug-recording-indicator,
+.app-shell.is-trailer-screen .debug-fps {
   display: none !important;
 }
 

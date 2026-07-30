@@ -46,6 +46,29 @@ These figures are development diagnostics, not a cross-device benchmark. Future 
 work should keep reporting frame time and GPU/CPU counters rather than deriving an FPS promise
 from one machine.
 
+### 120 Hz browser pass (2026-07-29)
+
+The deployed GitHub Pages build was measured first, then the candidate production artifact was
+built with `VITE_PUBLIC_BASE=/DeltaV/` and served at the same `/DeltaV/` path. On the 120 Hz test
+display, a busy AI autorun sample from the deployed build fell as low as 92.8 rolling FPS and
+recorded 60 intervals over 20 ms. The candidate build held 119.38–119.96 rolling FPS at
+8.34–8.38 ms per frame in the same browser during continuous 3D AI turns. In the post-warm-up
+12-second window it recorded one interval over 20 ms, none over 30 ms, and a 24.6 ms maximum.
+A separate 15-second user-mode sample recorded 119.66 FPS with no interval over 20 ms.
+
+With diagnostics enabled, the stable minimal-quality sample averaged 5.21 ms renderer CPU,
+1.61 ms GPU, and 2.54 ms scene-render time. The remaining headroom comes from enabling the
+adaptive governor for normal browser gameplay, reacting inside the 8.33 ms 120 Hz budget,
+avoiding continuous transfer-geometry rebuilds in reduced/minimal modes, splitting BURN and FIRE
+rebuild peaks across adjacent frames, and capping detailed body, label, and missile-impact work
+at quality-appropriate cadences. Disabled beat synchronization also avoids redundant per-frame
+DOM style mutations.
+
+These are controlled measurements, not a universal 120 FPS guarantee. Browser VSync cannot
+present 120 FPS on a 60 Hz display, and hardware, power mode, background throttling, viewport,
+device pixel ratio, and screen capture can change the result. Screen capture was kept outside
+the reported pacing windows because taking a screenshot itself stalls presentation.
+
 ## Logic Audit
 
 Automated tests and four 40-turn AI diagnostic simulations preserve deterministic state and core

@@ -277,3 +277,25 @@ The prototype now has a minimal missile loop that can be play-tested without imp
 evasion, contested nodes, moving enemy ships, AI, victory, or defeat. Fire solutions include
 target ship keys so future movement can cancel pending or active solutions when a target
 ship leaves its node.
+
+Decision 0018: The command log is the tutorial knowledge interface
+Date: 2026-07-30
+Status: Active
+Context:
+World-relative tutorial help competed with the map and explained only the object under the
+cursor. The player instead needs every meaningful command-log term, year, body name, resource
+value, turn index, ETA, progress fraction, and control verb to expose the rules that produced it.
+Decision:
+Remove the world-hover tutorial explanation. Command-log terms are data-driven hypertext.
+After a short dwell, a brief typed explanation appears without a box in a matching column to
+the left, vertically aligned with the hovered log line. Clicking or keyboard activation types
+a dense explanation below EXECUTE in one fixed log-width column. That column ends at the
+bottom of the viewport, never scrolls, and cannot be text-selected. Player-facing glossary
+labels reuse the selected term and do not add slash headers. Astronomical body entries combine
+stable physical data with explicitly separated DeltaV node and 2079 canon; unspecified
+geopolitical or economic facts remain identified as unspecified.
+Consequences:
+Tutorial knowledge is contextual to the command chronology rather than the 3D world. The
+glossary remains UI-only and cannot own or change simulation, camera, content, cost, ETA,
+legality, or resolution state. Dense entries must be edited to fit the fixed column instead of
+adding scrolling, cards, panels, or new visual syntax.

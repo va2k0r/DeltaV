@@ -31,6 +31,7 @@ import {
 } from "./cameraZoom";
 import { advanceSunRelativeCameraYaw, type CinematicCameraReferenceMode } from "./cameraReference";
 import { resolveDampedCameraControlVelocity } from "./cameraControls";
+import { beautyPanZoomInputScale } from "./beautyMode";
 import {
   buildFirePreviewGeometry,
   buildTrajectoryPlaneReflectionPoints,
@@ -138,6 +139,7 @@ import {
   buildZoomStableBurnPreviewTrajectory,
   createLaunchOriginRenderData,
   getActiveBurnFlightPathDistanceProgress,
+  getBurnTrajectoryPresentationVisibleStartProgress,
   getPlanarDistance,
   getSafeDirection,
   getTransferArcDirectionFromPositions,
@@ -1193,14 +1195,14 @@ const tutorialScreenNudgeCameraAssistDefaultDurationMs = 1250;
 const tutorialScreenNudgeCameraAssistMinDurationMs = 560;
 const tutorialScreenNudgeCameraAssistMaxDurationMs = 1700;
 const tutorialFocusPanDurationMs = 720;
-// Trailer capture targets 120 Hz, so the adaptive governor must react before a workload that is
-// acceptable at 60 Hz has already started dropping every other presentation frame.
+// Browser presentation targets 120 Hz, so the adaptive governor must react before a workload that
+// is acceptable at 60 Hz has already started dropping every other presentation frame.
 const performanceFrameBudgetReducedMs = 8.55;
-const performanceFrameBudgetMinimalMs = 11.5;
+const performanceFrameBudgetMinimalMs = 8.9;
 const performanceReplayFrameBudgetMinimalMs = 8.75;
 const performanceFrameSpikeReducedMs = 10.5;
-const performanceFrameSpikeMinimalMs = 22;
-const performanceRecoveryFrameMs = 7.8;
+const performanceFrameSpikeMinimalMs = 12.5;
+const performanceRecoveryFrameMs = 7.3;
 const performanceModeSmoothing = 0.08;
 const performanceSpikeHoldMs = 650;
 const performanceSpikeStreakFrames = 2;
@@ -1342,11 +1344,17 @@ const tacticalPresentationTransitionReducedUpdateSeconds = 1 / 30;
 const tacticalPresentationTransitionMinimalUpdateSeconds = 1 / 24;
 const tacticalPresentationMinimumFrameGap = 2;
 const missileTransientPresentationUpdateSeconds = 1 / 30;
-const missileImpactPresentationUpdateSeconds = 1 / 60;
+const missileImpactPresentationFullUpdateSeconds = 1 / 60;
+const missileImpactPresentationReducedUpdateSeconds = 1 / 45;
+const missileImpactPresentationMinimalUpdateSeconds = 1 / 30;
 const minimalActiveMissileTrajectoryLimit = 2;
 const tacticalReadabilityFullUpdateSeconds = 1 / 30;
 const tacticalReadabilityReducedUpdateSeconds = 1 / 24;
 const tacticalReadabilityMinimalUpdateSeconds = 1 / 18;
+const detailedBodyAnimationReducedUpdateSeconds = 1 / 60;
+const detailedBodyAnimationMinimalUpdateSeconds = 1 / 60;
+const labelPresentationReducedUpdateSeconds = 1 / 60;
+const labelPresentationMinimalUpdateSeconds = 1 / 60;
 const performanceSectionKeys = [
   "frame",
   "replayPreview",
@@ -2309,6 +2317,7 @@ export class CinematicSolarSystemRenderer {
   private backlitBodyFrameCompositionSerial = 0;
   private didacticUiVisibilityUntil = 0;
   private shipModelVariant: ShipModelVariant = defaultShipModelVariant;
+  private beautyModeEnabled = false;
   private snapshot: SolarSystemSnapshot | null = null;
   private displayState: CinematicDisplayState | null = null;
   private dragState: DragState | null = null;
@@ -2500,6 +2509,8 @@ export class CinematicSolarSystemRenderer {
   private tacticalPresentationLastSignature = "";
   private tacticalPresentationCameraMotionWasActive = false;
   private tacticalPresentationDisplayScaleDirty = false;
+  private tacticalPresentationUpdatePhase: "all" | "burn" | "fire" = "all";
+  private tacticalPresentationDeferredFireUpdate = false;
   private didUpdateTacticalPresentationThisFrame = false;
   private missileTransientPresentationLastUpdatedAt = Number.NEGATIVE_INFINITY;
   private isBuildingTacticalPresentation = false;
@@ -2508,6 +2519,8 @@ export class CinematicSolarSystemRenderer {
   private nodePresentationNodeIdsToSync: ReadonlySet<string> | null = null;
   private nodePresentationDynamicNodeIds: ReadonlySet<string> = new Set();
   private tacticalReadabilityLastUpdatedAt = Number.NEGATIVE_INFINITY;
+  private detailedBodyAnimationLastUpdatedAt = Number.NEGATIVE_INFINITY;
+  private labelPresentationLastUpdatedAt = Number.NEGATIVE_INFINITY;
   private contestedThrusterJetsLastUpdatedAt = Number.NEGATIVE_INFINITY;
   private tritiumWorkStreamsLastUpdatedAt = Number.NEGATIVE_INFINITY;
   private tritiumWorkStreamsLastSignature = "";
@@ -2947,6 +2960,24 @@ export class CinematicSolarSystemRenderer {
       this.syncScene(this.snapshot);
       this.renderFrame();
     }
+  }
+
+  setBeautyModeEnabled(enabled: boolean): void {
+    if (this.beautyModeEnabled === enabled) {
+      return;
+    }
+
+    this.beautyModeEnabled = enabled;
+    this.clearKeyboardCameraControls();
+    this.clearSmoothWheelZoomTarget();
+    this.lastPrimaryClick = null;
+    this.setHoveredTarget(null);
+
+    this.renderFrame();
+  }
+
+  isBeautyModeEnabled(): boolean {
+    return this.beautyModeEnabled;
   }
 
   animateTurnTransition(from: SolarSystemSnapshot, to: SolarSystemSnapshot): Promise<void> {
@@ -11184,7 +11215,14 @@ export class CinematicSolarSystemRenderer {
         this.noteTrajectoryLabelCameraMotion();
       } else if (this.dragState.mode === "pan") {
         const previousFocus = this.focus.clone();
-        this.panByScreenDelta(delta, this.dragState.panReferenceDistance ?? this.distance);
+        const inputScale = this.getPanZoomInputSpeedScale();
+        this.panByScreenDelta(
+          {
+            x: delta.x * inputScale,
+            y: delta.y * inputScale
+          },
+          this.dragState.panReferenceDistance ?? this.distance
+        );
         this.offsetActiveCameraTransitionFocus(this.focus.clone().sub(previousFocus));
         this.noteTrajectoryLabelCameraMotion();
       }
@@ -11445,7 +11483,13 @@ export class CinematicSolarSystemRenderer {
       smoothWheelZoomSmallDeltaBoost;
     const normalizedDeltaY =
       direction * Math.min(smoothWheelZoomMaxNormalizedDelta, responsiveMagnitude);
-    return Math.exp(normalizedDeltaY * smoothWheelZoomSensitivity);
+    return Math.exp(
+      normalizedDeltaY * smoothWheelZoomSensitivity * this.getPanZoomInputSpeedScale()
+    );
+  }
+
+  private getPanZoomInputSpeedScale(): number {
+    return this.beautyModeEnabled ? beautyPanZoomInputScale : 1;
   }
 
   private getZoomOutLimit(): number {
@@ -11542,9 +11586,11 @@ export class CinematicSolarSystemRenderer {
         this.renderSolarDust(elapsed);
         this.renderCinematicScene();
         this.renderer.domElement.dispatchEvent(new CustomEvent("deltav:frame-rendered"));
-        this.updateLabels();
-        this.updateSelectedNodeMarker();
-        this.updateInvalidActionBillboard(now);
+        if (this.shouldUpdateLabelPresentation(elapsed)) {
+          this.updateLabels();
+          this.updateSelectedNodeMarker();
+          this.updateInvalidActionBillboard(now);
+        }
         this.stabilizeTrajectoryLabelOffsetsForCameraMotion = false;
       } finally {
         this.recordPerformanceSection("frame", performance.now() - now);
@@ -11607,11 +11653,15 @@ export class CinematicSolarSystemRenderer {
         }
       });
       this.renderer.domElement.dispatchEvent(new CustomEvent("deltav:frame-rendered"));
-      this.measurePerformanceSection("labels", () => {
-        this.updateLabels();
-        this.updateSelectedNodeMarker();
-        this.updateInvalidActionBillboard(now);
-      });
+      if (this.shouldUpdateLabelPresentation(elapsed)) {
+        this.measurePerformanceSection("labels", () => {
+          this.updateLabels();
+          this.updateSelectedNodeMarker();
+          this.updateInvalidActionBillboard(now);
+        });
+      } else {
+        this.recordPerformanceSection("labels", 0);
+      }
       this.stabilizeTrajectoryLabelOffsetsForCameraMotion = false;
     } finally {
       this.recordPerformanceSection("frame", performance.now() - now);
@@ -12468,9 +12518,10 @@ export class CinematicSolarSystemRenderer {
 
     const zoomDirection =
       (this.keyboardCameraControls.zoomOut ? 1 : 0) - (this.keyboardCameraControls.zoomIn ? 1 : 0);
+    const panZoomInputSpeedScale = this.getPanZoomInputSpeedScale();
     this.keyboardCameraVelocity.zoomLogDistancePerSecond = resolveDampedCameraControlVelocity({
       current: this.keyboardCameraVelocity.zoomLogDistancePerSecond,
-      target: zoomDirection * keyboardCinematicZoomDistanceRatePerSecond,
+      target: zoomDirection * keyboardCinematicZoomDistanceRatePerSecond * panZoomInputSpeedScale,
       deltaSeconds,
       accelerationTimeConstantMs: keyboardCinematicAccelerationTimeConstantMs,
       releaseTimeConstantMs: keyboardCinematicReleaseTimeConstantMs,
@@ -12521,7 +12572,11 @@ export class CinematicSolarSystemRenderer {
     const diagonalScale = panXDirection !== 0 && panYDirection !== 0 ? Math.SQRT1_2 : 1;
     this.keyboardCameraVelocity.panXPixelsPerSecond = resolveDampedCameraControlVelocity({
       current: this.keyboardCameraVelocity.panXPixelsPerSecond,
-      target: panXDirection * keyboardCinematicPanPixelsPerSecond * diagonalScale,
+      target:
+        panXDirection *
+        keyboardCinematicPanPixelsPerSecond *
+        diagonalScale *
+        panZoomInputSpeedScale,
       deltaSeconds,
       accelerationTimeConstantMs: keyboardCinematicAccelerationTimeConstantMs,
       releaseTimeConstantMs: keyboardCinematicReleaseTimeConstantMs,
@@ -12529,7 +12584,11 @@ export class CinematicSolarSystemRenderer {
     });
     this.keyboardCameraVelocity.panYPixelsPerSecond = resolveDampedCameraControlVelocity({
       current: this.keyboardCameraVelocity.panYPixelsPerSecond,
-      target: panYDirection * keyboardCinematicPanPixelsPerSecond * diagonalScale,
+      target:
+        panYDirection *
+        keyboardCinematicPanPixelsPerSecond *
+        diagonalScale *
+        panZoomInputSpeedScale,
       deltaSeconds,
       accelerationTimeConstantMs: keyboardCinematicAccelerationTimeConstantMs,
       releaseTimeConstantMs: keyboardCinematicReleaseTimeConstantMs,
@@ -12930,18 +12989,24 @@ export class CinematicSolarSystemRenderer {
       assist.arrivalPose.focusedTargetKey ?? assist.destinationTargetKey;
     const [fallbackFocusX, fallbackFocusY, fallbackFocusZ] = assist.arrivalPose.focus;
     const fallbackTargetFocus = new THREE.Vector3(fallbackFocusX, fallbackFocusY, fallbackFocusZ);
-    const resolvedTargetFocus =
-      this.findSnapshotDisplayTargetPosition(assist.destinationTargetKey, to, {
-        focusedTargetKey: displayScaleFocusTargetKey,
-        distance: targetDistance
-      }) ??
-      (displayScaleFocusTargetKey === assist.destinationTargetKey
+    // The first transition only advances `to` to the departure turn. Aim the single tutorial pan
+    // at the destination's orbital position when the ship actually arrives; targeting `to`
+    // makes the camera lead toward the launch-era position and overshoot the moving planet.
+    const arrivalSnapshot = this.getSnapshotForDisplayTurn(matchingOrder.arrivalTurn);
+    const snapshotTargetFocus =
+      arrivalSnapshot === null
         ? null
-        : this.findSnapshotDisplayTargetPosition(displayScaleFocusTargetKey, to, {
+        : (this.findSnapshotDisplayTargetPosition(assist.destinationTargetKey, arrivalSnapshot, {
             focusedTargetKey: displayScaleFocusTargetKey,
             distance: targetDistance
-          })) ??
-      fallbackTargetFocus;
+          }) ??
+          (displayScaleFocusTargetKey === assist.destinationTargetKey
+            ? null
+            : this.findSnapshotDisplayTargetPosition(displayScaleFocusTargetKey, arrivalSnapshot, {
+                focusedTargetKey: displayScaleFocusTargetKey,
+                distance: targetDistance
+              })));
+    const resolvedTargetFocus = snapshotTargetFocus ?? fallbackTargetFocus;
     const targetFocus = resolvedTargetFocus.clone();
 
     if (assist.arrivalPose.focusOffset !== undefined) {
@@ -14401,6 +14466,7 @@ export class CinematicSolarSystemRenderer {
     const bodiesById = this.snapshot === null ? this.emptyBodiesById : this.snapshotBodiesById;
     const occupiedShipyardBodyIds =
       this.snapshot === null ? this.emptyBodyIdSet : this.snapshotOccupiedShipyardBodyIds;
+    const shouldUpdateDetailedBodyAnimation = this.shouldUpdateDetailedBodyAnimation(elapsed);
 
     for (const [bodyId, bodyObject] of this.bodyObjects.entries()) {
       const body = bodiesById.get(bodyId);
@@ -14433,7 +14499,9 @@ export class CinematicSolarSystemRenderer {
         );
         setShaderUniformVector(bodyObject.cloudMesh.material, "sunPosition", this.sunPosition);
       }
-      this.syncTritiumExtractionSurfaceGlowUniforms(bodyObject, body, elapsed);
+      if (shouldUpdateDetailedBodyAnimation) {
+        this.syncTritiumExtractionSurfaceGlowUniforms(bodyObject, body, elapsed);
+      }
 
       if (body.visualClass === "star") {
         const sunSurfaceSpeed = this.tuning.sunSurfaceAnimationSpeed;
@@ -14442,7 +14510,9 @@ export class CinematicSolarSystemRenderer {
           sunSurfaceSpeed,
           beatPulse
         );
-        this.syncSunGlowPresentation(bodyObject, body);
+        if (shouldUpdateDetailedBodyAnimation) {
+          this.syncSunGlowPresentation(bodyObject, body);
+        }
       }
 
       if (body.visualClass !== "star") {
@@ -14462,15 +14532,17 @@ export class CinematicSolarSystemRenderer {
         }
       }
 
-      this.syncSunlitPresentation(bodyObject, body, bodyObject.group.position, bodiesById);
-      this.syncJupiterRingAnimation(bodyObject, body, elapsed);
-      this.syncNeptuneRingAnimation(bodyObject, elapsed);
-      this.syncSaturnRingAnimation(bodyObject, elapsed);
-      this.syncUranusRingAnimation(bodyObject, elapsed);
+      if (shouldUpdateDetailedBodyAnimation) {
+        this.syncSunlitPresentation(bodyObject, body, bodyObject.group.position, bodiesById);
+        this.syncJupiterRingAnimation(bodyObject, body, elapsed);
+        this.syncNeptuneRingAnimation(bodyObject, elapsed);
+        this.syncSaturnRingAnimation(bodyObject, elapsed);
+        this.syncUranusRingAnimation(bodyObject, elapsed);
+      }
 
       if (!industrialSurfaceLightsEnabled) {
         bodyObject.industrialLights.visible = false;
-      } else if (bodyObject.industrialLights.visible) {
+      } else if (shouldUpdateDetailedBodyAnimation && bodyObject.industrialLights.visible) {
         const industrialNode = this.snapshotNodesByBodyId.get(body.id);
         const isShipyardOccupied = occupiedShipyardBodyIds.has(body.id);
         const isShipyardWorking = industrialNode?.type === "shipyard" && industrialNode.isWorking;
@@ -14604,6 +14676,56 @@ export class CinematicSolarSystemRenderer {
     if (shouldMeasurePresentationStages) {
       this.recordPerformanceSection("lightPools", performance.now() - presentationStageStartedAt);
     }
+  }
+
+  private shouldUpdateDetailedBodyAnimation(elapsed: number): boolean {
+    const performanceMode = this.getEffectivePerformanceMode();
+
+    if (performanceMode === "full") {
+      this.detailedBodyAnimationLastUpdatedAt = elapsed;
+      return true;
+    }
+
+    if (this.didUpdateTacticalPresentationThisFrame) {
+      return false;
+    }
+
+    const updateInterval =
+      performanceMode === "minimal"
+        ? detailedBodyAnimationMinimalUpdateSeconds
+        : detailedBodyAnimationReducedUpdateSeconds;
+
+    if (elapsed - this.detailedBodyAnimationLastUpdatedAt < updateInterval) {
+      return false;
+    }
+
+    this.detailedBodyAnimationLastUpdatedAt = elapsed;
+    return true;
+  }
+
+  private shouldUpdateLabelPresentation(elapsed: number): boolean {
+    const performanceMode = this.getEffectivePerformanceMode();
+
+    if (performanceMode === "full") {
+      this.labelPresentationLastUpdatedAt = elapsed;
+      return true;
+    }
+
+    if (this.didUpdateTacticalPresentationThisFrame) {
+      return false;
+    }
+
+    const updateInterval =
+      performanceMode === "minimal"
+        ? labelPresentationMinimalUpdateSeconds
+        : labelPresentationReducedUpdateSeconds;
+
+    if (elapsed - this.labelPresentationLastUpdatedAt < updateInterval) {
+      return false;
+    }
+
+    this.labelPresentationLastUpdatedAt = elapsed;
+    return true;
   }
 
   private syncCinematicDecorativePointLightPools(): void {
@@ -14867,8 +14989,8 @@ export class CinematicSolarSystemRenderer {
       setObjectShaderUniformNumber(
         cachedTrajectory,
         "dashVisibleStart",
-        this.getActiveBurnTrajectoryVisibleStartProgress(
-          resolvedTrajectory.flightPath,
+        this.getResolvedBurnTrajectoryVisibleStartProgress(
+          resolvedTrajectory,
           this.getActiveBurnVisualProgress(transit),
           transit
         )
@@ -17622,11 +17744,15 @@ export class CinematicSolarSystemRenderer {
   private updateMissileImpactPresentation(elapsed: number): void {
     this.updateMissileImpactWhiteout(elapsed);
     this.updateShipDestructionRetinalAfterimages(elapsed);
+    const performanceMode = this.getEffectivePerformanceMode();
+    const updateInterval =
+      performanceMode === "minimal"
+        ? missileImpactPresentationMinimalUpdateSeconds
+        : performanceMode === "reduced"
+          ? missileImpactPresentationReducedUpdateSeconds
+          : missileImpactPresentationFullUpdateSeconds;
 
-    if (
-      elapsed - this.missileImpactPresentationLastUpdatedAt <
-      missileImpactPresentationUpdateSeconds
-    ) {
+    if (elapsed - this.missileImpactPresentationLastUpdatedAt < updateInterval) {
       return;
     }
 
@@ -21117,6 +21243,7 @@ export class CinematicSolarSystemRenderer {
     const shouldUpdateTacticalPresentation = this.shouldUpdateTacticalPresentationFrame(
       this.presentationElapsed
     );
+    const tacticalPresentationUpdatePhase = this.tacticalPresentationUpdatePhase;
     this.didUpdateTacticalPresentationThisFrame = shouldUpdateTacticalPresentation;
 
     if (!sceneWasSyncedThisFrame) {
@@ -21152,8 +21279,12 @@ export class CinematicSolarSystemRenderer {
         this.isBuildingTacticalPresentation = true;
 
         try {
-          this.updateBurnPresentation(snapshot);
-          this.updateFirePresentation(snapshot);
+          if (tacticalPresentationUpdatePhase !== "fire") {
+            this.updateBurnPresentation(snapshot);
+          }
+          if (tacticalPresentationUpdatePhase !== "burn") {
+            this.updateFirePresentation(snapshot);
+          }
         } finally {
           this.isBuildingTacticalPresentation = false;
         }
@@ -21207,12 +21338,20 @@ export class CinematicSolarSystemRenderer {
         this.isBuildingTacticalPresentation = true;
 
         try {
-          this.measurePerformanceSection("burnPresentation", () =>
-            this.updateBurnPresentation(snapshot)
-          );
-          this.measurePerformanceSection("firePresentation", () =>
-            this.updateFirePresentation(snapshot)
-          );
+          if (tacticalPresentationUpdatePhase === "fire") {
+            this.recordPerformanceSection("burnPresentation", 0);
+          } else {
+            this.measurePerformanceSection("burnPresentation", () =>
+              this.updateBurnPresentation(snapshot)
+            );
+          }
+          if (tacticalPresentationUpdatePhase === "burn") {
+            this.recordPerformanceSection("firePresentation", 0);
+          } else {
+            this.measurePerformanceSection("firePresentation", () =>
+              this.updateFirePresentation(snapshot)
+            );
+          }
         } finally {
           this.isBuildingTacticalPresentation = false;
         }
@@ -21330,6 +21469,7 @@ export class CinematicSolarSystemRenderer {
     const snapshot = this.snapshot;
 
     if (snapshot === null) {
+      this.tacticalPresentationDeferredFireUpdate = false;
       return false;
     }
 
@@ -21338,9 +21478,7 @@ export class CinematicSolarSystemRenderer {
     if (signature !== this.tacticalPresentationLastSignature) {
       this.tacticalPresentationLastSignature = signature;
       this.tacticalPresentationDisplayScaleDirty = false;
-      this.tacticalPresentationLastUpdatedAt = elapsed;
-      this.tacticalPresentationLastUpdatedRenderFrameSerial = this.renderFrameSerial;
-      return true;
+      return this.scheduleTacticalPresentationUpdate(elapsed);
     }
 
     const framesSinceLastUpdate =
@@ -21349,10 +21487,17 @@ export class CinematicSolarSystemRenderer {
     // Wheel zoom changes the non-linear display-space layout used by BURN/FIRE endpoints. Camera
     // rotation and pan can keep using the existing shader-facing ribbons, but stale display-scale
     // geometry visibly trails the bodies. Refresh zoom-driven geometry on the very next rendered
-    // frame; the cached presentation objects keep this path allocation-light, and the normal
-    // tactical cadence below remains capped when display scale is stable.
+    // frame. BURN owns the selected transfer field and hover preview, so it must stay ahead of a
+    // deferred FIRE rebuild throughout a continuous zoom gesture instead of updating every other
+    // frame and visibly catching up. FIRE resumes on the first frame whose display scale is stable.
     if (this.tacticalPresentationDisplayScaleDirty) {
       this.tacticalPresentationDisplayScaleDirty = false;
+      return this.scheduleTacticalPresentationUpdate(elapsed);
+    }
+
+    if (this.tacticalPresentationDeferredFireUpdate) {
+      this.tacticalPresentationDeferredFireUpdate = false;
+      this.tacticalPresentationUpdatePhase = "fire";
       this.tacticalPresentationLastUpdatedAt = elapsed;
       this.tacticalPresentationLastUpdatedRenderFrameSerial = this.renderFrameSerial;
       return true;
@@ -21368,9 +21513,7 @@ export class CinematicSolarSystemRenderer {
 
     if (!isCameraMotionActive && this.tacticalPresentationCameraMotionWasActive) {
       this.tacticalPresentationCameraMotionWasActive = false;
-      this.tacticalPresentationLastUpdatedAt = elapsed;
-      this.tacticalPresentationLastUpdatedRenderFrameSerial = this.renderFrameSerial;
-      return true;
+      return this.scheduleTacticalPresentationUpdate(elapsed);
     }
 
     // Stable BURN/FIRE geometry is persistent: dash phase, active-flight clipping and vehicle
@@ -21392,13 +21535,30 @@ export class CinematicSolarSystemRenderer {
       return false;
     }
 
+    return this.scheduleTacticalPresentationUpdate(elapsed);
+  }
+
+  private scheduleTacticalPresentationUpdate(elapsed: number): boolean {
     this.tacticalPresentationLastUpdatedAt = elapsed;
     this.tacticalPresentationLastUpdatedRenderFrameSerial = this.renderFrameSerial;
+
+    if (this.getEffectivePerformanceMode() === "full") {
+      this.tacticalPresentationUpdatePhase = "all";
+      this.tacticalPresentationDeferredFireUpdate = false;
+      return true;
+    }
+
+    // The two trajectory families share no mutable geometry. Splitting their rebuilds prevents a
+    // stable-state update from stacking both CPU peaks into one 120 Hz frame. Continuous zoom
+    // prioritizes BURN above; the deferred FIRE rebuild runs as soon as display scale settles.
+    this.tacticalPresentationUpdatePhase = "burn";
+    this.tacticalPresentationDeferredFireUpdate = true;
     return true;
   }
 
   private needsContinuousTacticalPresentationRebuild(): boolean {
     const transition = this.turnTransition ?? this.replayPreviewContext;
+    const performanceMode = this.getEffectivePerformanceMode();
     const hasResolvingBurnWithdrawal =
       transition?.from.pendingBurnOrders.some((order) => {
         return (
@@ -21428,9 +21588,10 @@ export class CinematicSolarSystemRenderer {
         }));
 
     return (
-      hasResolvingBurnWithdrawal ||
-      hasResolvingFireWithdrawal ||
-      hasAdvancingFutureOrbitTiming ||
+      (performanceMode === "full" &&
+        (hasResolvingBurnWithdrawal ||
+          hasResolvingFireWithdrawal ||
+          hasAdvancingFutureOrbitTiming)) ||
       (this.getTutorialAttentionPulse?.() ?? null) !== null
     );
   }
@@ -23315,7 +23476,8 @@ export class CinematicSolarSystemRenderer {
       flowSpeed: this.tuning.burnPreviewEffectFlowSpeed,
       pixelRatio: this.renderer.getPixelRatio(),
       renderLayer: cinematicUiBloomRenderLayer,
-      presentation: "confirmed"
+      presentation: "confirmed",
+      showArrivalAperture: false
     });
 
     if (effect !== null) {
@@ -26060,6 +26222,7 @@ export class CinematicSolarSystemRenderer {
       destination.center;
     const destinationLoopDirection = getBurnPreviewDestinationLoopDirection(
       flightPath?.insertionPoints,
+      presentationBasePoints,
       destination.center,
       trajectoryArcDirection
     );
@@ -26131,21 +26294,15 @@ export class CinematicSolarSystemRenderer {
       destination,
       color,
       isAffordable,
-      flightPath,
       points,
       presentationPoints,
       reflectionPoints
     } = trajectoryData;
-    const baseVisibleStartProgress =
-      flightPath === null
-        ? 0
-        : this.getActiveBurnTrajectoryVisibleStartProgress(flightPath, activeProgress ?? 0, plan);
-    const visibleStartProgress =
-      flightPath === null
-        ? 0
-        : baseVisibleStartProgress *
-          (measurePolylineLength(points) /
-            Math.max(0.001, measurePolylineLength(presentationPoints)));
+    const visibleStartProgress = this.getResolvedBurnTrajectoryVisibleStartProgress(
+      trajectoryData,
+      activeProgress ?? 0,
+      plan
+    );
     const zoomOutThicknessMultiplier = this.getBurnTrajectoryZoomOutThicknessMultiplier();
     const trajectoryCacheKey = this.getBurnTrajectoryPresentationCacheKey(plan, group);
     const reusableTrajectory = this.burnTrajectoryPresentationCache.get(trajectoryCacheKey);
@@ -26571,6 +26728,22 @@ export class CinematicSolarSystemRenderer {
       remainingDistance * 0.32
     );
     return clamp((traveledDistance + noseClearance) / fullDistance, 0, 1);
+  }
+
+  private getResolvedBurnTrajectoryVisibleStartProgress(
+    trajectory: ResolvedBurnTrajectory,
+    progress: number,
+    plan: RenderableBurnPlan
+  ): number {
+    if (trajectory.flightPath === null) {
+      return 0;
+    }
+
+    return getBurnTrajectoryPresentationVisibleStartProgress(
+      this.getActiveBurnTrajectoryVisibleStartProgress(trajectory.flightPath, progress, plan),
+      measurePolylineLength(trajectory.points),
+      measurePolylineLength(trajectory.presentationPoints)
+    );
   }
 
   private renderActiveBurnMarker(
@@ -32368,12 +32541,51 @@ function syncShipMarkerPresentation(
     return;
   }
 
+  // The circular strategic silhouette is the canonical zoomed-out ship representation. Resolve
+  // it before the lightweight performance branch so changing performance mode cannot replace it
+  // with the generic center dot at the far end of the camera range.
+  if (dot !== undefined) {
+    dot.visible = dotFade > 0.02;
+    setObjectOpacity(
+      dot,
+      context.tuning.shipMarkerOpacity *
+        presentationOpacityMultiplier *
+        collapsedOccludedOpacity *
+        dotFade *
+        0.32
+    );
+  }
+
+  if (silhouette !== undefined) {
+    silhouette.visible = silhouetteFade > 0.02;
+    setObjectOpacity(
+      silhouette,
+      context.tuning.shipMarkerOpacity *
+        presentationOpacityMultiplier *
+        collapsedOccludedOpacity *
+        silhouetteFade *
+        (0.72 + dotPulse * 0.24)
+    );
+  }
+
+  if (dotGlow !== undefined) {
+    dotGlow.visible = dotFade > 0.02 && zoomOutDotGlowSuppression > 0.02;
+    setObjectOpacity(
+      dotGlow,
+      context.tuning.shipMarkerOpacity *
+        context.tuning.shipDotGlowStrength *
+        presentationOpacityMultiplier *
+        (0.65 + dotPulse * 0.35) *
+        collapsedOccludedOpacity *
+        dotFade *
+        zoomOutDotGlowSuppression *
+        0.52
+    );
+  }
+
   if (forceMinimalLod) {
     if (model !== undefined) {
       model.visible = false;
-    }
-    if (silhouette !== undefined) {
-      silhouette.visible = false;
     }
     if (engineBloomPoint !== undefined) {
       engineBloomPoint.visible = false;
@@ -32386,29 +32598,6 @@ function syncShipMarkerPresentation(
     }
     if (sensorLight !== undefined) {
       sensorLight.visible = false;
-    }
-
-    const minimalDotOpacity =
-      context.tuning.shipMarkerOpacity *
-      presentationOpacityMultiplier *
-      collapsedOccludedOpacity *
-      (0.46 + dotPulse * 0.18);
-
-    if (dot !== undefined) {
-      dot.visible = minimalDotOpacity > 0.012;
-      setObjectOpacity(dot, minimalDotOpacity);
-    }
-
-    if (dotGlow !== undefined) {
-      const minimalGlowOpacity =
-        context.tuning.shipMarkerOpacity *
-        context.tuning.shipDotGlowStrength *
-        presentationOpacityMultiplier *
-        collapsedOccludedOpacity *
-        zoomOutDotGlowSuppression *
-        (0.22 + dotPulse * 0.12);
-      dotGlow.visible = minimalGlowOpacity > 0.012;
-      setObjectOpacity(dotGlow, minimalGlowOpacity);
     }
 
     return;
@@ -32472,45 +32661,6 @@ function syncShipMarkerPresentation(
         });
       }
     }
-  }
-
-  if (dot !== undefined) {
-    dot.visible = dotFade > 0.02;
-    setObjectOpacity(
-      dot,
-      context.tuning.shipMarkerOpacity *
-        presentationOpacityMultiplier *
-        collapsedOccludedOpacity *
-        dotFade *
-        0.32
-    );
-  }
-
-  if (silhouette !== undefined) {
-    silhouette.visible = silhouetteFade > 0.02;
-    setObjectOpacity(
-      silhouette,
-      context.tuning.shipMarkerOpacity *
-        presentationOpacityMultiplier *
-        collapsedOccludedOpacity *
-        silhouetteFade *
-        (0.72 + dotPulse * 0.24)
-    );
-  }
-
-  if (dotGlow !== undefined) {
-    dotGlow.visible = dotFade > 0.02 && zoomOutDotGlowSuppression > 0.02;
-    setObjectOpacity(
-      dotGlow,
-      context.tuning.shipMarkerOpacity *
-        context.tuning.shipDotGlowStrength *
-        presentationOpacityMultiplier *
-        (0.65 + dotPulse * 0.35) *
-        collapsedOccludedOpacity *
-        dotFade *
-        zoomOutDotGlowSuppression *
-        0.52
-    );
   }
 
   if (engineBloomPoint !== undefined) {
@@ -38593,22 +38743,44 @@ function createNodeHoverRingPoints(destination: DisplayNodeRenderData): THREE.Ve
   return points;
 }
 
-function getBurnPreviewDestinationLoopDirection(
+export function getBurnPreviewDestinationLoopDirection(
   insertionPoints: readonly THREE.Vector3[] | undefined,
+  transferPoints: readonly THREE.Vector3[],
   destinationCenter: THREE.Vector3,
   fallbackDirection: -1 | 1
 ): -1 | 1 {
   const first = insertionPoints?.[0];
   const second = insertionPoints?.[1];
 
-  if (first === undefined || second === undefined) {
+  if (first !== undefined && second !== undefined) {
+    const firstAngle = Math.atan2(first.z - destinationCenter.z, first.x - destinationCenter.x);
+    const secondAngle = Math.atan2(second.z - destinationCenter.z, second.x - destinationCenter.x);
+    const signedDelta = positiveModulo(secondAngle - firstAngle + Math.PI, Math.PI * 2) - Math.PI;
+    return signedDelta < 0 ? -1 : 1;
+  }
+
+  const arrival = transferPoints[transferPoints.length - 1];
+  const previous = transferPoints[transferPoints.length - 2];
+
+  if (arrival === undefined || previous === undefined) {
     return fallbackDirection;
   }
 
-  const firstAngle = Math.atan2(first.z - destinationCenter.z, first.x - destinationCenter.x);
-  const secondAngle = Math.atan2(second.z - destinationCenter.z, second.x - destinationCenter.x);
-  const signedDelta = positiveModulo(secondAngle - firstAngle + Math.PI, Math.PI * 2) - Math.PI;
-  return signedDelta < 0 ? -1 : 1;
+  const radial = arrival.clone().sub(destinationCenter);
+  radial.y = 0;
+  const incoming = arrival.clone().sub(previous);
+  incoming.y = 0;
+
+  if (radial.lengthSq() <= 0.0001 || incoming.lengthSq() <= 0.0001) {
+    return fallbackDirection;
+  }
+
+  radial.normalize();
+  incoming.normalize();
+  const counterClockwiseTangent = new THREE.Vector3(-radial.z, 0, radial.x);
+  const alignment = counterClockwiseTangent.dot(incoming);
+
+  return Math.abs(alignment) <= 0.0001 ? fallbackDirection : alignment < 0 ? -1 : 1;
 }
 
 export function closeBurnPreviewDestinationLoop(

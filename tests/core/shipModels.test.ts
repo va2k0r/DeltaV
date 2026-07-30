@@ -8,7 +8,7 @@ import {
 import { defaultCinematic3dVisualTuning } from "../../src/renderers/cinematic3d/visualTuning";
 
 describe("ring-hex ship model", () => {
-  it("never replaces a close-up hull with the strategic dot when performance mode changes", () => {
+  it("only enables lightweight rendering after the hull has reached strategic zoom", () => {
     expect(shouldForceStrategicShipMarkerLod(0, true)).toBe(true);
     expect(shouldForceStrategicShipMarkerLod(0.16, true)).toBe(true);
     expect(shouldForceStrategicShipMarkerLod(0.17, true)).toBe(false);

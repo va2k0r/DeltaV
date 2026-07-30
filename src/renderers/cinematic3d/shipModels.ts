@@ -15,10 +15,10 @@ const shipEngineBloomPointSize = 4.5;
 const strategicShipMarkerMinimalLodMaximumDetailProgress = 0.16;
 
 /**
- * Minimal performance mode may replace an already-collapsed strategic marker with its cheapest
- * dot, but it must never turn a close-up hull into tactical UI. The performance governor can
- * change mode while replay is running, so tying this decision to both mode and camera LOD keeps
- * play/pause transitions visually stable.
+ * Minimal performance mode may skip physical hull detail once a ship has already collapsed into
+ * its strategic circular silhouette, but it must never turn a close-up hull into tactical UI. The
+ * performance governor can change mode while replay is running, so tying this decision to both
+ * mode and camera LOD keeps play/pause transitions visually stable.
  */
 export function shouldForceStrategicShipMarkerLod(
   detailProgress: number,

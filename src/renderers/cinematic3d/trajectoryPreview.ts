@@ -15,6 +15,9 @@ const burnPreviewEndpointSharpTurnLimitRadians = THREE.MathUtils.degToRad(28);
 const burnPreviewTurnSofteningPassCount = 4;
 const burnPreviewEndpointTangentPreservePointCount = 3;
 const burnPreviewMidspanBowPower = 0.86;
+const burnPreviewMinimumPlanarBowRatio = 0.1;
+const burnPreviewMaximumPlanarBowRatio = 0.24;
+const burnPreviewRadialToPlanarBowRatio = 0.92;
 const firePreviewMidspanBowPower = 0.92;
 const missilePreviewLiftPower = 0.96;
 const missilePreviewSupportingLiftPower = 1.62;
@@ -219,19 +222,13 @@ export function createLaunchOriginRenderData(context: {
       : Math.atan2(localLaunchOffset.z, localLaunchOffset.x);
   const transferAnchor =
     context.orbitDirection === undefined || context.lockTransferAnchor === true
-      ? getTransferNodeTangentPoint(
-          context.baseOrigin,
-          context.destination,
-          arcDirection,
-          context.profile
-        )
+      ? getTransferNodeTangentPoint(context.baseOrigin, context.destination, arcDirection)
       : getLaunchTransferAnchor(
           context.baseOrigin,
           context.destination,
           startAngle,
           arcDirection,
-          context.orbitDirection,
-          context.profile
+          context.orbitDirection
         );
   const localAnchorOffset = transferAnchor.clone().sub(context.baseOrigin.center);
   const targetAngle =
@@ -286,17 +283,12 @@ function buildLocalOrbitalTransferPreview(
 
   const transferTurns = Math.max(1, etaTurns, destination.snapshot.turn - currentTurn);
   if (style === "burn") {
-    const startCandidates = getLocalNodeOrbitTangentCandidates(
-      origin,
-      frame.startParent,
-      destination.center,
-      arcDirection
-    );
+    const startCandidates = getLocalNodeOrbitTangentCandidates(origin, destination, arcDirection);
     const endCandidates = getLocalNodeOrbitTangentCandidates(
       destination,
-      frame.endParent,
-      origin.center,
-      arcDirection
+      origin,
+      arcDirection,
+      "arrival"
     );
 
     if (!lockArcBranch) {
@@ -324,12 +316,7 @@ function buildLocalOrbitalTransferPreview(
     );
   }
 
-  const start = getLocalNodeOrbitTangentPoint(
-    origin,
-    frame.startParent,
-    destination.center,
-    arcDirection
-  );
+  const start = getTransferNodeTangentPoint(origin, destination, arcDirection);
   // FIRE is a firing solution, not an orbital insertion. Ending the main spline at the
   // impact point avoids the visible change of curvature caused by a separate terminal leg.
   const end = destination.center.clone();
@@ -428,20 +415,48 @@ function getTransferNodeTangentPoint(
   nodeRenderData: DisplayNodeRenderData,
   otherNodeRenderData: DisplayNodeRenderData,
   arcDirection: -1 | 1,
-  profile?: TransferVisualProfile
+  endpoint: "departure" | "arrival" = "departure"
 ): THREE.Vector3 {
-  const frame = getLocalTransferFrame(nodeRenderData, otherNodeRenderData, profile);
-
-  if (frame !== null) {
-    return getLocalNodeOrbitTangentPoint(
-      nodeRenderData,
-      frame.startParent,
-      otherNodeRenderData.center,
-      arcDirection
-    );
+  if (hasPinnedTransferTangent(nodeRenderData)) {
+    return getNodeOrbitTangentPoint(nodeRenderData, arcDirection);
   }
 
-  return getNodeOrbitTangentPoint(nodeRenderData, arcDirection);
+  const routeDirection = getStableTransferRouteDirection(
+    nodeRenderData,
+    otherNodeRenderData,
+    endpoint
+  );
+  const orbitRadial = getNodeOrbitRadialForTangent(routeDirection).multiplyScalar(arcDirection);
+  const point = nodeRenderData.center
+    .clone()
+    .addScaledVector(orbitRadial, nodeRenderData.ringRadius);
+  point.y = nodeRenderData.center.y;
+  return point;
+}
+
+function getStableTransferRouteDirection(
+  nodeRenderData: DisplayNodeRenderData,
+  otherNodeRenderData: DisplayNodeRenderData,
+  endpoint: "departure" | "arrival"
+): THREE.Vector3 {
+  const routeDirection = new THREE.Vector3(
+    otherNodeRenderData.node.position.x - nodeRenderData.node.position.x,
+    0,
+    otherNodeRenderData.node.position.y - nodeRenderData.node.position.y
+  );
+
+  if (routeDirection.lengthSq() <= 0.0001) {
+    routeDirection.copy(otherNodeRenderData.center).sub(nodeRenderData.center);
+    routeDirection.y = 0;
+  }
+
+  if (routeDirection.lengthSq() <= 0.0001) {
+    routeDirection.set(1, 0, 0);
+  } else {
+    routeDirection.normalize();
+  }
+
+  return endpoint === "arrival" ? routeDirection.multiplyScalar(-1) : routeDirection;
 }
 
 function getLaunchTransferAnchor(
@@ -449,20 +464,17 @@ function getLaunchTransferAnchor(
   otherNodeRenderData: DisplayNodeRenderData,
   startAngle: number,
   preferredArcDirection: -1 | 1,
-  orbitDirection: -1 | 1,
-  profile?: TransferVisualProfile
+  orbitDirection: -1 | 1
 ): THREE.Vector3 {
   const preferredPoint = getTransferNodeTangentPoint(
     nodeRenderData,
     otherNodeRenderData,
-    preferredArcDirection,
-    profile
+    preferredArcDirection
   );
   const alternatePoint = getTransferNodeTangentPoint(
     nodeRenderData,
     otherNodeRenderData,
-    preferredArcDirection === 1 ? -1 : 1,
-    profile
+    preferredArcDirection === 1 ? -1 : 1
   );
   const preferredScore = scoreLaunchTransferAnchor(
     nodeRenderData,
@@ -515,68 +527,17 @@ function scoreLaunchTransferAnchor(
   return localTangent.dot(desiredTransferDirection) * 1.35 - orbitArc * 0.45 + preferredBonus;
 }
 
-function getLocalNodeOrbitTangentPoint(
-  nodeRenderData: DisplayNodeRenderData,
-  parentCenter: THREE.Vector3,
-  fallbackTarget: THREE.Vector3,
-  arcDirection: -1 | 1
-): THREE.Vector3 {
-  if (nodeRenderData.departureOrbit !== undefined) {
-    return nodeRenderData.departureOrbit.transferAnchor.clone();
-  }
-
-  if (
-    nodeRenderData.departureDirection !== undefined &&
-    nodeRenderData.departureDirection.lengthSq() > 0.0001
-  ) {
-    const point = nodeRenderData.center
-      .clone()
-      .addScaledVector(
-        nodeRenderData.departureDirection.clone().normalize(),
-        nodeRenderData.ringRadius
-      );
-    point.y = nodeRenderData.center.y;
-    return point;
-  }
-
-  const angle =
-    getStableLocalNodeOrbitAngle(nodeRenderData) ??
-    getLocalTransferAngle(nodeRenderData.center, parentCenter, fallbackTarget);
-  const localTangent = getLocalOrbitTangent(angle, arcDirection);
-  const point = nodeRenderData.center
-    .clone()
-    .addScaledVector(getNodeOrbitRadialForTangent(localTangent), nodeRenderData.ringRadius);
-  point.y = nodeRenderData.center.y;
-  return point;
-}
-
 function getLocalNodeOrbitTangentCandidates(
   nodeRenderData: DisplayNodeRenderData,
-  parentCenter: THREE.Vector3,
-  fallbackTarget: THREE.Vector3,
-  preferredArcDirection: -1 | 1
+  otherNodeRenderData: DisplayNodeRenderData,
+  preferredArcDirection: -1 | 1,
+  endpoint: "departure" | "arrival" = "departure"
 ): TransferEndpointCandidate[] {
-  if (hasPinnedTransferTangent(nodeRenderData)) {
-    return [
-      getTransferEndpointCandidate(
-        nodeRenderData,
-        getLocalNodeOrbitTangentPoint(
-          nodeRenderData,
-          parentCenter,
-          fallbackTarget,
-          preferredArcDirection
-        ),
-        preferredArcDirection
-      )
-    ];
-  }
-
-  return getOrderedTransferPreviewDirections(preferredArcDirection).map((arcDirection) =>
-    getTransferEndpointCandidate(
-      nodeRenderData,
-      getLocalNodeOrbitTangentPoint(nodeRenderData, parentCenter, fallbackTarget, arcDirection),
-      arcDirection
-    )
+  return getTransferNodeTangentCandidates(
+    nodeRenderData,
+    otherNodeRenderData,
+    preferredArcDirection,
+    endpoint
   );
 }
 
@@ -654,7 +615,7 @@ export function buildZoomStableBurnPreviewTrajectory(
           options.lockArcBranch === true
         )
       : buildReadableSingleSpanTransferPreview(
-          getTransferNodeTangentPoint(origin, destination, arcDirection, profile),
+          getTransferNodeTangentPoint(origin, destination, arcDirection),
           destination.center.clone(),
           profile,
           transferTurns,
@@ -687,17 +648,12 @@ function buildBurnTransferPreviewSpan(
   arcDirection: -1 | 1,
   lockArcBranch: boolean
 ): THREE.Vector3[] {
-  const startCandidates = getTransferNodeTangentCandidates(
-    origin,
-    destination,
-    arcDirection,
-    profile
-  );
+  const startCandidates = getTransferNodeTangentCandidates(origin, destination, arcDirection);
   const endCandidates = getTransferNodeTangentCandidates(
     destination,
     origin,
     arcDirection,
-    profile
+    "arrival"
   );
 
   if (!lockArcBranch) {
@@ -735,8 +691,32 @@ function buildLockedTangentSingleSpanTransferPreview(
   originCenter: THREE.Vector3,
   destinationCenter: THREE.Vector3
 ): THREE.Vector3[] {
-  const startCandidate = startCandidates[0];
-  const endCandidate = endCandidates[0];
+  const startPoint = startCandidates[0]?.point ?? originCenter;
+  const endPoint = endCandidates[0]?.point ?? destinationCenter;
+  const planarDirection = endPoint.clone().sub(startPoint);
+  planarDirection.y = 0;
+
+  if (planarDirection.lengthSq() <= 0.0001) {
+    planarDirection.copy(destinationCenter).sub(originCenter);
+    planarDirection.y = 0;
+  }
+
+  if (planarDirection.lengthSq() <= 0.0001) {
+    planarDirection.set(1, 0, 0);
+  } else {
+    planarDirection.normalize();
+  }
+
+  const startCandidate = getForwardTransferEndpointCandidate(
+    startCandidates,
+    planarDirection,
+    arcDirection
+  );
+  const endCandidate = getForwardTransferEndpointCandidate(
+    endCandidates,
+    planarDirection,
+    arcDirection
+  );
   return buildReadableSingleSpanTransferPreview(
     startCandidate?.point ?? originCenter,
     endCandidate?.point ?? destinationCenter,
@@ -748,33 +728,49 @@ function buildLockedTangentSingleSpanTransferPreview(
   );
 }
 
+function getForwardTransferEndpointCandidate(
+  candidates: readonly TransferEndpointCandidate[],
+  planarDirection: THREE.Vector3,
+  preferredArcDirection: -1 | 1
+): TransferEndpointCandidate | undefined {
+  let bestCandidate = candidates[0];
+  let bestScore = Number.NEGATIVE_INFINITY;
+
+  for (const candidate of candidates) {
+    const tangent = getPlanarTransferTangent(candidate.tangent);
+    const forwardAlignment = tangent?.dot(planarDirection) ?? 0;
+    const score =
+      forwardAlignment +
+      (candidate.arcDirection === preferredArcDirection ? Number.EPSILON * 16 : 0);
+
+    if (score > bestScore) {
+      bestCandidate = candidate;
+      bestScore = score;
+    }
+  }
+
+  return bestCandidate;
+}
+
 function getTransferNodeTangentCandidates(
   nodeRenderData: DisplayNodeRenderData,
   otherNodeRenderData: DisplayNodeRenderData,
   preferredArcDirection: -1 | 1,
-  profile?: TransferVisualProfile
+  endpoint: "departure" | "arrival" = "departure"
 ): TransferEndpointCandidate[] {
+  const point = getTransferNodeTangentPoint(
+    nodeRenderData,
+    otherNodeRenderData,
+    preferredArcDirection,
+    endpoint
+  );
+
   if (hasPinnedTransferTangent(nodeRenderData)) {
-    return [
-      getTransferEndpointCandidate(
-        nodeRenderData,
-        getTransferNodeTangentPoint(
-          nodeRenderData,
-          otherNodeRenderData,
-          preferredArcDirection,
-          profile
-        ),
-        preferredArcDirection
-      )
-    ];
+    return [getTransferEndpointCandidate(nodeRenderData, point, preferredArcDirection)];
   }
 
   return getOrderedTransferPreviewDirections(preferredArcDirection).map((arcDirection) =>
-    getTransferEndpointCandidate(
-      nodeRenderData,
-      getTransferNodeTangentPoint(nodeRenderData, otherNodeRenderData, arcDirection, profile),
-      arcDirection
-    )
+    getTransferEndpointCandidate(nodeRenderData, point, arcDirection)
   );
 }
 
@@ -1176,6 +1172,20 @@ function getReadableEndpointControlTangent(
   return tangent.normalize();
 }
 
+function getForwardSafeBurnEndpointTangent(
+  rawTangent: THREE.Vector3,
+  planarDirection: THREE.Vector3
+): THREE.Vector3 {
+  const forwardAlignment = rawTangent.dot(planarDirection);
+
+  if (forwardAlignment >= 0) {
+    return rawTangent;
+  }
+
+  const tangent = rawTangent.clone().addScaledVector(planarDirection, -forwardAlignment + 0.04);
+  return tangent.lengthSq() <= 0.0001 ? planarDirection.clone() : tangent.normalize();
+}
+
 function buildReadableSingleSpanTransferPreview(
   start: THREE.Vector3,
   end: THREE.Vector3,
@@ -1222,11 +1232,13 @@ function buildReadableSingleSpanTransferPreview(
     style === "fire" ? 0.24 : 0.2
   );
   const enforcedStartTangent =
-    style === "burn" && endpointTangents.startTangent !== undefined
-      ? rawStartTangent
+    style === "burn"
+      ? getForwardSafeBurnEndpointTangent(rawStartTangent, planarDirection)
       : startTangent;
   const enforcedEndTangent =
-    style === "burn" && endpointTangents.endTangent !== undefined ? rawEndTangent : endTangent;
+    style === "burn"
+      ? getForwardSafeBurnEndpointTangent(rawEndTangent, planarDirection)
+      : endTangent;
   const lateralBow = clamp(
     chordLength * personality.lateralBend * (style === "fire" ? 5.5 : 2.25),
     chordLength * (style === "fire" ? 0.012 : 0.02),
@@ -1237,10 +1249,21 @@ function buildReadableSingleSpanTransferPreview(
     2,
     chordLength * (style === "fire" ? 0.22 : 0.42)
   );
-  const readableBow = radialDirection
-    .clone()
-    .multiplyScalar(radialBow)
-    .addScaledVector(sideDirection, lateralBow);
+  const burnPlanarBow = clamp(
+    Math.max(lateralBow, radialBow * burnPreviewRadialToPlanarBowRatio),
+    chordLength * burnPreviewMinimumPlanarBowRatio,
+    chordLength * burnPreviewMaximumPlanarBowRatio
+  );
+  // BURN bow is strictly perpendicular to the endpoint chord. Its envelope therefore cannot
+  // reverse along-route progress or create a terminal hairpin; the Z-axis curve remains readable
+  // without borrowing displacement from the longitudinal axis.
+  const readableBow =
+    style === "burn"
+      ? sideDirection.clone().multiplyScalar(burnPlanarBow)
+      : radialDirection
+          .clone()
+          .multiplyScalar(radialBow)
+          .addScaledVector(sideDirection, lateralBow);
   const computedHeight =
     chordLength * (0.085 + clamp((transferTurns - 1) / 8, 0, 1.4) * 0.035) + transferTurns * 1.9;
   const requestedHeight = profile?.visualArcHeight ?? computedHeight;
@@ -2054,25 +2077,6 @@ function getStableHeliocentricNodeAngle(nodeRenderData: DisplayNodeRenderData): 
   return getPlanarAngle(nodeRenderData.center);
 }
 
-function getStableLocalNodeOrbitAngle(nodeRenderData: DisplayNodeRenderData): number | null {
-  const parentId = nodeRenderData.body.parentId;
-
-  if (parentId === null) {
-    return null;
-  }
-
-  const parent = nodeRenderData.snapshot.bodies.find((body) => body.id === parentId);
-
-  if (parent === undefined) {
-    return null;
-  }
-
-  const offsetX = nodeRenderData.body.position.x - parent.position.x;
-  const offsetY = nodeRenderData.body.position.y - parent.position.y;
-
-  return Math.hypot(offsetX, offsetY) <= 0.0001 ? null : Math.atan2(offsetY, offsetX);
-}
-
 function getHeliocentricTangent(angle: number, arcDirection: -1 | 1): THREE.Vector3 {
   return new THREE.Vector3(-Math.sin(angle) * arcDirection, 0, Math.cos(angle) * arcDirection);
 }
@@ -2254,6 +2258,19 @@ export function getActiveBurnFlightPathDistanceProgress(
     1
   );
   return clamp((transferDistance + insertionDistance * insertionProgress) / totalDistance, 0, 1);
+}
+
+export function getBurnTrajectoryPresentationVisibleStartProgress(
+  flightPathVisibleStartProgress: number,
+  flightPathDistance: number,
+  presentationDistance: number
+): number {
+  return clamp(
+    (clamp(flightPathVisibleStartProgress, 0, 1) * Math.max(0, flightPathDistance)) /
+      Math.max(0.001, presentationDistance),
+    0,
+    1
+  );
 }
 
 export function slicePolylineByDistance(

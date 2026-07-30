@@ -7,6 +7,7 @@ import {
   buildZoomStableBurnPreviewTrajectory,
   burnTrajectoryDashMaximumFrameDeltaSeconds,
   getActiveBurnFlightPathDistanceProgress,
+  getBurnTrajectoryPresentationVisibleStartProgress,
   rebaseBurnTrajectoryDashAnimationState,
   type DisplayNodeRenderData
 } from "../../src/renderers/cinematic3d/trajectoryPreview";
@@ -60,6 +61,12 @@ describe("BURN trajectory preview", () => {
     expect(getActiveBurnFlightPathDistanceProgress(flightPath, 0.25)).toBeCloseTo(0.5);
     expect(getActiveBurnFlightPathDistanceProgress(flightPath, 0.625)).toBeCloseTo(0.75);
     expect(getActiveBurnFlightPathDistanceProgress(flightPath, 1)).toBe(1);
+  });
+
+  it("maps active clipping into the longer presentation path without advancing the gap", () => {
+    expect(getBurnTrajectoryPresentationVisibleStartProgress(0.4, 80, 100)).toBeCloseTo(0.32);
+    expect(getBurnTrajectoryPresentationVisibleStartProgress(0.4, 80, 80)).toBeCloseTo(0.4);
+    expect(getBurnTrajectoryPresentationVisibleStartProgress(1.4, 80, 100)).toBeCloseTo(0.8);
   });
 
   it("keeps its endpoint approach and departure tangent to and outside the node orbits", () => {
@@ -195,10 +202,91 @@ describe("BURN trajectory preview", () => {
       );
       const arrivalSide = getPlanarRadial(destination.center, points[points.length - 1]);
 
+      expect(getMinimumPlanarProgressDelta(points)).toBeGreaterThanOrEqual(-0.001);
+      expect(countPlanarSelfIntersections(points)).toBe(0);
+
       if (expectedArrivalSide === null) {
         expectedArrivalSide = arrivalSide;
       } else {
         expect(arrivalSide.dot(expectedArrivalSide)).toBeGreaterThan(0.999);
+      }
+    }
+  });
+
+  it("keeps a readable planar bow when the transfer is radially aligned", () => {
+    const snapshot = { turn: 3 } as SolarSystemSnapshot;
+    const origin = createDisplayNode("radial-origin", new THREE.Vector3(48, 0, 0), snapshot);
+    const destination = createDisplayNode(
+      "radial-destination",
+      new THREE.Vector3(148, 0, 0),
+      snapshot
+    );
+    const points = buildZoomStableBurnPreviewTrajectory(
+      origin,
+      destination,
+      snapshot.turn,
+      5,
+      undefined,
+      1,
+      { lockArcBranch: true, style: "burn" }
+    );
+    const chordLength = getPlanarDistance(
+      points[0] ?? origin.center,
+      points[points.length - 1] ?? destination.center
+    );
+
+    expect(getMaximumPlanarChordDeviation(points)).toBeGreaterThan(chordLength * 0.18);
+    expect(Math.max(...points.map((point) => point.y))).toBeGreaterThan(chordLength * 0.1);
+  });
+
+  it("cannot form hooks, backtracking, or self-intersections across route geometries", () => {
+    const snapshot = { turn: 3 } as SolarSystemSnapshot;
+    const routes = [
+      { start: polarPoint(34, 0), end: polarPoint(148, 0.02), eta: 2 },
+      { start: polarPoint(118, 0.05), end: polarPoint(38, 0.08), eta: 7 },
+      { start: polarPoint(52, 0.82), end: polarPoint(156, 2.36), eta: 5 },
+      { start: polarPoint(146, 2.94), end: polarPoint(62, -2.98), eta: 4 },
+      { start: polarPoint(76, -1.42), end: polarPoint(164, 1.48), eta: 6 },
+      { start: new THREE.Vector3(-124, 0, 18), end: new THREE.Vector3(96, 0, 22), eta: 3 }
+    ] as const;
+
+    for (const [routeIndex, route] of routes.entries()) {
+      for (const arcDirection of [-1, 1] as const) {
+        const origin = createDisplayNode(`matrix-origin-${routeIndex}`, route.start, snapshot);
+        const destination = createDisplayNode(
+          `matrix-destination-${routeIndex}`,
+          route.end,
+          snapshot
+        );
+        const points = buildZoomStableBurnPreviewTrajectory(
+          origin,
+          destination,
+          snapshot.turn,
+          route.eta,
+          {
+            transferCategory: "intersystem",
+            transferWindowQuality: routeIndex % 2 === 0 ? "favorable" : "unfavorable",
+            motionRelation: routeIndex % 3 === 0 ? "moving-away" : "moving-toward",
+            visualArcType: routeIndex % 2 === 0 ? "cross-map" : "strained-window",
+            visualArcHeight: 24
+          },
+          arcDirection,
+          { lockArcBranch: true, style: "burn" }
+        );
+        const chordLength = getPlanarDistance(
+          points[0] ?? origin.center,
+          points[points.length - 1] ?? destination.center
+        );
+        const planarBow = getMaximumPlanarChordDeviation(points);
+
+        expect(getMinimumPlanarProgressDelta(points)).toBeGreaterThanOrEqual(-0.001);
+        expect(countPlanarSelfIntersections(points)).toBe(0);
+        expect(planarBow).toBeGreaterThan(chordLength * 0.075);
+        expect(planarBow).toBeLessThan(chordLength * 0.265);
+        expect(
+          getMaximumTrajectoryTurnRadians(points),
+          `route ${routeIndex}, branch ${arcDirection}`
+        ).toBeLessThan(THREE.MathUtils.degToRad(15));
       }
     }
   });
@@ -319,6 +407,107 @@ function getMaximumPlanarChordDeviation(points: readonly THREE.Vector3[]): numbe
       (point) => Math.abs((point.x - start.x) * chordZ - (point.z - start.z) * chordX) / chordLength
     )
   );
+}
+
+function getMinimumPlanarProgressDelta(points: readonly THREE.Vector3[]): number {
+  const start = points[0];
+  const end = points[points.length - 1];
+
+  if (start === undefined || end === undefined) {
+    return 0;
+  }
+
+  const direction = end.clone().sub(start);
+  direction.y = 0;
+
+  if (direction.lengthSq() <= 0.0001) {
+    return 0;
+  }
+
+  direction.normalize();
+  let minimumDelta = Number.POSITIVE_INFINITY;
+  let previousProgress = 0;
+
+  for (let index = 1; index < points.length; index += 1) {
+    const point = points[index];
+
+    if (point === undefined) {
+      continue;
+    }
+
+    const offset = point.clone().sub(start);
+    offset.y = 0;
+    const progress = offset.dot(direction);
+    minimumDelta = Math.min(minimumDelta, progress - previousProgress);
+    previousProgress = progress;
+  }
+
+  return Number.isFinite(minimumDelta) ? minimumDelta : 0;
+}
+
+function countPlanarSelfIntersections(points: readonly THREE.Vector3[]): number {
+  let intersections = 0;
+
+  for (let firstIndex = 0; firstIndex < points.length - 1; firstIndex += 1) {
+    const firstStart = points[firstIndex];
+    const firstEnd = points[firstIndex + 1];
+
+    if (firstStart === undefined || firstEnd === undefined) {
+      continue;
+    }
+
+    for (let secondIndex = firstIndex + 2; secondIndex < points.length - 1; secondIndex += 1) {
+      if (firstIndex === 0 && secondIndex === points.length - 2) {
+        continue;
+      }
+
+      const secondStart = points[secondIndex];
+      const secondEnd = points[secondIndex + 1];
+
+      if (
+        secondStart !== undefined &&
+        secondEnd !== undefined &&
+        doPlanarSegmentsIntersect(firstStart, firstEnd, secondStart, secondEnd)
+      ) {
+        intersections += 1;
+      }
+    }
+  }
+
+  return intersections;
+}
+
+function doPlanarSegmentsIntersect(
+  firstStart: THREE.Vector3,
+  firstEnd: THREE.Vector3,
+  secondStart: THREE.Vector3,
+  secondEnd: THREE.Vector3
+): boolean {
+  const firstDirectionX = firstEnd.x - firstStart.x;
+  const firstDirectionZ = firstEnd.z - firstStart.z;
+  const secondDirectionX = secondEnd.x - secondStart.x;
+  const secondDirectionZ = secondEnd.z - secondStart.z;
+  const determinant = firstDirectionX * secondDirectionZ - firstDirectionZ * secondDirectionX;
+
+  if (Math.abs(determinant) <= 0.000001) {
+    return false;
+  }
+
+  const offsetX = secondStart.x - firstStart.x;
+  const offsetZ = secondStart.z - firstStart.z;
+  const firstProgress = (offsetX * secondDirectionZ - offsetZ * secondDirectionX) / determinant;
+  const secondProgress = (offsetX * firstDirectionZ - offsetZ * firstDirectionX) / determinant;
+  const epsilon = 0.000001;
+  return (
+    firstProgress > epsilon &&
+    firstProgress < 1 - epsilon &&
+    secondProgress > epsilon &&
+    secondProgress < 1 - epsilon
+  );
+}
+
+function polarPoint(radius: number, angle: number): THREE.Vector3 {
+  return new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
 }
 
 function getMaximumTrajectoryTurnRadians(points: readonly THREE.Vector3[]): number {

@@ -27,6 +27,10 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(methodSource).toContain("this.needsContinuousTacticalPresentationRebuild()");
     expect(wheelRefreshSource).toContain("this.tacticalPresentationDisplayScaleDirty = true");
     expect(methodSource).toContain("if (this.tacticalPresentationDisplayScaleDirty)");
+    expect(methodSource).toContain("if (this.tacticalPresentationDeferredFireUpdate)");
+    expect(methodSource.indexOf("if (this.tacticalPresentationDisplayScaleDirty)")).toBeLessThan(
+      methodSource.indexOf("if (this.tacticalPresentationDeferredFireUpdate)")
+    );
     expect(methodSource.indexOf("if (this.tacticalPresentationDisplayScaleDirty)")).toBeLessThan(
       methodSource.indexOf("if (isCameraMotionActive")
     );
@@ -37,7 +41,9 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(displayScaleDirtyBranch).not.toContain(
       "framesSinceLastUpdate < tacticalPresentationMinimumFrameGap"
     );
-    expect(displayScaleDirtyBranch).toContain("return true;");
+    expect(displayScaleDirtyBranch).toContain(
+      "return this.scheduleTacticalPresentationUpdate(elapsed);"
+    );
     expect(source).toContain("const tacticalPresentationMinimumFrameGap = 2");
     expect(methodSource).toContain("framesSinceLastUpdate < tacticalPresentationMinimumFrameGap");
     expect(methodSource).toContain(
@@ -130,7 +136,9 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("this.getBurnPlanArrivalAngle(plan)");
     expect(source).toContain("activeProgress ?? 0");
     expect(source).toContain("isPendingOrderPreview ? 0 : undefined");
-    expect(source).toContain("flightPath === null ? visiblePoints : points");
+    expect(source).toContain(
+      "const presentationBasePoints = flightPath === null ? visiblePoints : points"
+    );
     expect(source).toContain("activeProgress === undefined && !isPendingOrderPreview");
     expect(source).toContain("function getBurnTrajectoryDashPhase(");
     expect(tacticalSource).not.toContain("animateBurnTrajectoryDashPhases");
@@ -153,7 +161,12 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(animationSource).toContain("this.syncActiveBurnTrajectoryVisibleStarts()");
     expect(animationSource).toContain('"dashVisibleStart"');
     expect(source).toContain("private getActiveBurnTrajectoryVisibleStartProgress(");
+    expect(source).toContain("private getResolvedBurnTrajectoryVisibleStartProgress(");
     expect(source).toContain("getActiveBurnFlightPathDistanceProgress(flightPath, progress)");
+    expect(source).toContain("getBurnTrajectoryPresentationVisibleStartProgress(");
+    expect(source).toContain("measurePolylineLength(trajectory.points)");
+    expect(source).toContain("measurePolylineLength(trajectory.presentationPoints)");
+    expect(animationSource).toContain("this.getResolvedBurnTrajectoryVisibleStartProgress(");
     expect(source).toContain(
       "const presentationBasePoints = flightPath === null ? visiblePoints : points"
     );
@@ -379,6 +392,9 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain('header.className = "debug-drawer is-hidden"');
     expect(uiSource).toContain("function toggleDebugDrawer()");
     expect(uiSource).toContain('debugToggleButton.addEventListener("click", toggleDebugDrawer)');
+    expect(uiSource).toContain(
+      "if (isHidden) {\n      debugToggleButton.remove();\n      return;\n    }"
+    );
     expect(uiSource).toContain('const isDebugUiEnabled = urlSearchParams.get("debug") === "1"');
     expect(uiSource).toContain(
       "if (isDebugUiEnabled) {\n    canvasFrame.append(debugToggleButton, header);\n  }"
@@ -1550,7 +1566,12 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(rendererSource).toContain("const tutorialNodeToNodeCameraAssistYawDelayProgress = 0.78");
     expect(rendererSource).toContain("findSnapshotDisplayTargetPosition(");
     expect(rendererSource).toContain("visualTurn: snapshot.turn");
-    expect(rendererSource).toContain("assist.destinationTargetKey, to");
+    expect(rendererSource).toContain("this.getSnapshotForDisplayTurn(matchingOrder.arrivalTurn)");
+    expect(rendererSource).toContain("assist.destinationTargetKey, arrivalSnapshot");
+    expect(rendererSource).not.toContain("assist.destinationTargetKey, to");
+    expect(rendererSource).toContain(
+      "const resolvedTargetFocus = snapshotTargetFocus ?? fallbackTargetFocus"
+    );
     expect(rendererSource).toContain("displayScaleFocusTargetKey,");
     expect(rendererSource).toContain("displayScaleDistance: targetDistance");
     expect(rendererSource).toContain("this.tutorialNodeToNodeCameraAssist.displayScaleDistance");
@@ -1592,11 +1613,12 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(tutorialCameraSource).toContain(
       "const openingCameraPose = isGameMenuDemoActive\n      ? gameMenuOpeningCameraPose\n      : tutorialOpeningCameraPose"
     );
-    expect(tutorialCameraSource).toContain("focus.fromArray([...openingCameraPose.focus])");
+    expect(tutorialCameraSource).toContain("const activeOpeningCameraPose = isTrailerScreenActive");
+    expect(tutorialCameraSource).toContain("focus.fromArray([...activeOpeningCameraPose.focus])");
     expect(tutorialCameraSource).toContain("renderer.restoreCameraState");
-    expect(tutorialCameraSource).toContain("yaw: openingCameraPose.yaw");
-    expect(tutorialCameraSource).toContain("pitch: openingCameraPose.pitch");
-    expect(tutorialCameraSource).toContain("distance: openingCameraPose.distance");
+    expect(tutorialCameraSource).toContain("yaw: activeOpeningCameraPose.yaw");
+    expect(tutorialCameraSource).toContain("pitch: activeOpeningCameraPose.pitch");
+    expect(tutorialCameraSource).toContain("distance: activeOpeningCameraPose.distance");
     expect(tutorialCameraSource.match(/renderer\.restoreCameraState\(/g)).toHaveLength(1);
     expect(tutorialCameraSource).not.toContain("const gameMenuCamera");
     expect(tutorialCameraSource).not.toContain("frameTargetsToScreenAnchorsInstant");
@@ -1979,6 +2001,51 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(startupBlock).not.toContain('startDebugAiAutorunMode("2p");');
     expect(uiSource).toContain('planningTimerMode = "zero";');
     expect(uiSource).toContain("hasConsumedZeroTimerInitialCountdown = true;");
+  });
+
+  it("uses the canonical planets-crossing-space composition for the opening menu", () => {
+    const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
+
+    expect(uiSource).toContain("focus: [652.9258901215434, 0, 366.4386699181108]");
+    expect(uiSource).toContain("yaw: 6.141398437499985");
+    expect(uiSource).toContain("pitch: 1.5707963267948966");
+    expect(uiSource).toContain("distance: 1812.3634761265382");
+    expect(uiSource).toContain('displayScaleFocusTargetKey: "node:mercury_node"');
+    expect(uiSource).toContain("displayScaleDistance: 2535.4735630035007");
+    expect(uiSource).toContain('const gameMenuCanonicalProceduralSeed = "proc-ms4v3wlj-0puste0"');
+    expect(uiSource).toContain("const gameMenuCanonicalOpeningOrbitTurn = 76");
+    expect(uiSource).toContain(
+      "content = shiftSolarSystemOrbitPhase(gameMenuCanonicalContent, gameMenuOrbitEpochTurn)"
+    );
+  });
+
+  it("provides clean title and CTA trailer screens with a dedicated camera composition", () => {
+    const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
+    const styles = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
+
+    expect(uiSource).toContain('createDebugModeButton("TRAILER SCREEN")');
+    expect(uiSource).toContain('createDebugModeButton("CTA SCREEN")');
+    expect(uiSource).toContain('requestedTrailerScreen === "trailer"');
+    expect(uiSource).toContain('requestedTrailerScreen === "cta"');
+    expect(uiSource).toContain('["DELTAV", "ORBITAL", "STRATEGY"]');
+    expect(uiSource).toContain('"WISHLIST NOW ON STEAM"');
+    expect(uiSource).not.toContain("COMING SOON");
+    expect(uiSource).toContain("function activateTrailerScreen(): void");
+    expect(uiSource).toContain("function activateTrailerCtaScreen(): void");
+    expect(uiSource).toContain("forceCanonicalGameMenuOpening = true");
+    expect(uiSource).toContain("trailerScreenOpeningCameraPose");
+    expect(uiSource).toContain("setGameMenuGlyphText(line, lineText)");
+    expect(uiSource).toContain(
+      'trailerScreenTitle.querySelectorAll<HTMLElement>(".game-menu__glyph")'
+    );
+    expect(uiSource).toContain("scheduleGameMenuDemoTurn(0);");
+    expect(styles).toContain(".trailer-screen-title");
+    expect(styles).toContain(".trailer-screen-title__line");
+    expect(styles).toContain(".trailer-cta-screen");
+    expect(styles).toContain(".trailer-cta-screen__action");
+    expect(styles).toContain("font-size: clamp(15px, 1.15vw, 24px)");
+    expect(styles).toContain("font: inherit");
+    expect(styles).toContain(".app-shell.is-trailer-screen");
   });
 
   it("keeps lighting and background ownership in the cinematic renderer", () => {
@@ -2947,6 +3014,8 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(beatSource).toContain("presentationCycleMaxNudgeRatio = 0.12");
     expect(beatSource).toContain("getBeatSynchronizedCycleAngle");
     expect(uiSource).toContain("syncBeatSynchronizedCssAnimations");
+    expect(uiSource).toContain("let beatSynchronizedCssAnimationsActive = false");
+    expect(uiSource).toContain("if (!beatSynchronizedCssAnimationsActive) {");
     expect(uiSource).toContain("musicPulse === null");
     expect(uiSource).toContain('shell.classList.remove("is-beat-synchronized")');
     expect(source).toContain("getBeatSynchronizedCycleAngle");
@@ -3095,6 +3164,14 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("allowComplexModelDetail");
     expect(source).toContain("forceMinimalLod");
     expect(source).toContain("if (forceMinimalLod)");
+    const shipPresentationStart = source.indexOf("function syncShipMarkerPresentation");
+    const collapsedSilhouettePresentation = source.indexOf(
+      "if (silhouette !== undefined)",
+      shipPresentationStart
+    );
+    const lightweightShipLodBranch = source.indexOf("if (forceMinimalLod)", shipPresentationStart);
+    expect(collapsedSilhouettePresentation).toBeGreaterThan(shipPresentationStart);
+    expect(collapsedSilhouettePresentation).toBeLessThan(lightweightShipLodBranch);
     expect(source.match(/shouldForceStrategicShipMarkerLod\(/g)?.length).toBe(2);
     expect(source).not.toContain("forceMinimalLod: this.isMinimalPerformanceMode()");
     expect(source).toContain("allowComplexModelDetail: !this.isReducedPerformanceMode()");
@@ -3578,6 +3655,15 @@ describe("Cinematic 3D architecture boundary", () => {
       transientPresentationStart,
       transientPresentationEnd
     );
+    const confirmedBurnEffectStart = source.indexOf("  private renderConfirmedBurnOrderEffect(");
+    const confirmedBurnEffectEnd = source.indexOf(
+      "  private renderConfirmedFireOrderEffect(",
+      confirmedBurnEffectStart
+    );
+    const confirmedBurnEffectSource = source.slice(
+      confirmedBurnEffectStart,
+      confirmedBurnEffectEnd
+    );
     const trajectoryPreviewSource = readFileSync(
       join(process.cwd(), "src/renderers/cinematic3d/trajectoryPreview.ts"),
       "utf8"
@@ -3594,6 +3680,9 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("syncConfirmedFireSolutionStartTimes");
     expect(source).toContain("renderConfirmedBurnOrderEffect(order)");
     expect(source).toContain("renderConfirmedFireOrderEffect(order)");
+    expect(confirmedBurnEffectStart).toBeGreaterThanOrEqual(0);
+    expect(confirmedBurnEffectEnd).toBeGreaterThan(confirmedBurnEffectStart);
+    expect(confirmedBurnEffectSource).toContain("showArrivalAperture: false");
     expect(source).toContain("animateConfirmedTrajectoryEffect(");
     expect(source).toContain('presentation: "confirmed"');
     expect(source).toContain("fireConfirmedSolutionRevealDurationSeconds");
@@ -4110,7 +4199,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("isTutorialTargetInputAllowed(tutorialState, targetKey)");
   });
 
-  it("suppresses mouseover text throughout the tutorial without disabling hover previews", () => {
+  it("keeps gameplay hover previews independent from the log-relative tutorial glossary", () => {
     const rendererSource = readFileSync(
       join(process.cwd(), "src/renderers/cinematic3d/index.ts"),
       "utf8"
@@ -4121,9 +4210,9 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(rendererSource).toContain("private isHoverTextEnabled(): boolean");
     expect(rendererSource).toContain("private showHoverTrajectoryLabel(");
     expect(rendererSource).toContain("if (!this.isHoverTextEnabled())");
-    expect(uiSource).toContain(
-      "getHoverTextEnabled() {\n        return tutorialState === null;\n      }"
-    );
+    expect(uiSource).not.toContain("getHoverTextEnabled()");
+    expect(uiSource).not.toContain("onHoverInterestChange");
+    expect(uiSource).toContain("commandGlossaryController.bindRoot(commandTranscript)");
     expect(rendererSource).toContain("const hoverPlan = this.getHoverBurnPlan()");
     expect(rendererSource).toContain("const hoverPlan = this.getHoverFirePlan()");
   });
@@ -4673,7 +4762,9 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("this.keyboardCameraControls.panLeft = isPanKey");
     expect(source).toContain("this.keyboardCameraControls.orbitCounterClockwise = !isPanKey");
     expect(source).toContain("this.keyboardCameraControls.panRight = isPanKey");
-    expect(source).toContain("target: zoomDirection * keyboardCinematicZoomDistanceRatePerSecond");
+    expect(source).toContain(
+      "zoomDirection * keyboardCinematicZoomDistanceRatePerSecond * panZoomInputSpeedScale"
+    );
     expect(source).toContain("this.keyboardCameraVelocity.zoomLogDistancePerSecond * deltaSeconds");
     expect(source).toContain("this.refreshDisplayScaleForWheelZoom();");
     expect(source).toContain("target: -orbitDirection * keyboardCinematicOrbitRadiansPerSecond");
@@ -4681,7 +4772,10 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("this.yaw += yawDelta");
     expect(source).toContain("this.offsetActiveCameraTransitionRotation(yawDelta, 0)");
     expect(source).toContain("const diagonalScale = panXDirection !== 0 && panYDirection !== 0");
-    expect(source).toContain("panXDirection * keyboardCinematicPanPixelsPerSecond * diagonalScale");
+    expect(source).toContain("panXDirection *");
+    expect(source).toContain("keyboardCinematicPanPixelsPerSecond *");
+    expect(source).toContain("diagonalScale *");
+    expect(source).toContain("panZoomInputSpeedScale");
     expect(source).toContain("panYPixelsPerSecond * deltaSeconds");
     expect(source).toContain("this.panByScreenDelta({");
     expect(source).toContain("using the current camera distance");
@@ -6080,7 +6174,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(styleSource).not.toContain("rgba(79, 231, 255");
   });
 
-  it("keeps full quality outside trailer mode and adaptive quality inside it", () => {
+  it("keeps browser gameplay and trailer presentation inside the adaptive performance budget", () => {
     const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
     const modeResolverStart = uiSource.indexOf(
       "  function getCinematicPerformanceMode(): CinematicPerformanceMode {"
@@ -6100,7 +6194,8 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(modeResolverEnd).toBeGreaterThan(modeResolverStart);
     expect(resolverStart).toBeGreaterThanOrEqual(0);
     expect(resolverEnd).toBeGreaterThan(resolverStart);
-    expect(modeResolverSource).toContain('return isTrailerModeActive ? "auto" : "full";');
+    expect(modeResolverSource).toContain('return "auto";');
+    expect(modeResolverSource).not.toContain("isTrailerModeActive");
     expect(modeResolverSource).not.toContain("localStorage");
     expect(resolverSource).toContain("return getCinematicPerformanceMode();");
     expect(resolverSource).not.toContain('"auto"');
@@ -6362,22 +6457,29 @@ describe("Cinematic 3D architecture boundary", () => {
 
     expect(animateStart).toBeGreaterThanOrEqual(0);
     expect(playbackStart).toBeGreaterThan(animateStart);
-    expect(animateSource).toContain("if (focusTargetKeys.length === 0)");
+    expect(animateSource).toContain(
+      "if (!preserveCurrentCameraAndFocus && focusTargetKeys.length === 0)"
+    );
     expect(animateSource).toContain("cinematicRenderer?.freezeTimelineReviewCamera()");
     expect(animateSource).toContain("syncLogReviewStaticFocusTargetKeys(focusTargetKeys)");
     expect(animateSource).toContain("await waitForCommandLogReplayFocusBeforePlayback()");
+    expect(animateSource).toContain("reviewState.followTrackedFocus = false");
+    expect(animateSource).toContain("getAcceleratedTimelineReviewDurationMs(");
+    expect(animateSource).toContain("sampleAcceleratedTimelineReviewPosition(");
     expect(
       animateSource.indexOf("await waitForCommandLogReplayFocusBeforePlayback()")
     ).toBeLessThan(animateSource.indexOf("const clampedTarget"));
+    expect(uiSource).toContain("function isCommandLogTurnHeaderLine(");
+    expect(uiSource).toContain("{ preserveCurrentCameraAndFocus }");
     expect(uiSource).toContain(
       'const orbitTargetKeys = targetKeys.filter((targetKey) => targetKey.startsWith("node:"))'
     );
     expect(renderSource).toContain(
-      "followTrackedFocus: (commandLogTimeReviewState?.focusTargetKeys.length ?? 0) > 0"
+      "followTrackedFocus: commandLogTimeReviewState?.followTrackedFocus === true"
     );
   });
 
-  it("keeps tutorial command log wheel inert while rewind is disabled", () => {
+  it("keeps tutorial command log scrolling active while rewind is disabled", () => {
     const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
     const wheelStart = uiSource.indexOf(
       "  function handleCommandLiveRowsWheel(event: WheelEvent): void {"
@@ -6390,18 +6492,22 @@ describe("Cinematic 3D architecture boundary", () => {
 
     expect(wheelStart).toBeGreaterThanOrEqual(0);
     expect(listenersStart).toBeGreaterThan(wheelStart);
-    expect(wheelSource).toContain("if (isTutorialCommandLogLocked()) {");
+    expect(wheelSource).not.toContain("isTutorialCommandLogLocked()");
+    expect(wheelSource).toContain("normalizeCommandLogWheelDelta(");
+    expect(wheelSource).toContain("commandTranscript.scrollTop = clampNumber(");
     expect(wheelSource).toContain("event.preventDefault();");
     expect(wheelSource).toContain("event.stopPropagation();");
-    expect(wheelSource).toContain("return;");
-    expect(wheelSource.indexOf("if (isTutorialCommandLogLocked()) {")).toBeLessThan(
-      wheelSource.indexOf("normalizeCommandLogWheelDelta(")
-    );
     expect(uiSource).toContain(
       'commandTranscript.addEventListener("wheel", handleCommandLiveRowsWheel, { passive: false })'
     );
-    expect(uiSource).not.toContain(
-      'commandLiveRows.addEventListener("wheel", handleCommandLiveRowsWheel, { passive: false })'
+    expect(uiSource).toContain(
+      'commandLive.addEventListener("wheel", handleCommandLiveRowsWheel, { passive: false })'
+    );
+    expect(uiSource).toContain("function syncTutorialCommandLogPinnedRow(");
+    expect(uiSource).toContain("commandPinnedLiveRow.append(pinnedLine)");
+    expect(uiSource).toContain("commandLive.prepend(commandPinnedLiveRow)");
+    expect(uiSource).toContain(
+      'line.classList.contains("command-console__line--tutorial-live-hint")'
     );
   });
 
@@ -6422,8 +6528,19 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("let commandTranscriptFollowsTail = true");
     expect(uiSource).toContain("const commandTranscriptTailTolerancePixels = 2");
     expect(scrollSource).toContain("if (!commandTranscriptFollowsTail) {");
+    expect(scrollSource).toContain("function snapCommandTranscriptToLiveTail(): void");
+    expect(scrollSource).toContain("commandTranscriptFollowsTail = true;");
+    expect(scrollSource).toContain(
+      "commandTranscript.scrollTop = getCommandTranscriptScrollEnd();"
+    );
     expect(scrollSource).toContain("function isCommandTranscriptAtEnd(): boolean");
     expect(wheelSource).toContain("commandTranscriptFollowsTail = isCommandTranscriptAtEnd();");
+    expect(
+      uiSource.match(/snapCommandTranscriptToLiveTail\(\);/g)?.length ?? 0
+    ).toBeGreaterThanOrEqual(7);
+    expect(uiSource).toContain(
+      'if (source === "manual") {\n      snapCommandTranscriptToLiveTail();'
+    );
     expect(uiSource).toContain(
       "commandTranscriptFollowsTail = true;\n    commandTranscript.innerHTML ="
     );
@@ -6453,11 +6570,11 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain('commandTranscript.classList.add("has-scrollback")');
     expect(styles).toContain(".command-console__transcript.has-scrollback::before");
     expect(styles).toContain("max-height: 0;");
-    expect(uiSource).toContain("beginTrailerReplayLogRewrite");
-    expect(uiSource).toContain("syncTrailerReplayCommandLog(clampedPosition)");
     expect(uiSource).toContain("getReplayEntryVisualProgress");
-    expect(styles).toContain(".is-trailer-replay-future");
-    expect(styles).toContain("@keyframes command-trailer-replay-reveal");
+    expect(uiSource).not.toContain("beginTrailerReplayLogRewrite");
+    expect(uiSource).not.toContain("syncTrailerReplayCommandLog");
+    expect(styles).not.toContain(".is-trailer-replay-future");
+    expect(styles).not.toContain("@keyframes command-trailer-replay-reveal");
   });
 
   it("coalesces timeline previews into the renderer frame and caches replay-only work", () => {
@@ -6469,9 +6586,12 @@ describe("Cinematic 3D architecture boundary", () => {
     const previewStart = rendererSource.indexOf("  previewReplayTransition(");
     const cameraStart = rendererSource.indexOf("  captureCameraState()", previewStart);
     const previewSource = rendererSource.slice(previewStart, cameraStart);
-    const logSyncStart = uiSource.indexOf("  function syncTrailerReplayCommandLog(");
-    const logSyncEnd = uiSource.indexOf("  function endTrailerReplayLogRewrite(", logSyncStart);
-    const logSyncSource = uiSource.slice(logSyncStart, logSyncEnd);
+    const reviewPositionStart = uiSource.indexOf("  function setCommandLogReviewPosition(");
+    const reviewPositionEnd = uiSource.indexOf(
+      "  function syncLogReviewStaticFocusTargetKeys(",
+      reviewPositionStart
+    );
+    const reviewPositionSource = uiSource.slice(reviewPositionStart, reviewPositionEnd);
     const playingEventStart = uiSource.indexOf("  function setCommandScrollbackPlayingEvent(");
     const redrawStart = uiSource.indexOf("  function redraw()", playingEventStart);
     const playingEventSource = uiSource.slice(playingEventStart, redrawStart);
@@ -6488,24 +6608,36 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource.match(/deferRender: true/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
     expect(rendererSource).toContain("this.getReplayDestructionTimeline(transitions)");
     expect(rendererSource).toContain("this.replayDestructionTimelineTransitions !== transitions");
-    expect(uiSource).toContain("rebuildTrailerReplayLogCache()");
-    expect(logSyncSource).toContain("trailerReplayLogLineCache");
-    expect(logSyncSource).not.toContain("querySelectorAll");
-    expect(logSyncSource).not.toContain("offsetWidth");
-    expect(logSyncSource).not.toContain("setTimeout");
-    expect(uiSource).toContain("handleTrailerReplayLogRevealAnimationEnd");
-    expect(uiSource).toContain(
-      'commandTranscript.addEventListener("animationend", handleTrailerReplayLogRevealAnimationEnd)'
-    );
+    expect(reviewPositionStart).toBeGreaterThanOrEqual(0);
+    expect(reviewPositionEnd).toBeGreaterThan(reviewPositionStart);
+    expect(reviewPositionSource).not.toContain("renderCommandTranscriptFromTimeline");
+    expect(reviewPositionSource).not.toContain("scrollCommandTranscriptToEnd");
+    expect(reviewPositionSource).not.toContain("commandTranscript.scrollTop");
+    expect(uiSource).not.toContain("trailerReplayLogLineCache");
+    expect(uiSource).not.toContain("handleTrailerReplayLogRevealAnimationEnd");
     expect(playingEventSource).toContain("commandScrollbackPlayingEventId === eventId");
     expect(rendererSource).toContain("Math.floor(snapshot.turn + 0.0001)");
     expect(rendererSource).toContain(
       "const transition = this.turnTransition ?? this.replayPreviewContext"
     );
-    expect(uiSource).toContain('return isTrailerModeActive ? "auto" : "full"');
+    expect(uiSource).toContain("function getCinematicPerformanceMode(): CinematicPerformanceMode");
+    expect(uiSource).toContain('return "auto";');
     expect(rendererSource).toContain("const performanceFrameBudgetReducedMs = 8.55");
-    expect(rendererSource).toContain("const performanceFrameBudgetMinimalMs = 11.5");
+    expect(rendererSource).toContain("const performanceFrameBudgetMinimalMs = 8.9");
     expect(rendererSource).toContain("const performanceReplayFrameBudgetMinimalMs = 8.75");
+    expect(rendererSource).toContain("const performanceFrameSpikeMinimalMs = 12.5");
+    expect(rendererSource).toContain("const performanceRecoveryFrameMs = 7.3");
+    expect(rendererSource).toContain("const detailedBodyAnimationMinimalUpdateSeconds = 1 / 60");
+    expect(rendererSource).toContain("const labelPresentationMinimalUpdateSeconds = 1 / 60");
+    expect(rendererSource).toContain(
+      'private tacticalPresentationUpdatePhase: "all" | "burn" | "fire" = "all"'
+    );
+    expect(rendererSource).toContain("private scheduleTacticalPresentationUpdate(elapsed: number)");
+    expect(rendererSource).toContain("this.tacticalPresentationDeferredFireUpdate = true");
+    expect(rendererSource).toContain('if (this.getEffectivePerformanceMode() === "full")');
+    expect(rendererSource).toContain(
+      'performanceMode === "full" &&\n        (hasResolvingBurnWithdrawal ||'
+    );
     expect(rendererSource).toContain(
       "this.isTimelinePreviewActive && this.replayPresentationEffectsEnabled"
     );
@@ -6573,6 +6705,7 @@ describe("Cinematic 3D architecture boundary", () => {
       "cameraState.trackedFocusTargetKey ?? cameraState.focusedTargetKey"
     );
     expect(ensureSource).toContain("focusTargetKeys: liveCameraFocusTargetKeys");
+    expect(ensureSource).toContain("followTrackedFocus: liveCameraFocusTargetKeys.length > 0");
     expect(ensureSource).toContain("cinematicRenderer.restoreCameraState(capturedLiveCameraState)");
     expect(fixedSource).not.toContain("reviewState.focusTargetKeys = []");
     expect(fixedSource).toContain(
@@ -6584,7 +6717,7 @@ describe("Cinematic 3D architecture boundary", () => {
     );
     expect(restoreSource).toContain("options.preserveCurrentFocusTracking === true");
     expect(uiSource).toContain(
-      "followTrackedFocus: (commandLogTimeReviewState?.focusTargetKeys.length ?? 0) > 0"
+      "followTrackedFocus: commandLogTimeReviewState?.followTrackedFocus === true"
     );
   });
 
@@ -6604,8 +6737,9 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("onUserFocusChange(targetKey: string)");
     expect(uiSource).toContain("setUserReplayFocusTarget(targetKey)");
     expect(uiSource).toContain("reviewState.focusTargetKeys = [targetKey]");
+    expect(uiSource).toContain("reviewState.followTrackedFocus = true");
     expect(uiSource).toContain(
-      "trackedFocusTargetKeys: commandLogTimeReviewState?.focusTargetKeys ?? []"
+      "commandLogTimeReviewState?.followTrackedFocus === true\n              ? commandLogTimeReviewState.focusTargetKeys"
     );
     expect(rendererSource).toContain("private applyReplayTimelineFocus(");
     expect(rendererSource).toContain("this.getActiveMovingTargetPosition(targetKey)");
@@ -6690,9 +6824,10 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(helperSource).toContain(
       "return tutorialState !== null && !isTutorialFirstEnemyKillReplayCueActive();"
     );
-    expect(reviewSource).toContain(
-      "return !isTutorialCommandLogLocked() && replayTape.transitions.length > 0;"
-    );
+    expect(uiSource).toContain("const commandLogTemporalReviewTemporarilyDisabled = true;");
+    expect(reviewSource).toContain("!commandLogTemporalReviewTemporarilyDisabled &&");
+    expect(reviewSource).toContain("!isTutorialCommandLogLocked() &&");
+    expect(reviewSource).toContain("replayTape.transitions.length > 0");
     expect(pointerSource).toContain("if (isTutorialCommandLogLocked()) {");
     expect(pointerSource).toContain("clearCommandLogScrubState();");
     expect(pointerSource).toContain("event.preventDefault();");
@@ -6768,19 +6903,21 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("getCommandScrollbackLineReviewKey");
     expect(uiSource).toContain("commandLogTimeReviewState.activeCommandRowKey === commandRowKey");
     expect(uiSource).toContain(
-      "void playCommandLogReviewForwardToPosition(replayTape.transitions.length, null"
+      'options.preserveCurrentCameraAndFocus === true ? "accelerated" : "standard"'
     );
-    expect(uiSource).not.toContain(
-      "void animateCommandLogTimeReviewToPosition(replayTape.transitions.length, null)"
-    );
+    expect(uiSource).toContain("playCommandLogReviewToLiveFromLine(line)");
     expect(uiSource).toContain("setCommandLogReviewPosition");
     expect(uiSource).toContain("handleCommandTranscriptPointerMove");
     expect(uiSource).toContain("getCommandScrollbackLineAtPoint");
     expect(uiSource).toContain("getCommandScrollbackLineFromPointer");
     expect(uiSource).toContain("handleGlobalTimeReviewPointerDown");
-    expect(globalTimeReviewPointerSource).toContain("event.button === 2");
+    expect(globalTimeReviewPointerSource).toContain("event.button !== 2");
     expect(globalTimeReviewPointerSource).toContain("event.preventDefault()");
-    expect(globalTimeReviewPointerSource).not.toContain("skipCommandLogTimeReviewToLive");
+    expect(globalTimeReviewPointerSource).toContain("skipCommandLogTimeReviewToLive");
+    expect(globalTimeReviewPointerSource).toContain("isCommandLogInteractionTarget(event.target)");
+    expect(uiSource).toContain(
+      'window.addEventListener("contextmenu", handleCommandLogContextMenu)'
+    );
     expect(uiSource).toContain("armCommandLogScrub");
     expect(uiSource).toContain("updateCommandLogScrubPosition");
     expect(uiSource).toContain("commandLogScrubLongPressMs = 115");
@@ -6808,10 +6945,10 @@ describe("Cinematic 3D architecture boundary", () => {
     );
     expect(uiSource).toContain("commandLogTimeReviewState");
     expect(uiSource).toContain("const durationMs = getFixedTimelineReviewDurationMs(");
+    expect(uiSource).toContain("getAcceleratedTimelineReviewDurationMs(");
+    expect(uiSource).toContain("sampleAcceleratedTimelineReviewPosition(");
     expect(uiSource).toContain("commandLogTimeReviewDurations.replayTurnMs");
-    expect(uiSource).toContain(
-      "const position = startPosition + (clampedTarget - startPosition) * linearProgress"
-    );
+    expect(uiSource).toContain('const pacing = options.pacing ?? "standard"');
     expect(uiSource).toContain("replayTurnMs: fixedTimelineReviewReplayTurnDurationMs");
     expect(uiSource).toContain("getReplayTransitionIndexForResolutionEventId");
     expect(uiSource).toContain("getReplayPositionForResolutionEventId");
@@ -6822,7 +6959,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("focusCommandScrollbackLineTarget(line)");
     expect(uiSource).toContain("rewindCommandLogToEvent(targetId, focusTargetKeys, commandRowKey)");
     expect(uiSource).toContain(
-      "followTrackedFocus: (commandLogTimeReviewState?.focusTargetKeys.length ?? 0) > 0"
+      "followTrackedFocus: commandLogTimeReviewState?.followTrackedFocus === true"
     );
     expect(uiSource).toContain("preserveCurrentFocus: true");
     expect(uiSource).toContain(
@@ -8500,6 +8637,11 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain('const isHoverPreview = !("id" in plan)');
     expect(source).not.toContain("`burn-preview-node:${presentationKey}`");
     expect(resolveBurnTrajectorySource).toContain("closeBurnPreviewDestinationLoop(");
+    expect(resolveBurnTrajectorySource).toContain(
+      "const presentationBasePoints = flightPath === null ? visiblePoints : points"
+    );
+    expect(resolveBurnTrajectorySource).toContain("flightPath?.insertionPoints[0]");
+    expect(resolveBurnTrajectorySource).toContain("getBurnPreviewDestinationLoopDirection(");
     expect(renderPendingBurnFutureDestinationLinkStart).toBeGreaterThan(renderBurnArcStart);
     expect(getBurnTrajectoryZoomOutThicknessMultiplierStart).toBeGreaterThan(
       renderPendingBurnFutureDestinationLinkStart
