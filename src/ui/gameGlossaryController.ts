@@ -21,6 +21,7 @@ export type GameGlossaryController = Readonly<{
   hoverPanel: HTMLElement;
   detailPanel: HTMLElement;
   bindRoot: (root: HTMLElement) => void;
+  bindHoverRoot: (root: HTMLElement) => void;
   closeAll: () => void;
 }>;
 
@@ -79,8 +80,8 @@ export function createGameGlossaryController(
   let hoverReleaseTimer: number | null = null;
   let hoverAnimationFrame: number | null = null;
   let hoverGeneration = 0;
-  let hoveredGlossaryId: string | null = null;
-  let hoveredGlossaryToken: HTMLElement | null = null;
+  let hoveredHoverKey: string | null = null;
+  let hoveredHoverToken: HTMLElement | null = null;
   let detailAnimationFrame: number | null = null;
   let detailGeneration = 0;
   let detailSourceToken: HTMLElement | null = null;
@@ -97,6 +98,15 @@ export function createGameGlossaryController(
     root.addEventListener("pointerdown", interceptGlossaryPointerDown, true);
     root.addEventListener("click", handleGlossaryClick, true);
     root.addEventListener("keydown", handleGlossaryKeydown, true);
+  };
+
+  const bindHoverRoot = (root: HTMLElement): void => {
+    root.addEventListener("pointerover", handleStaticPointerOver, true);
+    root.addEventListener("pointerout", handleStaticPointerOut, true);
+    root.addEventListener("mouseover", handleStaticPointerOver, true);
+    root.addEventListener("mouseout", handleStaticPointerOut, true);
+    root.addEventListener("focusin", handleStaticFocusIn, true);
+    root.addEventListener("focusout", handleStaticFocusOut, true);
   };
 
   function handlePointerOver(event: MouseEvent): void {
@@ -134,6 +144,42 @@ export function createGameGlossaryController(
 
   function handleFocusOut(event: FocusEvent): void {
     const token = getGlossaryToken(event.target);
+
+    if (token !== null && !token.contains(asNode(event.relatedTarget))) {
+      scheduleHoverClear();
+    }
+  }
+
+  function handleStaticPointerOver(event: MouseEvent): void {
+    const token = getStaticHoverToken(event.target);
+
+    if (token === null || token.contains(asNode(event.relatedTarget))) {
+      return;
+    }
+
+    scheduleStaticHover(token);
+  }
+
+  function handleStaticPointerOut(event: MouseEvent): void {
+    const token = getStaticHoverToken(event.target);
+
+    if (token === null || token.contains(asNode(event.relatedTarget))) {
+      return;
+    }
+
+    scheduleHoverClear();
+  }
+
+  function handleStaticFocusIn(event: FocusEvent): void {
+    const token = getStaticHoverToken(event.target);
+
+    if (token !== null) {
+      scheduleStaticHover(token);
+    }
+  }
+
+  function handleStaticFocusOut(event: FocusEvent): void {
+    const token = getStaticHoverToken(event.target);
 
     if (token !== null && !token.contains(asNode(event.relatedTarget))) {
       scheduleHoverClear();
@@ -208,11 +254,37 @@ export function createGameGlossaryController(
   }
 
   function scheduleHover(glossaryId: string, token: HTMLElement): void {
+    const entry = getGameGlossaryEntry(glossaryId);
+
+    if (entry === undefined) {
+      return;
+    }
+
+    scheduleHoverCopy(`glossary:${glossaryId}`, entry.label, entry.short, token);
+  }
+
+  function scheduleStaticHover(token: HTMLElement): void {
+    const label = token.dataset["glossaryHoverLabel"];
+    const text = token.dataset["glossaryHoverText"];
+
+    if (label === undefined || text === undefined) {
+      return;
+    }
+
+    scheduleHoverCopy(`static:${label}\u0000${text}`, label, text, token);
+  }
+
+  function scheduleHoverCopy(
+    hoverKey: string,
+    label: string,
+    text: string,
+    token: HTMLElement
+  ): void {
     clearHoverReleaseTimer();
 
     if (
-      hoveredGlossaryId === glossaryId &&
-      hoveredGlossaryToken === token &&
+      hoveredHoverKey === hoverKey &&
+      hoveredHoverToken === token &&
       hoverPanel.classList.contains("is-visible")
     ) {
       return;
@@ -221,24 +293,20 @@ export function createGameGlossaryController(
     clearHoverDwellTimer();
     hoverGeneration += 1;
     const generation = hoverGeneration;
-    hoveredGlossaryId = glossaryId;
-    hoveredGlossaryToken = token;
+    hoveredHoverKey = hoverKey;
+    hoveredHoverToken = token;
     hoverDwellTimer = view.setTimeout(() => {
       hoverDwellTimer = null;
 
       if (
         generation !== hoverGeneration ||
-        hoveredGlossaryId !== glossaryId ||
-        hoveredGlossaryToken !== token
+        hoveredHoverKey !== hoverKey ||
+        hoveredHoverToken !== token
       ) {
         return;
       }
 
-      const entry = getGameGlossaryEntry(glossaryId);
-
-      if (entry !== undefined) {
-        revealHover(entry, token, generation);
-      }
+      revealHover(label, text, token, generation);
     }, gameGlossaryHoverDwellMs);
   }
 
@@ -247,8 +315,8 @@ export function createGameGlossaryController(
     clearHoverReleaseTimer();
     const generation = hoverGeneration + 1;
     hoverGeneration = generation;
-    hoveredGlossaryId = null;
-    hoveredGlossaryToken = null;
+    hoveredHoverKey = null;
+    hoveredHoverToken = null;
     hoverReleaseTimer = view.setTimeout(() => {
       hoverReleaseTimer = null;
 
@@ -258,16 +326,16 @@ export function createGameGlossaryController(
     }, gameGlossaryHoverReleaseMs);
   }
 
-  function revealHover(entry: GameGlossaryEntry, token: HTMLElement, generation: number): void {
+  function revealHover(label: string, text: string, token: HTMLElement, generation: number): void {
     cancelHoverAnimation();
     alignHoverPanelToToken(token);
-    hoverLabel.textContent = entry.label;
+    hoverLabel.textContent = label;
     hoverText.textContent = "";
     hoverPanel.classList.remove("is-hidden");
     hoverPanel.classList.add("is-visible", "is-typewriting");
     hoverPanel.setAttribute("aria-hidden", "false");
 
-    const durationMs = getGlossaryTypewriterDuration(entry.short);
+    const durationMs = getGlossaryTypewriterDuration(text);
     const startedAt = performance.now();
 
     const typeNextFrame = (): void => {
@@ -277,13 +345,13 @@ export function createGameGlossaryController(
 
       const progress = clampGlossaryProgress((performance.now() - startedAt) / durationMs);
       const visibleCharacters = Math.min(
-        entry.short.length,
-        Math.max(1, Math.floor(entry.short.length * progress))
+        text.length,
+        Math.max(1, Math.floor(text.length * progress))
       );
-      hoverText.textContent = entry.short.slice(0, visibleCharacters);
+      hoverText.textContent = text.slice(0, visibleCharacters);
 
-      if (visibleCharacters >= entry.short.length) {
-        hoverText.textContent = entry.short;
+      if (visibleCharacters >= text.length) {
+        hoverText.textContent = text;
         hoverPanel.classList.remove("is-typewriting");
         hoverAnimationFrame = null;
         return;
@@ -465,8 +533,8 @@ export function createGameGlossaryController(
     clearHoverDwellTimer();
     clearHoverReleaseTimer();
     cancelHoverAnimation();
-    hoveredGlossaryId = null;
-    hoveredGlossaryToken = null;
+    hoveredHoverKey = null;
+    hoveredHoverToken = null;
     hoverPanel.classList.remove("is-visible", "is-typewriting");
     hoverPanel.classList.add("is-hidden");
     hoverPanel.setAttribute("aria-hidden", "true");
@@ -513,6 +581,7 @@ export function createGameGlossaryController(
     hoverPanel,
     detailPanel,
     bindRoot,
+    bindHoverRoot,
     closeAll
   };
 }
@@ -532,6 +601,12 @@ function applyGlossaryTokenSemantics(span: HTMLSpanElement, glossaryId: string):
 function getGlossaryToken(target: EventTarget | null): HTMLElement | null {
   return target instanceof Element
     ? target.closest<HTMLElement>(".command-glossary-token[data-glossary-id]")
+    : null;
+}
+
+function getStaticHoverToken(target: EventTarget | null): HTMLElement | null {
+  return target instanceof Element
+    ? target.closest<HTMLElement>("[data-glossary-hover-label][data-glossary-hover-text]")
     : null;
 }
 

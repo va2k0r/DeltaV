@@ -6354,6 +6354,46 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(keydownSource).not.toContain('type: "CANCEL_PENDING_FIRE_ORDER"');
   });
 
+  it("keeps title-screen hover explanations concise and left of the menu log column", () => {
+    const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
+    const glossaryControllerSource = readFileSync(
+      join(process.cwd(), "src/ui/gameGlossaryController.ts"),
+      "utf8"
+    );
+    const styleSource = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
+    const bindHoverStart = glossaryControllerSource.indexOf(
+      "  const bindHoverRoot = (root: HTMLElement): void => {"
+    );
+    const bindHoverEnd = glossaryControllerSource.indexOf(
+      "  function handlePointerOver",
+      bindHoverStart
+    );
+    const bindHoverSource = glossaryControllerSource.slice(bindHoverStart, bindHoverEnd);
+
+    expect(uiSource).toContain("commandGlossaryController.bindHoverRoot(gameMenu);");
+    expect(uiSource).toContain('applyGameMenuHoverCopy(title, "DELTAV", "ORBITAL STRATEGY");');
+    expect(uiSource).toContain(
+      'tooltip: "Begin the guided introduction to movement, production and combat."'
+    );
+    expect(uiSource).toContain(
+      'tooltip: "Open match configuration for factions and planning time."'
+    );
+    expect(uiSource).toContain(
+      'tooltip: "Open audio, display and trajectory presentation settings."'
+    );
+    expect(uiSource).toContain('tooltip: "Open the command used to close this window."');
+    expect(uiSource).toContain(
+      'applyGameMenuHoverCopy(control, "BRIGHTNESS", "Set the global display brightness.");'
+    );
+    expect(bindHoverSource).toContain('root.addEventListener("pointerover"');
+    expect(bindHoverSource).toContain('root.addEventListener("focusin"');
+    expect(bindHoverSource).not.toContain('root.addEventListener("click"');
+    expect(styleSource).toContain(".game-menu__title:hover,\n.game-menu__title:focus-visible");
+    expect(styleSource).toContain(
+      "clamp(4px, 0.65vw, 14px) + min(clamp(310px, 22vw, 500px), calc(100vw - 24px)) +"
+    );
+  });
+
   it("keeps audio controls in the Options submenu", () => {
     const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
     const styleSource = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");

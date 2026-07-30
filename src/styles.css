@@ -1208,11 +1208,21 @@ select {
   min-height: 1em;
   margin: 0 0 1.36em;
   color: #eff2d9;
+  cursor: help;
   font: inherit;
   line-height: 1;
   padding-right: var(--command-console-line-right-gutter);
   text-align: left;
-  pointer-events: none;
+  pointer-events: auto;
+}
+
+.game-menu__title:hover,
+.game-menu__title:focus-visible {
+  color: rgba(249, 252, 255, 0.98);
+  outline: none;
+  text-shadow:
+    0 0 8px rgba(159, 232, 255, 0.2),
+    0 1px 8px rgba(0, 0, 0, 0.42);
 }
 
 .trailer-screen-title,

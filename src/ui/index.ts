@@ -1011,6 +1011,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   const gameMenu = document.createElement("nav");
   gameMenu.className = "game-menu is-hidden";
   gameMenu.ariaLabel = "Game menu";
+  commandGlossaryController.bindHoverRoot(gameMenu);
 
   const trailerScreenTitle = document.createElement("div");
   trailerScreenTitle.className = "trailer-screen-title is-hidden";
@@ -2531,6 +2532,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       const title = document.createElement("div");
       title.className = "game-menu__title";
       title.setAttribute("aria-label", "DELTAV");
+      title.tabIndex = 0;
+      applyGameMenuHoverCopy(title, "DELTAV", "ORBITAL STRATEGY");
       typingTargets.push({ element: title, text: "DELTAV" });
 
       const columns = document.createElement("div");
@@ -2550,7 +2553,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
               createGameMenuAction(
                 "RESUME",
                 resumeGameFromMenu,
-                { actionScreen: "main", tone: "bright" },
+                {
+                  actionScreen: "main",
+                  tone: "bright",
+                  tooltip: "Return to the current match without changing its state."
+                },
                 typingTargets
               )
             ]
@@ -2560,7 +2567,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           startTutorialFromGameMenu,
           {
             actionScreen: "main",
-            tone: isInGameMenuActive ? "regular" : "bright"
+            tone: isInGameMenuActive ? "regular" : "bright",
+            tooltip: "Begin the guided introduction to movement, production and combat."
           },
           typingTargets
         ),
@@ -2569,7 +2577,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           () => {
             toggleGameMenuSubmenu("new-game");
           },
-          { actionScreen: "new-game", tone: "regular" },
+          {
+            actionScreen: "new-game",
+            tone: "regular",
+            tooltip: "Open match configuration for factions and planning time."
+          },
           typingTargets
         ),
         createGameMenuAction(
@@ -2577,7 +2589,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           () => {
             toggleGameMenuSubmenu("options");
           },
-          { actionScreen: "options", tone: "soft" },
+          {
+            actionScreen: "options",
+            tone: "soft",
+            tooltip: "Open audio, display and trajectory presentation settings."
+          },
           typingTargets
         ),
         createGameMenuAction(
@@ -2585,7 +2601,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           () => {
             toggleGameMenuSubmenu("quit");
           },
-          { actionScreen: "quit", tone: "dim" },
+          {
+            actionScreen: "quit",
+            tone: "dim",
+            tooltip: "Open the command used to close this window."
+          },
           typingTargets
         )
       );
@@ -2635,7 +2655,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           () => {
             window.close();
           },
-          { tone: "dim" },
+          {
+            tone: "dim",
+            tooltip: "Close the DeltaV browser tab or window."
+          },
           typingTargets
         )
       );
@@ -2661,7 +2684,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         gameMenuNewGameTimerSeconds = gameMenuNewGameTimerSeconds === 90 ? 10 : 90;
         typeGameMenuAction(action, getGameMenuNewGameTimerLabel());
       },
-      { tone: "regular" },
+      {
+        tone: "regular",
+        tooltipLabel: "PLANNING TIMER",
+        tooltip: "Toggle the human planning limit between 90 and 10 seconds."
+      },
       typingTargets
     );
     timerAction.disabled = isTrailerModeActive || isGameMenuNewGameAiMode();
@@ -2674,7 +2701,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         timerAction.disabled = isTrailerModeActive || isGameMenuNewGameAiMode();
         typeGameMenuAction(timerAction, getGameMenuNewGameTimerLabel());
       },
-      { tone: "soft" },
+      {
+        tone: "soft",
+        tooltipLabel: "FACTIONS",
+        tooltip: "Cycle between two-faction, three-faction and AI demonstration matches."
+      },
       typingTargets
     );
     modeAction.classList.add("game-menu__action--nowrap");
@@ -2685,7 +2716,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       createGameMenuAction(
         "START GAME",
         startConfiguredGameFromMenu,
-        { tone: "bright" },
+        {
+          tone: "bright",
+          tooltip: "Start a new match with the displayed configuration."
+        },
         typingTargets
       )
     );
@@ -2700,7 +2734,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       toggleGameMenuMusic,
       {
         audioControl: "music",
-        tone: isMusicEnabled ? "regular" : "dim"
+        tone: isMusicEnabled ? "regular" : "dim",
+        tooltipLabel: "MUSIC",
+        tooltip: "Enable or disable soundtrack playback."
       },
       typingTargets
     );
@@ -2709,7 +2745,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       toggleGameMenuSfx,
       {
         audioControl: "sfx",
-        tone: isGameMenuSfxEnabled() ? "regular" : "dim"
+        tone: isGameMenuSfxEnabled() ? "regular" : "dim",
+        tooltipLabel: "SFX",
+        tooltip: "Enable or disable interface and game sound effects."
       },
       typingTargets
     );
@@ -2730,7 +2768,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         action.classList.toggle("game-menu__action--dim", nextBloomMode === "off");
         typeGameMenuAction(action, getGameMenuBloomLabel());
       },
-      { tone: uiBloomMode === "on" ? "regular" : "dim" },
+      {
+        tone: uiBloomMode === "on" ? "regular" : "dim",
+        tooltipLabel: "BLOOM",
+        tooltip: "Cycle post-processing bloom between HIGH, LOW and OFF."
+      },
       typingTargets
     );
     const reflectionsAction = createGameMenuAction(
@@ -2758,7 +2800,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
             ? "bright"
             : trajectoryReflectionMode === "hover"
               ? "regular"
-              : "dim"
+              : "dim",
+        tooltipLabel: "REFLECTIONS",
+        tooltip: "Cycle trajectory-plane reflections between ON, HOVER and OFF."
       },
       typingTargets
     );
@@ -2782,7 +2826,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
             ? "bright"
             : getGameMenuAccentsMode() === "off"
               ? "dim"
-              : "regular"
+              : "regular",
+        tooltipLabel: "ACCENTS",
+        tooltip: "Cycle trajectory accents between all, burn-only, fire-only and off."
       },
       typingTargets
     );
@@ -2790,7 +2836,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     const debugAction = createGameMenuAction(
       "DEBUG",
       openDebugDrawerFromGameMenu,
-      { tone: "dim" },
+      {
+        tone: "dim",
+        tooltip: "Open the developer diagnostics drawer."
+      },
       typingTargets
     );
 
@@ -2810,6 +2859,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   ): HTMLLabelElement {
     const control = document.createElement("label");
     control.className = "game-menu__brightness-control";
+    applyGameMenuHoverCopy(control, "BRIGHTNESS", "Set the global display brightness.");
 
     const readout = document.createElement("span");
     readout.className = "game-menu__brightness-readout";
@@ -2891,6 +2941,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       selected?: boolean;
       actionScreen?: GameMenuScreen;
       tone?: GameMenuActionTone;
+      tooltip?: string;
+      tooltipLabel?: string;
     }> = {},
     typingTargets?: GameMenuTypingTarget[]
   ): HTMLButtonElement {
@@ -2906,6 +2958,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       action.dataset["menuAudioControl"] = options.audioControl;
     }
     action.setAttribute("aria-label", label);
+    if (options.tooltip !== undefined) {
+      applyGameMenuHoverCopy(action, options.tooltipLabel ?? label, options.tooltip);
+    }
     if (typingTargets === undefined) {
       setGameMenuGlyphText(action, label);
     } else {
@@ -2918,6 +2973,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       onClick(action);
     });
     return action;
+  }
+
+  function applyGameMenuHoverCopy(element: HTMLElement, label: string, text: string): void {
+    element.classList.add("game-menu__tooltip-target");
+    element.dataset["glossaryHoverLabel"] = label;
+    element.dataset["glossaryHoverText"] = text;
   }
 
   async function typeGameMenuTargetsSequentially(
