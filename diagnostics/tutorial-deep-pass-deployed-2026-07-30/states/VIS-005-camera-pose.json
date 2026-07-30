@@ -1,0 +1,29 @@
+{
+  "label": "DeltaV Camera Pose",
+  "version": 1,
+  "copiedAt": "2026-07-30T13:23:00.470Z",
+  "turn": 12,
+  "mode": "1p",
+  "mapPreset": "procedural",
+  "proceduralSeed": "proc-ms7j9tm3-1agxlz6",
+  "view": "cinematic3d",
+  "selectedTargetKey": null,
+  "viewport": {
+    "width": 1770,
+    "height": 1239
+  },
+  "camera": {
+    "focus": [
+      -112.39521196494748,
+      0,
+      1069.369009544111
+    ],
+    "yaw": -2.5743606466916362,
+    "pitch": 0.9100000000000004,
+    "distance": 1888.8259429573582,
+    "focusedTargetKey": "node:mars_node",
+    "trackedFocusTargetKey": "node:mars_node",
+    "displayScaleFocusTargetKey": "node:mars_node",
+    "displayScaleDistance": 1888.8259429573582
+  }
+}

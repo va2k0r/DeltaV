@@ -1,0 +1,6583 @@
+{
+  "label": "DeltaV GameState Diagnostic Dump",
+  "version": 1,
+  "copiedAt": "2026-07-30T13:15:32.886Z",
+  "url": "https://va2k0r.github.io/DeltaV/?debug=1&build=ae8d0be",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+  "runtime": {
+    "view": "cinematic3d",
+    "selectedTargetKey": null,
+    "planningTimerMode": "auto",
+    "isReplayMode": false,
+    "isTurnTransitionActive": false,
+    "isCommandConsoleResolving": false,
+    "tutorial": {
+      "segmentId": "TUTORIAL_SEGMENT_01",
+      "phase": "firstBurnQueued",
+      "startedAt": 48989.90000009537,
+      "firstSelectionAt": 73309.70000004768,
+      "firstBurnReselectionStartedAt": null,
+      "inputLocked": false,
+      "autoAdvanceActive": false,
+      "activeMandatoryLaunchId": null,
+      "mandatoryLaunchResumePhase": null,
+      "enemySimpleAiEnabled": false,
+      "hasZoomedOutCamera": false,
+      "firstBurnPreviewDestinationNodeId": null,
+      "firstBurnDestinationNodeId": "venus_node",
+      "firstBurnArrivalTurn": 3,
+      "productiveBurnOriginNodeId": null,
+      "productiveBurnDestinationNodeId": null,
+      "productiveBurnArrivalTurn": null,
+      "productiveBurnPromptStartedAt": null,
+      "productiveBurnReselectionStartedAt": null,
+      "tutorialBurnDestinationNodeId": "venus_node",
+      "tutorialBurnArrivalTurn": 3,
+      "tritiumAnchorNodeId": null,
+      "hasIntroducedBarren": false,
+      "tritiumLessonContinuation": null,
+      "shipyardContestedRecoveryActive": false,
+      "shipyardSupportProductionNodeId": null,
+      "shipyardLessonNodeId": "mars_node",
+      "shipyardEnemyOriginNodeId": null,
+      "shipyardEnemyDestinationNodeId": null,
+      "shipyardEnemyFireImpactTurn": null,
+      "shipyardEnemyEvadeObserved": false,
+      "shipyardEnemyReturnArrivalTurn": null,
+      "shipyardPlayerEscapeNodeId": null,
+      "shipyardSupportFireNodeId": null,
+      "shipyardCounterContestOriginNodeId": null,
+      "shipyardCounterContestArrivalTurn": null,
+      "shipyardCounterContestAutoAdvanceConsumed": false,
+      "shipyardFirePromptStartedAt": null,
+      "shipyardSupportFirePromptStartedAt": null,
+      "shipyardContestedPromptStartedAt": null,
+      "enemyNodeId": null,
+      "evadeLessonMissileTargetNodeId": null,
+      "contestedNodeId": null,
+      "defensivePlayerNodeId": null,
+      "defensiveEscapeNodeId": null,
+      "defensiveMissileImpactTurn": null,
+      "firstEnemyKillReplayEventId": null,
+      "firstEnemyKillReplayNodeId": null,
+      "firstEnemyKillReplayWarningPending": false,
+      "cameraZoomFocusHintDisplayCount": 1,
+      "cameraZoomFocusHintVisible": false,
+      "cameraPanOrbitHintDisplayCount": 0,
+      "cameraPanOrbitHintVisible": false,
+      "timerCount": 0,
+      "timers": [],
+      "loggedKeys": [
+        "tutorial:first-burn-cost",
+        "tutorial:first-burn-live-hints-frozen",
+        "tutorial:first-burn-time-cost",
+        "tutorial:opening-live-hints-frozen"
+      ]
+    }
+  },
+  "camera": {
+    "viewport": {
+      "width": 1770,
+      "height": 1239
+    },
+    "focus": [
+      -626.4921636184937,
+      0,
+      117.46770595701868
+    ],
+    "yaw": -2.5743606466916362,
+    "pitch": 0.9100000000000004,
+    "distance": 2168.3260012386177,
+    "focusedTargetKey": "node:moon_node",
+    "trackedFocusTargetKey": "node:moon_node",
+    "displayScaleFocusTargetKey": "node:moon_node",
+    "displayScaleDistance": 2168.3260012386177,
+    "smoothWheelZoomTargetDistance": null,
+    "arrivalChaseCamera": null,
+    "shipyardAssemblyChaseCamera": null
+  },
+  "map": {
+    "preset": "procedural",
+    "procedural": true,
+    "proceduralSeed": "proc-ms7j9tm3-1agxlz6",
+    "proceduralDebug": {
+      "seed": "proc-ms7j9tm3-1agxlz6",
+      "selectedTritiumNodes": [
+        "deimos_node",
+        "ganymede_node",
+        "iapetus_node",
+        "oberon_node",
+        "triton_node",
+        "pluto_node"
+      ],
+      "selectedShipyardNodes": [
+        "mercury_node",
+        "venus_node",
+        "jupiter_node",
+        "saturn_node",
+        "titania_node"
+      ],
+      "playerStart": {
+        "factionId": "player",
+        "controllerType": "human",
+        "tritium": "triton_node",
+        "shipyard": "jupiter_node",
+        "staging": "callisto_node",
+        "startingShips": [
+          {
+            "nodeId": "triton_node",
+            "factionId": "player",
+            "shipCount": 1
+          },
+          {
+            "nodeId": "jupiter_node",
+            "factionId": "player",
+            "shipCount": 1
+          },
+          {
+            "nodeId": "callisto_node",
+            "factionId": "player",
+            "shipCount": 1
+          }
+        ]
+      },
+      "opponentStart": {
+        "factionId": "opponent",
+        "controllerType": "ai",
+        "tritium": "oberon_node",
+        "shipyard": "venus_node",
+        "staging": "phobos_node",
+        "startingShips": [
+          {
+            "nodeId": "oberon_node",
+            "factionId": "opponent",
+            "shipCount": 1
+          },
+          {
+            "nodeId": "venus_node",
+            "factionId": "opponent",
+            "shipCount": 1
+          },
+          {
+            "nodeId": "phobos_node",
+            "factionId": "opponent",
+            "shipCount": 1
+          }
+        ]
+      },
+      "ai_2Start": {
+        "factionId": "ai_2",
+        "controllerType": "ai",
+        "tritium": "pluto_node",
+        "shipyard": "mercury_node",
+        "staging": "titan_node",
+        "startingShips": [
+          {
+            "nodeId": "pluto_node",
+            "factionId": "ai_2",
+            "shipCount": 1
+          },
+          {
+            "nodeId": "mercury_node",
+            "factionId": "ai_2",
+            "shipCount": 1
+          },
+          {
+            "nodeId": "titan_node",
+            "factionId": "ai_2",
+            "shipCount": 1
+          }
+        ]
+      },
+      "excludedNodes": {
+        "productive": [
+          "earth_node",
+          "moon_node"
+        ],
+        "starting": [
+          "earth_node",
+          "moon_node"
+        ]
+      },
+      "finalScore": 89.25,
+      "distributionScore": 100,
+      "fairnessScore": 90.21,
+      "expansionScore": 78.84,
+      "conflictScore": 86.41,
+      "killboxWarnings": [],
+      "acceptedMapWarnings": [],
+      "evaluatedCandidateCount": 700,
+      "acceptedCandidateCount": 0,
+      "rejectedCandidateCount": 700,
+      "candidateDiscardStats": [
+        "3p:fallback-recovery:opponent:fallback-recovery-insolvent:409",
+        "3p:neutral-expansion:opponent:neutral-expansion-over-t3-or-4dv:409",
+        "3p:fallback-recovery:player:fallback-recovery-insolvent:407",
+        "3p:neutral-expansion:player:neutral-expansion-over-t3-or-4dv:407",
+        "3p:fallback-recovery:ai_2:fallback-recovery-insolvent:399",
+        "3p:neutral-expansion:ai_2:neutral-expansion-over-t3-or-4dv:399",
+        "3p:fairness-below-minimum:354",
+        "fallback-recovery:player:fallback-recovery-insolvent:327",
+        "neutral-expansion:player:neutral-expansion-over-t3-or-4dv:327",
+        "fallback-recovery:opponent:fallback-recovery-insolvent:321",
+        "neutral-expansion:opponent:neutral-expansion-over-t3-or-4dv:321",
+        "3p:STARTING_SHIPYARD_SECURITY_OUTLIER:296",
+        "3p:starter-raid:opponent:starter-raid-before-t3-asymmetric:229",
+        "3p:early-collapse:opponent:fallback-tritium-contested-immediately:219",
+        "3p:early-collapse:player:fallback-tritium-contested-immediately:211",
+        "3p:dogpile-risk-major-outlier:208",
+        "STARTING_SHIPYARD_SECURITY_OUTLIER:207",
+        "3p:starter-raid:player:starter-raid-before-t3-asymmetric:204",
+        "3p:early-collapse:ai_2:fallback-tritium-contested-immediately:199",
+        "3p:starter-raid:ai_2:starter-raid-before-t3-asymmetric:182",
+        "starter-raid:player:starter-raid-before-t3-asymmetric:111",
+        "starter-raid:opponent:starter-raid-before-t3-asymmetric:104",
+        "3p:staging-value-major-outlier:90",
+        "3p:pressure-received-major-outlier:39",
+        "pressure-received-major-outlier:36",
+        "staging-value-major-outlier:35",
+        "fairness-below-minimum:30",
+        "3p:starting-shipyard-security-spread-3p:24",
+        "3p:early-collapse:player:dogpile-risk-near-100:21",
+        "3p:early-collapse:ai_2:dogpile-risk-near-100:20",
+        "3p:early-collapse:ai_2:early-contested-tritium-collapse:16",
+        "3p:early-collapse:opponent:dogpile-risk-near-100:16",
+        "3p:early-collapse:opponent:early-contested-tritium-collapse:16",
+        "3p:early-collapse:player:early-contested-tritium-collapse:10",
+        "3p:fairness-hard-reject:10",
+        "3p:tritium-access-score-spread-3p:8",
+        "shipyard-security-major-outlier:6",
+        "3p:shipyard-security-major-outlier:4",
+        "3p:tritium-access-major-outlier:3",
+        "tritium-access-major-outlier:3"
+      ],
+      "candidateRejectionStats": [
+        "rigid-audit-candidate-rejected:682",
+        "3p:fallback-recovery:opponent:fallback-recovery-insolvent:409",
+        "3p:neutral-expansion:opponent:neutral-expansion-over-t3-or-4dv:409",
+        "3p:fallback-recovery:player:fallback-recovery-insolvent:407",
+        "3p:neutral-expansion:player:neutral-expansion-over-t3-or-4dv:407",
+        "3p:fallback-recovery:ai_2:fallback-recovery-insolvent:399",
+        "3p:neutral-expansion:ai_2:neutral-expansion-over-t3-or-4dv:399",
+        "3p:fairness-below-minimum:354"
+      ],
+      "rigidAuditRejectedCandidates": 682,
+      "rigidAuditRejectionStats": [
+        "3p:fallback-recovery:opponent:fallback-recovery-insolvent:409",
+        "3p:neutral-expansion:opponent:neutral-expansion-over-t3-or-4dv:409",
+        "3p:fallback-recovery:player:fallback-recovery-insolvent:407",
+        "3p:neutral-expansion:player:neutral-expansion-over-t3-or-4dv:407",
+        "3p:fallback-recovery:ai_2:fallback-recovery-insolvent:399",
+        "3p:neutral-expansion:ai_2:neutral-expansion-over-t3-or-4dv:399",
+        "fallback-recovery:player:fallback-recovery-insolvent:327",
+        "neutral-expansion:player:neutral-expansion-over-t3-or-4dv:327",
+        "fallback-recovery:opponent:fallback-recovery-insolvent:321",
+        "neutral-expansion:opponent:neutral-expansion-over-t3-or-4dv:321",
+        "3p:starter-raid:opponent:starter-raid-before-t3-asymmetric:229",
+        "3p:starter-raid:player:starter-raid-before-t3-asymmetric:204",
+        "3p:starter-raid:ai_2:starter-raid-before-t3-asymmetric:182",
+        "starter-raid:player:starter-raid-before-t3-asymmetric:111",
+        "starter-raid:opponent:starter-raid-before-t3-asymmetric:104"
+      ],
+      "hardGatePassed": true,
+      "hardGateFailures": [],
+      "fairnessAudit": {
+        "hardGatePassed": true,
+        "hardGateFailures": [],
+        "activeFactionIds": [
+          "player"
+        ],
+        "factionScores": {
+          "player": {
+            "tritiumAccessScore": 63.852817679558015,
+            "shipyardSecurityScore": 75.65563535911602,
+            "stagingValueScore": 81.28706261510129,
+            "pressureReceivedScore": 0,
+            "pressureAppliedScore": 0,
+            "dogpileRisk": 0,
+            "fallbackTritiumQuality": 80.79558011049724,
+            "fallbackShipyardQuality": 78.02486187845304,
+            "tritiumAccess": {
+              "startingTritium": "triton_node",
+              "nearestFallbackTritium": "ganymede_node",
+              "nearestFallbackBurnTurns": 2,
+              "nearestFallbackBurnCost": 3,
+              "fallbackPaybackEstimate": 3.5,
+              "rankedTritiumOptions": [
+                {
+                  "nodeId": "ganymede_node",
+                  "burnTurns": 2,
+                  "burnCost": 3,
+                  "normalizedQuality": 89.08,
+                  "enemyPressureRisk": 0
+                },
+                {
+                  "nodeId": "oberon_node",
+                  "burnTurns": 5,
+                  "burnCost": 5,
+                  "normalizedQuality": 72.51,
+                  "enemyPressureRisk": 0
+                },
+                {
+                  "nodeId": "deimos_node",
+                  "burnTurns": 4,
+                  "burnCost": 5,
+                  "normalizedQuality": 68.71,
+                  "enemyPressureRisk": 0
+                },
+                {
+                  "nodeId": "pluto_node",
+                  "burnTurns": 4,
+                  "burnCost": 8,
+                  "normalizedQuality": 45.33,
+                  "enemyPressureRisk": 0
+                },
+                {
+                  "nodeId": "iapetus_node",
+                  "burnTurns": 4,
+                  "burnCost": 9,
+                  "normalizedQuality": 11.49,
+                  "enemyPressureRisk": 0
+                }
+              ],
+              "tritiumAccessScore": 63.852817679558015,
+              "tritiumRecoveryScore": 80.79558011049724
+            },
+            "shipyardAudit": {
+              "startingShipyard": "jupiter_node",
+              "incomingBurnPressureFromEnemies": 0,
+              "incomingFirePressureFromEnemies": 0,
+              "contestRisk": 0,
+              "progressStealRisk": 0,
+              "outgoingFireValue": 0,
+              "outgoingBurnValue": 0,
+              "mandatoryLaunchRisk": 16.659300184162063,
+              "shipyardSecurityScore": 75.65563535911602,
+              "notes": [
+                "enemy burn contest pressure is contained",
+                "saved progress has recovery space",
+                "shipyard is defensive more than projective",
+                "mandatory launch has credible exits"
+              ]
+            },
+            "openingCurve": {
+              "expectedDvByTurn": [
+                10,
+                12,
+                16,
+                20,
+                24,
+                28,
+                32,
+                36
+              ],
+              "expectedShipyardProgressByTurn": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                5,
+                5
+              ],
+              "likelySecondTritiumTiming": 2,
+              "likelyFirstPressureReceived": null,
+              "likelyFirstPressureApplied": null,
+              "predictedCollapseRisk": 14.503196685082873
+            },
+            "starterRaid": {
+              "startingTritium": "triton_node",
+              "enemyFaction": null,
+              "enemyOriginNode": null,
+              "enemyBurnTurns": null,
+              "enemyBurnCost": null,
+              "reciprocalBurnTurns": null,
+              "reciprocalBurnCost": null,
+              "exceptionalSymmetryUsed": false,
+              "hardGatePassed": true,
+              "rejectionReason": null
+            },
+            "neutralExpansion": {
+              "neutralTritium": "ganymede_node",
+              "burnTurns": 2,
+              "burnCost": 3,
+              "firstWorkTurn": 3,
+              "hardGatePassed": true,
+              "rejectionReason": null
+            },
+            "fallbackRecoverySolvency": {
+              "fallbackTritium": "ganymede_node",
+              "burnTurns": 2,
+              "burnCost": 3,
+              "firstWorkTurn": 3,
+              "projectedDvAtArrival": 7,
+              "firstUpkeepCost": 2,
+              "cheapestExitBurnCost": 3,
+              "projectedDvAfterUpkeepAndExit": 2,
+              "hardGatePassed": true,
+              "rejectionReason": null
+            }
+          }
+        },
+        "earlyCollapseAudits": [
+          {
+            "faction": "player",
+            "startingTritium": "triton_node",
+            "startingShipyard": "jupiter_node",
+            "stagingNode": "callisto_node",
+            "nearestFallbackTritium": "ganymede_node",
+            "fallbackArrivalTurn": 2,
+            "contestedRiskByT3": 14.5,
+            "dogpileRisk": 0,
+            "tritiumAccessScore": 63.85,
+            "predictedContestedUpkeepBurden": 0,
+            "hardGatePassed": true,
+            "rejectionReason": null
+          }
+        ],
+        "worstAsymmetryReason": "none",
+        "fallbackStaticLayoutUsed": true
+      },
+      "fairnessAuditByMode": {
+        "1p": {
+          "hardGatePassed": true,
+          "hardGateFailures": [],
+          "activeFactionIds": [
+            "player"
+          ],
+          "factionScores": {
+            "player": {
+              "tritiumAccessScore": 63.852817679558015,
+              "shipyardSecurityScore": 75.65563535911602,
+              "stagingValueScore": 81.28706261510129,
+              "pressureReceivedScore": 0,
+              "pressureAppliedScore": 0,
+              "dogpileRisk": 0,
+              "fallbackTritiumQuality": 80.79558011049724,
+              "fallbackShipyardQuality": 78.02486187845304,
+              "tritiumAccess": {
+                "startingTritium": "triton_node",
+                "nearestFallbackTritium": "ganymede_node",
+                "nearestFallbackBurnTurns": 2,
+                "nearestFallbackBurnCost": 3,
+                "fallbackPaybackEstimate": 3.5,
+                "rankedTritiumOptions": [
+                  {
+                    "nodeId": "ganymede_node",
+                    "burnTurns": 2,
+                    "burnCost": 3,
+                    "normalizedQuality": 89.08,
+                    "enemyPressureRisk": 0
+                  },
+                  {
+                    "nodeId": "oberon_node",
+                    "burnTurns": 5,
+                    "burnCost": 5,
+                    "normalizedQuality": 72.51,
+                    "enemyPressureRisk": 0
+                  },
+                  {
+                    "nodeId": "deimos_node",
+                    "burnTurns": 4,
+                    "burnCost": 5,
+                    "normalizedQuality": 68.71,
+                    "enemyPressureRisk": 0
+                  },
+                  {
+                    "nodeId": "pluto_node",
+                    "burnTurns": 4,
+                    "burnCost": 8,
+                    "normalizedQuality": 45.33,
+                    "enemyPressureRisk": 0
+                  },
+                  {
+                    "nodeId": "iapetus_node",
+                    "burnTurns": 4,
+                    "burnCost": 9,
+                    "normalizedQuality": 11.49,
+                    "enemyPressureRisk": 0
+                  }
+                ],
+                "tritiumAccessScore": 63.852817679558015,
+                "tritiumRecoveryScore": 80.79558011049724
+              },
+              "shipyardAudit": {
+                "startingShipyard": "jupiter_node",
+                "incomingBurnPressureFromEnemies": 0,
+                "incomingFirePressureFromEnemies": 0,
+                "contestRisk": 0,
+                "progressStealRisk": 0,
+                "outgoingFireValue": 0,
+                "outgoingBurnValue": 0,
+                "mandatoryLaunchRisk": 16.659300184162063,
+                "shipyardSecurityScore": 75.65563535911602,
+                "notes": [
+                  "enemy burn contest pressure is contained",
+                  "saved progress has recovery space",
+                  "shipyard is defensive more than projective",
+                  "mandatory launch has credible exits"
+                ]
+              },
+              "openingCurve": {
+                "expectedDvByTurn": [
+                  10,
+                  12,
+                  16,
+                  20,
+                  24,
+                  28,
+                  32,
+                  36
+                ],
+                "expectedShipyardProgressByTurn": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  5,
+                  5
+                ],
+                "likelySecondTritiumTiming": 2,
+                "likelyFirstPressureReceived": null,
+                "likelyFirstPressureApplied": null,
+                "predictedCollapseRisk": 14.503196685082873
+              },
+              "starterRaid": {
+                "startingTritium": "triton_node",
+                "enemyFaction": null,
+                "enemyOriginNode": null,
+                "enemyBurnTurns": null,
+                "enemyBurnCost": null,
+                "reciprocalBurnTurns": null,
+                "reciprocalBurnCost": null,
+                "exceptionalSymmetryUsed": false,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              },
+              "neutralExpansion": {
+                "neutralTritium": "ganymede_node",
+                "burnTurns": 2,
+                "burnCost": 3,
+                "firstWorkTurn": 3,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              },
+              "fallbackRecoverySolvency": {
+                "fallbackTritium": "ganymede_node",
+                "burnTurns": 2,
+                "burnCost": 3,
+                "firstWorkTurn": 3,
+                "projectedDvAtArrival": 7,
+                "firstUpkeepCost": 2,
+                "cheapestExitBurnCost": 3,
+                "projectedDvAfterUpkeepAndExit": 2,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              }
+            }
+          },
+          "earlyCollapseAudits": [
+            {
+              "faction": "player",
+              "startingTritium": "triton_node",
+              "startingShipyard": "jupiter_node",
+              "stagingNode": "callisto_node",
+              "nearestFallbackTritium": "ganymede_node",
+              "fallbackArrivalTurn": 2,
+              "contestedRiskByT3": 14.5,
+              "dogpileRisk": 0,
+              "tritiumAccessScore": 63.85,
+              "predictedContestedUpkeepBurden": 0,
+              "hardGatePassed": true,
+              "rejectionReason": null
+            }
+          ],
+          "worstAsymmetryReason": "none",
+          "fallbackStaticLayoutUsed": true
+        },
+        "2p": {
+          "hardGatePassed": true,
+          "hardGateFailures": [],
+          "activeFactionIds": [
+            "player",
+            "opponent"
+          ],
+          "factionScores": {
+            "player": {
+              "tritiumAccessScore": 57.99646408839779,
+              "shipyardSecurityScore": 62.001160220994485,
+              "stagingValueScore": 81.28706261510129,
+              "pressureReceivedScore": 69.53933701657459,
+              "pressureAppliedScore": 70.09116022099447,
+              "dogpileRisk": 0,
+              "fallbackTritiumQuality": 80.79558011049724,
+              "fallbackShipyardQuality": 78.02486187845304,
+              "tritiumAccess": {
+                "startingTritium": "triton_node",
+                "nearestFallbackTritium": "ganymede_node",
+                "nearestFallbackBurnTurns": 2,
+                "nearestFallbackBurnCost": 3,
+                "fallbackPaybackEstimate": 3.5,
+                "rankedTritiumOptions": [
+                  {
+                    "nodeId": "ganymede_node",
+                    "burnTurns": 2,
+                    "burnCost": 3,
+                    "normalizedQuality": 89.08,
+                    "enemyPressureRisk": 82.52
+                  },
+                  {
+                    "nodeId": "oberon_node",
+                    "burnTurns": 5,
+                    "burnCost": 5,
+                    "normalizedQuality": 72.51,
+                    "enemyPressureRisk": 23.4
+                  },
+                  {
+                    "nodeId": "deimos_node",
+                    "burnTurns": 4,
+                    "burnCost": 5,
+                    "normalizedQuality": 68.71,
+                    "enemyPressureRisk": 100
+                  },
+                  {
+                    "nodeId": "pluto_node",
+                    "burnTurns": 4,
+                    "burnCost": 8,
+                    "normalizedQuality": 45.33,
+                    "enemyPressureRisk": 23.14
+                  },
+                  {
+                    "nodeId": "iapetus_node",
+                    "burnTurns": 4,
+                    "burnCost": 9,
+                    "normalizedQuality": 11.49,
+                    "enemyPressureRisk": 57.85
+                  }
+                ],
+                "tritiumAccessScore": 57.99646408839779,
+                "tritiumRecoveryScore": 80.79558011049724
+              },
+              "shipyardAudit": {
+                "startingShipyard": "jupiter_node",
+                "incomingBurnPressureFromEnemies": 91.93922651933701,
+                "incomingFirePressureFromEnemies": 73.34254143646409,
+                "contestRisk": 91.93922651933701,
+                "progressStealRisk": 79.39790055248618,
+                "outgoingFireValue": 51.215469613259664,
+                "outgoingBurnValue": 66.21270718232043,
+                "mandatoryLaunchRisk": 16.659300184162063,
+                "shipyardSecurityScore": 62.001160220994485,
+                "notes": [
+                  "enemy burn contest pressure is high",
+                  "saved progress can be stolen quickly",
+                  "shipyard projects useful pressure",
+                  "mandatory launch has credible exits"
+                ]
+              },
+              "openingCurve": {
+                "expectedDvByTurn": [
+                  10,
+                  12,
+                  16,
+                  20,
+                  24,
+                  28,
+                  32,
+                  36
+                ],
+                "expectedShipyardProgressByTurn": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  5,
+                  5
+                ],
+                "likelySecondTritiumTiming": 2,
+                "likelyFirstPressureReceived": 4,
+                "likelyFirstPressureApplied": 4,
+                "predictedCollapseRisk": 33.89943535911602
+              },
+              "starterRaid": {
+                "startingTritium": "triton_node",
+                "enemyFaction": "opponent",
+                "enemyOriginNode": "phobos_node",
+                "enemyBurnTurns": 7,
+                "enemyBurnCost": 8,
+                "reciprocalBurnTurns": 5,
+                "reciprocalBurnCost": 5,
+                "exceptionalSymmetryUsed": false,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              },
+              "neutralExpansion": {
+                "neutralTritium": "ganymede_node",
+                "burnTurns": 2,
+                "burnCost": 3,
+                "firstWorkTurn": 3,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              },
+              "fallbackRecoverySolvency": {
+                "fallbackTritium": "ganymede_node",
+                "burnTurns": 2,
+                "burnCost": 3,
+                "firstWorkTurn": 3,
+                "projectedDvAtArrival": 7,
+                "firstUpkeepCost": 2,
+                "cheapestExitBurnCost": 3,
+                "projectedDvAfterUpkeepAndExit": 2,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              }
+            },
+            "opponent": {
+              "tritiumAccessScore": 56.439558011049726,
+              "shipyardSecurityScore": 66.92259668508288,
+              "stagingValueScore": 73.68411602209946,
+              "pressureReceivedScore": 69.38154696132597,
+              "pressureAppliedScore": 60.610497237569064,
+              "dogpileRisk": 0,
+              "fallbackTritiumQuality": 91.25966850828729,
+              "fallbackShipyardQuality": 94.62154696132596,
+              "tritiumAccess": {
+                "startingTritium": "oberon_node",
+                "nearestFallbackTritium": "deimos_node",
+                "nearestFallbackBurnTurns": 2,
+                "nearestFallbackBurnCost": 2,
+                "fallbackPaybackEstimate": 3,
+                "rankedTritiumOptions": [
+                  {
+                    "nodeId": "deimos_node",
+                    "burnTurns": 2,
+                    "burnCost": 2,
+                    "normalizedQuality": 100,
+                    "enemyPressureRisk": 68.71
+                  },
+                  {
+                    "nodeId": "ganymede_node",
+                    "burnTurns": 4,
+                    "burnCost": 3,
+                    "normalizedQuality": 82.52,
+                    "enemyPressureRisk": 95.66
+                  },
+                  {
+                    "nodeId": "iapetus_node",
+                    "burnTurns": 4,
+                    "burnCost": 6,
+                    "normalizedQuality": 57.68,
+                    "enemyPressureRisk": 38.7
+                  },
+                  {
+                    "nodeId": "triton_node",
+                    "burnTurns": 7,
+                    "burnCost": 8,
+                    "normalizedQuality": 25.92,
+                    "enemyPressureRisk": 5.77
+                  },
+                  {
+                    "nodeId": "pluto_node",
+                    "burnTurns": 7,
+                    "burnCost": 9,
+                    "normalizedQuality": 23.14,
+                    "enemyPressureRisk": 48.73
+                  }
+                ],
+                "tritiumAccessScore": 56.439558011049726,
+                "tritiumRecoveryScore": 91.25966850828729
+              },
+              "shipyardAudit": {
+                "startingShipyard": "venus_node",
+                "incomingBurnPressureFromEnemies": 67.66850828729281,
+                "incomingFirePressureFromEnemies": 52.734806629834246,
+                "contestRisk": 67.66850828729281,
+                "progressStealRisk": 58.213591160220986,
+                "outgoingFireValue": 34.87569060773481,
+                "outgoingBurnValue": 44.273480662983424,
+                "mandatoryLaunchRisk": 5.826887661141811,
+                "shipyardSecurityScore": 66.92259668508288,
+                "notes": [
+                  "enemy burn contest pressure is high",
+                  "saved progress has recovery space",
+                  "shipyard is defensive more than projective",
+                  "mandatory launch has credible exits"
+                ]
+              },
+              "openingCurve": {
+                "expectedDvByTurn": [
+                  10,
+                  12,
+                  16,
+                  20,
+                  24,
+                  28,
+                  32,
+                  36
+                ],
+                "expectedShipyardProgressByTurn": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  5,
+                  5
+                ],
+                "likelySecondTritiumTiming": 2,
+                "likelyFirstPressureReceived": 4,
+                "likelyFirstPressureApplied": 4,
+                "predictedCollapseRisk": 33.41479668508288
+              },
+              "starterRaid": {
+                "startingTritium": "oberon_node",
+                "enemyFaction": "player",
+                "enemyOriginNode": "callisto_node",
+                "enemyBurnTurns": 5,
+                "enemyBurnCost": 5,
+                "reciprocalBurnTurns": 7,
+                "reciprocalBurnCost": 8,
+                "exceptionalSymmetryUsed": false,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              },
+              "neutralExpansion": {
+                "neutralTritium": "deimos_node",
+                "burnTurns": 2,
+                "burnCost": 2,
+                "firstWorkTurn": 3,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              },
+              "fallbackRecoverySolvency": {
+                "fallbackTritium": "deimos_node",
+                "burnTurns": 2,
+                "burnCost": 2,
+                "firstWorkTurn": 3,
+                "projectedDvAtArrival": 8,
+                "firstUpkeepCost": 2,
+                "cheapestExitBurnCost": 2,
+                "projectedDvAfterUpkeepAndExit": 4,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              }
+            }
+          },
+          "earlyCollapseAudits": [
+            {
+              "faction": "player",
+              "startingTritium": "triton_node",
+              "startingShipyard": "jupiter_node",
+              "stagingNode": "callisto_node",
+              "nearestFallbackTritium": "ganymede_node",
+              "fallbackArrivalTurn": 2,
+              "contestedRiskByT3": 91.94,
+              "dogpileRisk": 0,
+              "tritiumAccessScore": 58,
+              "predictedContestedUpkeepBurden": 4,
+              "hardGatePassed": false,
+              "rejectionReason": "fallback-tritium-contested-immediately"
+            },
+            {
+              "faction": "opponent",
+              "startingTritium": "oberon_node",
+              "startingShipyard": "venus_node",
+              "stagingNode": "phobos_node",
+              "nearestFallbackTritium": "deimos_node",
+              "fallbackArrivalTurn": 2,
+              "contestedRiskByT3": 67.67,
+              "dogpileRisk": 0,
+              "tritiumAccessScore": 56.44,
+              "predictedContestedUpkeepBurden": 2,
+              "hardGatePassed": true,
+              "rejectionReason": null
+            }
+          ],
+          "worstAsymmetryReason": "pressureAppliedScore spread 9.48",
+          "fallbackStaticLayoutUsed": true
+        },
+        "3p": {
+          "hardGatePassed": true,
+          "hardGateFailures": [],
+          "activeFactionIds": [
+            "player",
+            "opponent",
+            "ai_2"
+          ],
+          "factionScores": {
+            "player": {
+              "tritiumAccessScore": 54.83790055248619,
+              "shipyardSecurityScore": 63.48674033149172,
+              "stagingValueScore": 82.10936924493555,
+              "pressureReceivedScore": 71.38375690607734,
+              "pressureAppliedScore": 67.83563535911603,
+              "dogpileRisk": 71.15105372771305,
+              "fallbackTritiumQuality": 80.79558011049724,
+              "fallbackShipyardQuality": 78.02486187845304,
+              "tritiumAccess": {
+                "startingTritium": "triton_node",
+                "nearestFallbackTritium": "ganymede_node",
+                "nearestFallbackBurnTurns": 2,
+                "nearestFallbackBurnCost": 3,
+                "fallbackPaybackEstimate": 3.5,
+                "rankedTritiumOptions": [
+                  {
+                    "nodeId": "ganymede_node",
+                    "burnTurns": 2,
+                    "burnCost": 3,
+                    "normalizedQuality": 89.08,
+                    "enemyPressureRisk": 75.17
+                  },
+                  {
+                    "nodeId": "oberon_node",
+                    "burnTurns": 5,
+                    "burnCost": 5,
+                    "normalizedQuality": 72.51,
+                    "enemyPressureRisk": 36.7
+                  },
+                  {
+                    "nodeId": "deimos_node",
+                    "burnTurns": 4,
+                    "burnCost": 5,
+                    "normalizedQuality": 68.71,
+                    "enemyPressureRisk": 87.87
+                  },
+                  {
+                    "nodeId": "pluto_node",
+                    "burnTurns": 4,
+                    "burnCost": 8,
+                    "normalizedQuality": 45.33,
+                    "enemyPressureRisk": 15.57
+                  },
+                  {
+                    "nodeId": "iapetus_node",
+                    "burnTurns": 4,
+                    "burnCost": 9,
+                    "normalizedQuality": 11.49,
+                    "enemyPressureRisk": 78.92
+                  }
+                ],
+                "tritiumAccessScore": 54.83790055248619,
+                "tritiumRecoveryScore": 80.79558011049724
+              },
+              "shipyardAudit": {
+                "startingShipyard": "jupiter_node",
+                "incomingBurnPressureFromEnemies": 84.62154696132596,
+                "incomingFirePressureFromEnemies": 67.44475138121547,
+                "contestRisk": 84.62154696132596,
+                "progressStealRisk": 73.06756906077348,
+                "outgoingFireValue": 45.476519337016576,
+                "outgoingBurnValue": 57.475138121546955,
+                "mandatoryLaunchRisk": 16.659300184162063,
+                "shipyardSecurityScore": 63.48674033149172,
+                "notes": [
+                  "enemy burn contest pressure is high",
+                  "saved progress can be stolen quickly",
+                  "shipyard projects useful pressure",
+                  "mandatory launch has credible exits"
+                ]
+              },
+              "openingCurve": {
+                "expectedDvByTurn": [
+                  10,
+                  12,
+                  16,
+                  20,
+                  24,
+                  28,
+                  32,
+                  36
+                ],
+                "expectedShipyardProgressByTurn": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  5,
+                  5
+                ],
+                "likelySecondTritiumTiming": 2,
+                "likelyFirstPressureReceived": 4,
+                "likelyFirstPressureApplied": 4,
+                "predictedCollapseRisk": 57.69053829784055
+              },
+              "starterRaid": {
+                "startingTritium": "triton_node",
+                "enemyFaction": "ai_2",
+                "enemyOriginNode": "titan_node",
+                "enemyBurnTurns": 5,
+                "enemyBurnCost": 7,
+                "reciprocalBurnTurns": 4,
+                "reciprocalBurnCost": 8,
+                "exceptionalSymmetryUsed": false,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              },
+              "neutralExpansion": {
+                "neutralTritium": "ganymede_node",
+                "burnTurns": 2,
+                "burnCost": 3,
+                "firstWorkTurn": 3,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              },
+              "fallbackRecoverySolvency": {
+                "fallbackTritium": "ganymede_node",
+                "burnTurns": 2,
+                "burnCost": 3,
+                "firstWorkTurn": 3,
+                "projectedDvAtArrival": 7,
+                "firstUpkeepCost": 2,
+                "cheapestExitBurnCost": 3,
+                "projectedDvAfterUpkeepAndExit": 2,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              }
+            },
+            "opponent": {
+              "tritiumAccessScore": 58.69149171270719,
+              "shipyardSecurityScore": 64.24729281767956,
+              "stagingValueScore": 74.28763812154696,
+              "pressureReceivedScore": 71.41944751381214,
+              "pressureAppliedScore": 60.41574585635359,
+              "dogpileRisk": 59.33905133415483,
+              "fallbackTritiumQuality": 91.25966850828729,
+              "fallbackShipyardQuality": 94.62154696132596,
+              "tritiumAccess": {
+                "startingTritium": "oberon_node",
+                "nearestFallbackTritium": "deimos_node",
+                "nearestFallbackBurnTurns": 2,
+                "nearestFallbackBurnCost": 2,
+                "fallbackPaybackEstimate": 3,
+                "rankedTritiumOptions": [
+                  {
+                    "nodeId": "deimos_node",
+                    "burnTurns": 2,
+                    "burnCost": 2,
+                    "normalizedQuality": 100,
+                    "enemyPressureRisk": 72.22
+                  },
+                  {
+                    "nodeId": "ganymede_node",
+                    "burnTurns": 4,
+                    "burnCost": 3,
+                    "normalizedQuality": 82.52,
+                    "enemyPressureRisk": 81.74
+                  },
+                  {
+                    "nodeId": "iapetus_node",
+                    "burnTurns": 4,
+                    "burnCost": 6,
+                    "normalizedQuality": 57.68,
+                    "enemyPressureRisk": 69.35
+                  },
+                  {
+                    "nodeId": "triton_node",
+                    "burnTurns": 7,
+                    "burnCost": 8,
+                    "normalizedQuality": 25.92,
+                    "enemyPressureRisk": 33.32
+                  },
+                  {
+                    "nodeId": "pluto_node",
+                    "burnTurns": 7,
+                    "burnCost": 9,
+                    "normalizedQuality": 23.14,
+                    "enemyPressureRisk": 28.37
+                  }
+                ],
+                "tritiumAccessScore": 58.69149171270719,
+                "tritiumRecoveryScore": 91.25966850828729
+              },
+              "shipyardAudit": {
+                "startingShipyard": "venus_node",
+                "incomingBurnPressureFromEnemies": 78.71823204419888,
+                "incomingFirePressureFromEnemies": 70.74585635359117,
+                "contestRisk": 78.71823204419888,
+                "progressStealRisk": 69.4113812154696,
+                "outgoingFireValue": 40.690607734806626,
+                "outgoingBurnValue": 45.64502762430939,
+                "mandatoryLaunchRisk": 5.826887661141811,
+                "shipyardSecurityScore": 64.24729281767956,
+                "notes": [
+                  "enemy burn contest pressure is high",
+                  "saved progress can be stolen quickly",
+                  "shipyard is defensive more than projective",
+                  "mandatory launch has credible exits"
+                ]
+              },
+              "openingCurve": {
+                "expectedDvByTurn": [
+                  10,
+                  12,
+                  16,
+                  20,
+                  24,
+                  28,
+                  32,
+                  36
+                ],
+                "expectedShipyardProgressByTurn": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  5,
+                  5
+                ],
+                "likelySecondTritiumTiming": 2,
+                "likelyFirstPressureReceived": 4,
+                "likelyFirstPressureApplied": 4,
+                "predictedCollapseRisk": 52.702644493227886
+              },
+              "starterRaid": {
+                "startingTritium": "oberon_node",
+                "enemyFaction": "player",
+                "enemyOriginNode": "callisto_node",
+                "enemyBurnTurns": 5,
+                "enemyBurnCost": 5,
+                "reciprocalBurnTurns": 7,
+                "reciprocalBurnCost": 8,
+                "exceptionalSymmetryUsed": false,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              },
+              "neutralExpansion": {
+                "neutralTritium": "deimos_node",
+                "burnTurns": 2,
+                "burnCost": 2,
+                "firstWorkTurn": 3,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              },
+              "fallbackRecoverySolvency": {
+                "fallbackTritium": "deimos_node",
+                "burnTurns": 2,
+                "burnCost": 2,
+                "firstWorkTurn": 3,
+                "projectedDvAtArrival": 8,
+                "firstUpkeepCost": 2,
+                "cheapestExitBurnCost": 2,
+                "projectedDvAfterUpkeepAndExit": 4,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              }
+            },
+            "ai_2": {
+              "tritiumAccessScore": 49.83558011049723,
+              "shipyardSecurityScore": 46.101933701657465,
+              "stagingValueScore": 53.59866482504604,
+              "pressureReceivedScore": 64.51569060773481,
+              "pressureAppliedScore": 69.48342541436465,
+              "dogpileRisk": 76.13114112301633,
+              "fallbackTritiumQuality": 87.86740331491713,
+              "fallbackShipyardQuality": 85.77624309392266,
+              "tritiumAccess": {
+                "startingTritium": "pluto_node",
+                "nearestFallbackTritium": "iapetus_node",
+                "nearestFallbackBurnTurns": 2,
+                "nearestFallbackBurnCost": 3,
+                "fallbackPaybackEstimate": 3.5,
+                "rankedTritiumOptions": [
+                  {
+                    "nodeId": "iapetus_node",
+                    "burnTurns": 2,
+                    "burnCost": 3,
+                    "normalizedQuality": 100,
+                    "enemyPressureRisk": 48.27
+                  },
+                  {
+                    "nodeId": "deimos_node",
+                    "burnTurns": 5,
+                    "burnCost": 5,
+                    "normalizedQuality": 75.73,
+                    "enemyPressureRisk": 84.35
+                  },
+                  {
+                    "nodeId": "triton_node",
+                    "burnTurns": 5,
+                    "burnCost": 7,
+                    "normalizedQuality": 60.87,
+                    "enemyPressureRisk": 17.53
+                  },
+                  {
+                    "nodeId": "ganymede_node",
+                    "burnTurns": 5,
+                    "burnCost": 4,
+                    "normalizedQuality": 67.82,
+                    "enemyPressureRisk": 89.09
+                  },
+                  {
+                    "nodeId": "oberon_node",
+                    "burnTurns": 5,
+                    "burnCost": 8,
+                    "normalizedQuality": 49.99,
+                    "enemyPressureRisk": 47.96
+                  }
+                ],
+                "tritiumAccessScore": 49.83558011049723,
+                "tritiumRecoveryScore": 87.86740331491713
+              },
+              "shipyardAudit": {
+                "startingShipyard": "mercury_node",
+                "incomingBurnPressureFromEnemies": 89.86740331491713,
+                "incomingFirePressureFromEnemies": 75.60773480662984,
+                "contestRisk": 89.86740331491713,
+                "progressStealRisk": 78.3139226519337,
+                "outgoingFireValue": 45.932320441988956,
+                "outgoingBurnValue": 52.98204419889503,
+                "mandatoryLaunchRisk": 19.523020257826886,
+                "shipyardSecurityScore": 46.101933701657465,
+                "notes": [
+                  "enemy burn contest pressure is high",
+                  "saved progress can be stolen quickly",
+                  "shipyard is defensive more than projective",
+                  "mandatory launch has credible exits"
+                ]
+              },
+              "openingCurve": {
+                "expectedDvByTurn": [
+                  10,
+                  12,
+                  16,
+                  20,
+                  24,
+                  28,
+                  32,
+                  36
+                ],
+                "expectedShipyardProgressByTurn": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  5,
+                  5
+                ],
+                "likelySecondTritiumTiming": 2,
+                "likelyFirstPressureReceived": 4,
+                "likelyFirstPressureApplied": 4,
+                "predictedCollapseRisk": 62.30310659582932
+              },
+              "starterRaid": {
+                "startingTritium": "pluto_node",
+                "enemyFaction": "player",
+                "enemyOriginNode": "triton_node",
+                "enemyBurnTurns": 4,
+                "enemyBurnCost": 8,
+                "reciprocalBurnTurns": 5,
+                "reciprocalBurnCost": 7,
+                "exceptionalSymmetryUsed": false,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              },
+              "neutralExpansion": {
+                "neutralTritium": "iapetus_node",
+                "burnTurns": 2,
+                "burnCost": 3,
+                "firstWorkTurn": 3,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              },
+              "fallbackRecoverySolvency": {
+                "fallbackTritium": "iapetus_node",
+                "burnTurns": 2,
+                "burnCost": 3,
+                "firstWorkTurn": 3,
+                "projectedDvAtArrival": 7,
+                "firstUpkeepCost": 2,
+                "cheapestExitBurnCost": 3,
+                "projectedDvAfterUpkeepAndExit": 2,
+                "hardGatePassed": true,
+                "rejectionReason": null
+              }
+            }
+          },
+          "earlyCollapseAudits": [
+            {
+              "faction": "player",
+              "startingTritium": "triton_node",
+              "startingShipyard": "jupiter_node",
+              "stagingNode": "callisto_node",
+              "nearestFallbackTritium": "ganymede_node",
+              "fallbackArrivalTurn": 2,
+              "contestedRiskByT3": 84.62,
+              "dogpileRisk": 71.15,
+              "tritiumAccessScore": 54.84,
+              "predictedContestedUpkeepBurden": 2,
+              "hardGatePassed": true,
+              "rejectionReason": null
+            },
+            {
+              "faction": "opponent",
+              "startingTritium": "oberon_node",
+              "startingShipyard": "venus_node",
+              "stagingNode": "phobos_node",
+              "nearestFallbackTritium": "deimos_node",
+              "fallbackArrivalTurn": 2,
+              "contestedRiskByT3": 78.72,
+              "dogpileRisk": 59.34,
+              "tritiumAccessScore": 58.69,
+              "predictedContestedUpkeepBurden": 2,
+              "hardGatePassed": true,
+              "rejectionReason": null
+            },
+            {
+              "faction": "ai_2",
+              "startingTritium": "pluto_node",
+              "startingShipyard": "mercury_node",
+              "stagingNode": "titan_node",
+              "nearestFallbackTritium": "iapetus_node",
+              "fallbackArrivalTurn": 2,
+              "contestedRiskByT3": 89.87,
+              "dogpileRisk": 76.13,
+              "tritiumAccessScore": 49.84,
+              "predictedContestedUpkeepBurden": 4,
+              "hardGatePassed": true,
+              "rejectionReason": null
+            }
+          ],
+          "worstAsymmetryReason": "stagingValueScore spread 28.51",
+          "fallbackStaticLayoutUsed": true
+        }
+      }
+    }
+  },
+  "stateHash": "d2b16d3f",
+  "summary": {
+    "turn": 0,
+    "gameMode": "1p",
+    "factionDv": {
+      "player": 50
+    },
+    "dvIncomeThisTurn": 0,
+    "shipsPerFaction": {
+      "player": 1
+    },
+    "shipsInTransit": 0,
+    "missilesInFlight": 0,
+    "contestedNodes": [],
+    "occupiedTritiumNodes": [],
+    "occupiedShipyards": [],
+    "shipyardProgressByNode": {},
+    "lastAIActionPerShip": {}
+  },
+  "state": {
+    "turn": 0,
+    "gameMode": "1p",
+    "factions": [
+      {
+        "id": "player",
+        "displayName": "PLAYER",
+        "color": "#7fe8ff",
+        "accent": "#d9f8ff",
+        "controlType": "human"
+      }
+    ],
+    "factionDv": {
+      "player": 50
+    },
+    "nodeOccupancies": [
+      {
+        "nodeId": "moon_node",
+        "factionId": "player",
+        "shipCount": 1
+      }
+    ],
+    "shipyardProgress": [],
+    "mandatoryLaunches": [],
+    "pendingBurnOrders": [
+      {
+        "originNodeId": "moon_node",
+        "destinationNodeId": "venus_node",
+        "burnCost": 2,
+        "etaTurns": 3,
+        "issuedTurn": 0,
+        "arrivalTurn": 3,
+        "originPosition": {
+          "x": -154,
+          "y": 38.00000000000002
+        },
+        "destinationPositionAtArrival": {
+          "x": -28.98773305148231,
+          "y": 108.18369254437565
+        },
+        "transferCategory": "intersystem",
+        "transferWindowQuality": "favorable",
+        "motionRelation": "moving-toward",
+        "visualArcType": "clean-window",
+        "visualArcHeight": 28.93,
+        "transferDifficultyScore": 2.77,
+        "energyScore": 3.15,
+        "id": "burn:player:moon_node:venus_node:T0",
+        "factionId": "player",
+        "shipCount": 1
+      }
+    ],
+    "pendingFireOrders": [],
+    "activeBurnTransits": [],
+    "activeMissiles": [],
+    "debugEvents": []
+  },
+  "snapshot": {
+    "turn": 0,
+    "gameMode": "1p",
+    "factions": [
+      {
+        "id": "player",
+        "displayName": "PLAYER",
+        "color": "#7fe8ff",
+        "accent": "#d9f8ff",
+        "controlType": "human"
+      }
+    ],
+    "factionDv": {
+      "player": 50
+    },
+    "bodies": [
+      {
+        "id": "sun",
+        "name": "Sun",
+        "kind": "star",
+        "parentId": null,
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "orbitRadius": 0,
+        "orbitPeriodTurns": 0,
+        "initialAngle": 0,
+        "visualRadius": 18,
+        "visualClass": "star"
+      },
+      {
+        "id": "mercury",
+        "name": "Mercury",
+        "kind": "planet",
+        "parentId": "sun",
+        "position": {
+          "x": -1.2858791391047208e-14,
+          "y": -70
+        },
+        "orbitRadius": 70,
+        "orbitPeriodTurns": 72,
+        "initialAngle": 270,
+        "visualRadius": 5,
+        "visualClass": "rocky"
+      },
+      {
+        "id": "venus",
+        "name": "Venus",
+        "kind": "planet",
+        "parentId": "sun",
+        "position": {
+          "x": 6.858022075225178e-15,
+          "y": 112
+        },
+        "orbitRadius": 112,
+        "orbitPeriodTurns": 72,
+        "initialAngle": 90,
+        "visualRadius": 7,
+        "visualClass": "rocky"
+      },
+      {
+        "id": "earth",
+        "name": "Earth",
+        "kind": "planet",
+        "parentId": "sun",
+        "position": {
+          "x": -154,
+          "y": 1.8859560706869238e-14
+        },
+        "orbitRadius": 154,
+        "orbitPeriodTurns": 72,
+        "initialAngle": 180,
+        "visualRadius": 8,
+        "visualClass": "protected"
+      },
+      {
+        "id": "moon",
+        "name": "Moon",
+        "kind": "moon",
+        "parentId": "earth",
+        "position": {
+          "x": -154,
+          "y": 38.00000000000002
+        },
+        "orbitRadius": 38,
+        "orbitPeriodTurns": 12,
+        "initialAngle": 90,
+        "visualRadius": 3,
+        "visualClass": "protectedMoon"
+      },
+      {
+        "id": "mars",
+        "name": "Mars",
+        "kind": "planet",
+        "parentId": "sun",
+        "position": {
+          "x": 196,
+          "y": 0
+        },
+        "orbitRadius": 196,
+        "orbitPeriodTurns": 72,
+        "initialAngle": 0,
+        "visualRadius": 6,
+        "visualClass": "rocky"
+      },
+      {
+        "id": "phobos",
+        "name": "Phobos",
+        "kind": "moon",
+        "parentId": "mars",
+        "position": {
+          "x": 214,
+          "y": 0
+        },
+        "orbitRadius": 18,
+        "orbitPeriodTurns": 12,
+        "initialAngle": 0,
+        "visualRadius": 2,
+        "visualClass": "moon"
+      },
+      {
+        "id": "deimos",
+        "name": "Deimos",
+        "kind": "moon",
+        "parentId": "mars",
+        "position": {
+          "x": 168,
+          "y": 3.429011037612589e-15
+        },
+        "orbitRadius": 28,
+        "orbitPeriodTurns": 12,
+        "initialAngle": 180,
+        "visualRadius": 2,
+        "visualClass": "moon"
+      },
+      {
+        "id": "jupiter",
+        "name": "Jupiter",
+        "kind": "planet",
+        "parentId": "sun",
+        "position": {
+          "x": -5.915044039881715e-14,
+          "y": -322
+        },
+        "orbitRadius": 322,
+        "orbitPeriodTurns": 72,
+        "initialAngle": 270,
+        "visualRadius": 15,
+        "visualClass": "gasGiant"
+      },
+      {
+        "id": "io",
+        "name": "Io",
+        "kind": "moon",
+        "parentId": "jupiter",
+        "position": {
+          "x": 37.99999999999994,
+          "y": -322
+        },
+        "orbitRadius": 38,
+        "orbitPeriodTurns": 12,
+        "initialAngle": 0,
+        "visualRadius": 3,
+        "visualClass": "moon"
+      },
+      {
+        "id": "europa",
+        "name": "Europa",
+        "kind": "moon",
+        "parentId": "jupiter",
+        "position": {
+          "x": -5.596635872103403e-14,
+          "y": -270
+        },
+        "orbitRadius": 52,
+        "orbitPeriodTurns": 12,
+        "initialAngle": 90,
+        "visualRadius": 3,
+        "visualClass": "moon"
+      },
+      {
+        "id": "ganymede",
+        "name": "Ganymede",
+        "kind": "moon",
+        "parentId": "jupiter",
+        "position": {
+          "x": -62.00000000000006,
+          "y": -322
+        },
+        "orbitRadius": 62,
+        "orbitPeriodTurns": 12,
+        "initialAngle": 180,
+        "visualRadius": 4,
+        "visualClass": "moon"
+      },
+      {
+        "id": "callisto",
+        "name": "Callisto",
+        "kind": "moon",
+        "parentId": "jupiter",
+        "position": {
+          "x": -7.237662582960856e-14,
+          "y": -394
+        },
+        "orbitRadius": 72,
+        "orbitPeriodTurns": 12,
+        "initialAngle": 270,
+        "visualRadius": 4,
+        "visualClass": "moon"
+      },
+      {
+        "id": "saturn",
+        "name": "Saturn",
+        "kind": "planet",
+        "parentId": "sun",
+        "position": {
+          "x": 2.743208830090071e-14,
+          "y": 448
+        },
+        "orbitRadius": 448,
+        "orbitPeriodTurns": 72,
+        "initialAngle": 90,
+        "visualRadius": 14,
+        "visualClass": "gasGiant"
+      },
+      {
+        "id": "titan",
+        "name": "Titan",
+        "kind": "moon",
+        "parentId": "saturn",
+        "position": {
+          "x": 3.147342273808698e-14,
+          "y": 514
+        },
+        "orbitRadius": 66,
+        "orbitPeriodTurns": 12,
+        "initialAngle": 90,
+        "visualRadius": 5,
+        "visualClass": "moon"
+      },
+      {
+        "id": "iapetus",
+        "name": "Iapetus",
+        "kind": "moon",
+        "parentId": "saturn",
+        "position": {
+          "x": 1.0531962472667239e-14,
+          "y": 356
+        },
+        "orbitRadius": 92,
+        "orbitPeriodTurns": 12,
+        "initialAngle": 270,
+        "visualRadius": 3,
+        "visualClass": "moon"
+      },
+      {
+        "id": "uranus",
+        "name": "Uranus",
+        "kind": "planet",
+        "parentId": "sun",
+        "position": {
+          "x": -574,
+          "y": 7.029472627105808e-14
+        },
+        "orbitRadius": 574,
+        "orbitPeriodTurns": 72,
+        "initialAngle": 180,
+        "visualRadius": 12,
+        "visualClass": "iceGiant"
+      },
+      {
+        "id": "oberon",
+        "name": "Oberon",
+        "kind": "moon",
+        "parentId": "uranus",
+        "position": {
+          "x": -574,
+          "y": 58.00000000000007
+        },
+        "orbitRadius": 58,
+        "orbitPeriodTurns": 12,
+        "initialAngle": 90,
+        "visualRadius": 3,
+        "visualClass": "moon"
+      },
+      {
+        "id": "titania",
+        "name": "Titania",
+        "kind": "moon",
+        "parentId": "uranus",
+        "position": {
+          "x": -574,
+          "y": -45.99999999999993
+        },
+        "orbitRadius": 46,
+        "orbitPeriodTurns": 12,
+        "initialAngle": 270,
+        "visualRadius": 3,
+        "visualClass": "moon"
+      },
+      {
+        "id": "neptune",
+        "name": "Neptune",
+        "kind": "planet",
+        "parentId": "sun",
+        "position": {
+          "x": 700,
+          "y": 0
+        },
+        "orbitRadius": 700,
+        "orbitPeriodTurns": 72,
+        "initialAngle": 0,
+        "visualRadius": 12,
+        "visualClass": "iceGiant"
+      },
+      {
+        "id": "triton",
+        "name": "Triton",
+        "kind": "moon",
+        "parentId": "neptune",
+        "position": {
+          "x": 675.595801415452,
+          "y": -54.81272745855606
+        },
+        "orbitRadius": 60,
+        "orbitPeriodTurns": 12,
+        "initialAngle": 246,
+        "visualRadius": 4,
+        "visualClass": "moon"
+      },
+      {
+        "id": "pluto",
+        "name": "Pluto",
+        "kind": "dwarfPlanet",
+        "parentId": "sun",
+        "position": {
+          "x": -1.5944901324898536e-13,
+          "y": -868
+        },
+        "orbitRadius": 868,
+        "orbitPeriodTurns": 72,
+        "initialAngle": 270,
+        "visualRadius": 6,
+        "visualClass": "dwarfBinary"
+      },
+      {
+        "id": "charon",
+        "name": "Charon",
+        "kind": "moon",
+        "parentId": "pluto",
+        "position": {
+          "x": -34.000000000000156,
+          "y": -868
+        },
+        "orbitRadius": 34,
+        "orbitPeriodTurns": 12,
+        "initialAngle": 180,
+        "visualRadius": 3,
+        "visualClass": "moon"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "mercury_node",
+        "bodyId": "mercury",
+        "label": "Mercury",
+        "type": "shipyard",
+        "position": {
+          "x": -1.2858791391047208e-14,
+          "y": -70
+        },
+        "nodeOrbitRadius": 13,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": false,
+        "allowsShipyard": true,
+        "gravityWell": 1,
+        "tritiumOutput": 0,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "venus_node",
+        "bodyId": "venus",
+        "label": "Venus",
+        "type": "tritium",
+        "position": {
+          "x": 6.858022075225178e-15,
+          "y": 112
+        },
+        "nodeOrbitRadius": 14,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": true,
+        "allowsShipyard": false,
+        "gravityWell": 1,
+        "tritiumOutput": 2,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "earth_node",
+        "bodyId": "earth",
+        "label": "Earth",
+        "type": "barren",
+        "position": {
+          "x": -154,
+          "y": 1.8859560706869238e-14
+        },
+        "nodeOrbitRadius": 16,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": true,
+        "producesTritium": false,
+        "allowsShipyard": false,
+        "gravityWell": 1,
+        "tritiumOutput": 0,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "moon_node",
+        "bodyId": "moon",
+        "label": "Moon",
+        "type": "barren",
+        "position": {
+          "x": -154,
+          "y": 38.00000000000002
+        },
+        "nodeOrbitRadius": 10,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": true,
+        "producesTritium": false,
+        "allowsShipyard": false,
+        "gravityWell": 0,
+        "tritiumOutput": 0,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": [
+          "player"
+        ]
+      },
+      {
+        "id": "mars_node",
+        "bodyId": "mars",
+        "label": "Mars",
+        "type": "shipyard",
+        "position": {
+          "x": 196,
+          "y": 0
+        },
+        "nodeOrbitRadius": 13,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": false,
+        "allowsShipyard": true,
+        "gravityWell": 1,
+        "tritiumOutput": 0,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "phobos_node",
+        "bodyId": "phobos",
+        "label": "Phobos",
+        "type": "barren",
+        "position": {
+          "x": 214,
+          "y": 0
+        },
+        "nodeOrbitRadius": 8,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": false,
+        "allowsShipyard": false,
+        "gravityWell": 0,
+        "tritiumOutput": 0,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "deimos_node",
+        "bodyId": "deimos",
+        "label": "Deimos",
+        "type": "tritium",
+        "position": {
+          "x": 168,
+          "y": 3.429011037612589e-15
+        },
+        "nodeOrbitRadius": 8,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": true,
+        "allowsShipyard": false,
+        "gravityWell": 0,
+        "tritiumOutput": 2,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "jupiter_node",
+        "bodyId": "jupiter",
+        "label": "Jupiter",
+        "type": "shipyard",
+        "position": {
+          "x": -5.915044039881715e-14,
+          "y": -322
+        },
+        "nodeOrbitRadius": 27,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": false,
+        "allowsShipyard": true,
+        "gravityWell": 3,
+        "tritiumOutput": 0,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "io_node",
+        "bodyId": "io",
+        "label": "Io",
+        "type": "barren",
+        "position": {
+          "x": 37.99999999999994,
+          "y": -322
+        },
+        "nodeOrbitRadius": 10,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": false,
+        "allowsShipyard": false,
+        "gravityWell": 0,
+        "tritiumOutput": 0,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "europa_node",
+        "bodyId": "europa",
+        "label": "Europa",
+        "type": "barren",
+        "position": {
+          "x": -5.596635872103403e-14,
+          "y": -270
+        },
+        "nodeOrbitRadius": 10,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": false,
+        "allowsShipyard": false,
+        "gravityWell": 0,
+        "tritiumOutput": 0,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "ganymede_node",
+        "bodyId": "ganymede",
+        "label": "Ganymede",
+        "type": "tritium",
+        "position": {
+          "x": -62.00000000000006,
+          "y": -322
+        },
+        "nodeOrbitRadius": 12,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": true,
+        "allowsShipyard": false,
+        "gravityWell": 1,
+        "tritiumOutput": 2,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "callisto_node",
+        "bodyId": "callisto",
+        "label": "Callisto",
+        "type": "barren",
+        "position": {
+          "x": -7.237662582960856e-14,
+          "y": -394
+        },
+        "nodeOrbitRadius": 12,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": false,
+        "allowsShipyard": false,
+        "gravityWell": 1,
+        "tritiumOutput": 0,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "saturn_node",
+        "bodyId": "saturn",
+        "label": "Saturn",
+        "type": "shipyard",
+        "position": {
+          "x": 2.743208830090071e-14,
+          "y": 448
+        },
+        "nodeOrbitRadius": 27,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": false,
+        "allowsShipyard": true,
+        "gravityWell": 3,
+        "tritiumOutput": 0,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "titan_node",
+        "bodyId": "titan",
+        "label": "Titan",
+        "type": "barren",
+        "position": {
+          "x": 3.147342273808698e-14,
+          "y": 514
+        },
+        "nodeOrbitRadius": 14,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": false,
+        "allowsShipyard": false,
+        "gravityWell": 1,
+        "tritiumOutput": 0,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "iapetus_node",
+        "bodyId": "iapetus",
+        "label": "Iapetus",
+        "type": "tritium",
+        "position": {
+          "x": 1.0531962472667239e-14,
+          "y": 356
+        },
+        "nodeOrbitRadius": 10,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": true,
+        "allowsShipyard": false,
+        "gravityWell": 0,
+        "tritiumOutput": 2,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "uranus_node",
+        "bodyId": "uranus",
+        "label": "Uranus",
+        "type": "barren",
+        "position": {
+          "x": -574,
+          "y": 7.029472627105808e-14
+        },
+        "nodeOrbitRadius": 22,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": false,
+        "allowsShipyard": false,
+        "gravityWell": 2,
+        "tritiumOutput": 0,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "oberon_node",
+        "bodyId": "oberon",
+        "label": "Oberon",
+        "type": "tritium",
+        "position": {
+          "x": -574,
+          "y": 58.00000000000007
+        },
+        "nodeOrbitRadius": 10,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": true,
+        "allowsShipyard": false,
+        "gravityWell": 0,
+        "tritiumOutput": 2,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "titania_node",
+        "bodyId": "titania",
+        "label": "Titania",
+        "type": "shipyard",
+        "position": {
+          "x": -574,
+          "y": -45.99999999999993
+        },
+        "nodeOrbitRadius": 10,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": false,
+        "allowsShipyard": true,
+        "gravityWell": 0,
+        "tritiumOutput": 0,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "neptune_node",
+        "bodyId": "neptune",
+        "label": "Neptune",
+        "type": "barren",
+        "position": {
+          "x": 700,
+          "y": 0
+        },
+        "nodeOrbitRadius": 22,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": false,
+        "allowsShipyard": false,
+        "gravityWell": 2,
+        "tritiumOutput": 0,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "triton_node",
+        "bodyId": "triton",
+        "label": "Triton",
+        "type": "tritium",
+        "position": {
+          "x": 675.595801415452,
+          "y": -54.81272745855606
+        },
+        "nodeOrbitRadius": 12,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": true,
+        "allowsShipyard": false,
+        "gravityWell": 1,
+        "tritiumOutput": 2,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "pluto_node",
+        "bodyId": "pluto",
+        "label": "Pluto",
+        "type": "tritium",
+        "position": {
+          "x": -1.5944901324898536e-13,
+          "y": -868
+        },
+        "nodeOrbitRadius": 16,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": true,
+        "allowsShipyard": false,
+        "gravityWell": 2,
+        "tritiumOutput": 2,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      },
+      {
+        "id": "charon_node",
+        "bodyId": "charon",
+        "label": "Charon",
+        "type": "barren",
+        "position": {
+          "x": -34.000000000000156,
+          "y": -868
+        },
+        "nodeOrbitRadius": 10,
+        "controllable": true,
+        "contestable": true,
+        "protectedNoWar": false,
+        "weaponsOffline": false,
+        "producesTritium": false,
+        "allowsShipyard": false,
+        "gravityWell": 0,
+        "tritiumOutput": 0,
+        "shipyardProgress": 0,
+        "isWorking": false,
+        "isContested": false,
+        "contestedFactionIds": []
+      }
+    ],
+    "nodeOccupancies": [
+      {
+        "nodeId": "moon_node",
+        "factionId": "player",
+        "shipCount": 1
+      }
+    ],
+    "shipyardProgress": [],
+    "mandatoryLaunches": [],
+    "pendingBurnOrders": [
+      {
+        "originNodeId": "moon_node",
+        "destinationNodeId": "venus_node",
+        "burnCost": 2,
+        "etaTurns": 3,
+        "issuedTurn": 0,
+        "arrivalTurn": 3,
+        "originPosition": {
+          "x": -154,
+          "y": 38.00000000000002
+        },
+        "destinationPositionAtArrival": {
+          "x": -28.98773305148231,
+          "y": 108.18369254437565
+        },
+        "transferCategory": "intersystem",
+        "transferWindowQuality": "favorable",
+        "motionRelation": "moving-toward",
+        "visualArcType": "clean-window",
+        "visualArcHeight": 28.93,
+        "transferDifficultyScore": 2.77,
+        "energyScore": 3.15,
+        "id": "burn:player:moon_node:venus_node:T0",
+        "factionId": "player",
+        "shipCount": 1
+      }
+    ],
+    "pendingFireOrders": [],
+    "activeBurnTransits": [],
+    "activeMissiles": [],
+    "debugEvents": [],
+    "bounds": {
+      "minX": -938,
+      "minY": -938,
+      "maxX": 938,
+      "maxY": 938
+    }
+  },
+  "trajectoryPreviews": {
+    "available": true,
+    "visualTurn": 0,
+    "zoomDistance": 2168.3260012386177,
+    "selectedTargetKey": null,
+    "hoveredTargetKey": null,
+    "hoveredBurn": null,
+    "hoveredFire": null,
+    "pendingBurns": [
+      {
+        "kind": "pending-burn",
+        "id": "burn:player:moon_node:venus_node:T0",
+        "originNodeId": "moon_node",
+        "destinationNodeId": "venus_node",
+        "issuedTurn": 0,
+        "arrivalTurn": 3,
+        "etaTurns": 3,
+        "burnCost": 2,
+        "trajectory": {
+          "pointCount": 117,
+          "length": 568.2761377368124,
+          "planarDistance": 333.3445055807365,
+          "originCenter": [
+            -578.329,
+            0.42,
+            111.48
+          ],
+          "destinationCenter": [
+            -320.868,
+            0,
+            304.492
+          ],
+          "start": [
+            -578.329,
+            0.42,
+            111.48
+          ],
+          "end": [
+            -347.551,
+            0,
+            352.02
+          ],
+          "midpoint": [
+            -561.121,
+            14.68,
+            181.964
+          ],
+          "maxY": 26.453,
+          "minY": -0.006,
+          "endpointHeightDelta": 26.032999999999998,
+          "arcDirection": -1,
+          "samples": [
+            {
+              "progress": 0,
+              "position": [
+                -578.329,
+                0.42,
+                111.48
+              ],
+              "direction": [
+                -0.183,
+                0,
+                -0.983
+              ]
+            },
+            {
+              "progress": 0.25,
+              "position": [
+                -671.848,
+                0.12,
+                114.657
+              ],
+              "direction": [
+                0.086,
+                -0.005,
+                0.996
+              ]
+            },
+            {
+              "progress": 0.5,
+              "position": [
+                -561.121,
+                14.68,
+                181.964
+              ],
+              "direction": [
+                0.952,
+                0.246,
+                0.184
+              ]
+            },
+            {
+              "progress": 0.75,
+              "position": [
+                -439.669,
+                24.133,
+                249.224
+              ],
+              "direction": [
+                0.694,
+                -0.121,
+                0.709
+              ]
+            },
+            {
+              "progress": 1,
+              "position": [
+                -347.551,
+                0,
+                352.02
+              ],
+              "direction": [
+                0.919,
+                -0.001,
+                0.394
+              ]
+            }
+          ],
+          "flightPath": null
+        }
+      }
+    ],
+    "pendingFires": [],
+    "activeBurns": [],
+    "activeFires": []
+  },
+  "solarVisuals": {
+    "flags": {
+      "sunSurfacePlasmaEnabled": true,
+      "sunCoronaEnabled": true,
+      "sunSmoothGlareEnabled": true,
+      "solarGlareAndDazzleEnabled": true,
+      "backgroundStarfieldEnabled": true,
+      "backgroundViewportStarfieldEnabled": false,
+      "background3dStarfieldEnabled": true,
+      "starLayerCount": 3,
+      "starAfterglowLayerCount": 3,
+      "solarHazeEnabled": false,
+      "solarOcclusionEnabled": true,
+      "atmosphericScatteringEnabled": true,
+      "heatDistortionEnabled": true,
+      "solarDustParticleOpacityMultiplier": 0
+    },
+    "sunProjection": {
+      "x": 472.4956168928394,
+      "y": 488.70999745978673,
+      "radius": 76.27964285136153
+    },
+    "sunSmoothGlareBudget": {
+      "performanceMode": "minimal",
+      "viewportPixels": 2193030,
+      "scaleMultiplier": 0.408,
+      "opacityMultiplier": 0.216,
+      "solarStressPressure": 0.24,
+      "skipGlare": false
+    },
+    "sunGroup": {
+      "name": "body:sun",
+      "type": "Group",
+      "visible": true,
+      "renderOrder": 0,
+      "childCount": 8,
+      "children": [
+        {
+          "name": "",
+          "type": "Mesh",
+          "visible": true,
+          "renderOrder": 0,
+          "childCount": 0,
+          "material": [
+            {
+              "type": "ShaderMaterial",
+              "transparent": false,
+              "opacity": 1,
+              "size": null,
+              "blending": 1,
+              "depthTest": true,
+              "depthWrite": true,
+              "toneMapped": true,
+              "color": null,
+              "hasMap": false
+            }
+          ],
+          "children": []
+        },
+        {
+          "name": "",
+          "type": "Mesh",
+          "visible": true,
+          "renderOrder": 0,
+          "childCount": 0,
+          "material": [
+            {
+              "type": "MeshBasicMaterial",
+              "transparent": true,
+              "opacity": 0,
+              "size": null,
+              "blending": 1,
+              "depthTest": false,
+              "depthWrite": false,
+              "toneMapped": true,
+              "color": "#ffffff",
+              "hasMap": false
+            }
+          ],
+          "children": []
+        },
+        {
+          "name": "sun-corona",
+          "type": "Sprite",
+          "visible": true,
+          "renderOrder": 0,
+          "childCount": 0,
+          "material": [
+            {
+              "type": "SpriteMaterial",
+              "transparent": true,
+              "opacity": 0.64,
+              "size": null,
+              "blending": 2,
+              "depthTest": true,
+              "depthWrite": false,
+              "toneMapped": false,
+              "color": "#ffffff",
+              "hasMap": true
+            }
+          ],
+          "children": []
+        },
+        {
+          "name": "sun-animated-corona",
+          "type": "Mesh",
+          "visible": true,
+          "renderOrder": -1,
+          "childCount": 0,
+          "material": [
+            {
+              "type": "ShaderMaterial",
+              "transparent": true,
+              "opacity": 1,
+              "size": null,
+              "blending": 2,
+              "depthTest": true,
+              "depthWrite": false,
+              "toneMapped": false,
+              "color": null,
+              "hasMap": false
+            }
+          ],
+          "children": []
+        },
+        {
+          "name": "sun-smooth-glare",
+          "type": "Sprite",
+          "visible": false,
+          "renderOrder": -2,
+          "childCount": 0,
+          "material": [
+            {
+              "type": "SpriteMaterial",
+              "transparent": true,
+              "opacity": 0,
+              "size": null,
+              "blending": 2,
+              "depthTest": true,
+              "depthWrite": false,
+              "toneMapped": false,
+              "color": "#ffffff",
+              "hasMap": true
+            }
+          ],
+          "children": []
+        },
+        {
+          "name": "",
+          "type": "Group",
+          "visible": false,
+          "renderOrder": 0,
+          "childCount": 0,
+          "children": []
+        },
+        {
+          "name": "physical-shadow-cone",
+          "type": "Mesh",
+          "visible": false,
+          "renderOrder": 24,
+          "childCount": 0,
+          "material": [
+            {
+              "type": "ShaderMaterial",
+              "transparent": true,
+              "opacity": 1,
+              "size": null,
+              "blending": 1,
+              "depthTest": true,
+              "depthWrite": false,
+              "toneMapped": true,
+              "color": "#02050b",
+              "hasMap": false
+            }
+          ],
+          "children": []
+        },
+        {
+          "name": "physical-shadow-cone-contrast",
+          "type": "Mesh",
+          "visible": false,
+          "renderOrder": 25,
+          "childCount": 0,
+          "material": [
+            {
+              "type": "ShaderMaterial",
+              "transparent": true,
+              "opacity": 1,
+              "size": null,
+              "blending": 1,
+              "depthTest": true,
+              "depthWrite": false,
+              "toneMapped": true,
+              "color": null,
+              "hasMap": false
+            }
+          ],
+          "children": []
+        }
+      ]
+    },
+    "viewportStarfield": null,
+    "starLayers": [
+      {
+        "name": "background-3d-starfield:0",
+        "type": "Group",
+        "visible": true,
+        "renderOrder": -20,
+        "worldPosition": [
+          -1341.669,
+          1733.831,
+          -1020.988
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 1
+      },
+      {
+        "name": "background-3d-starfield:1",
+        "type": "Group",
+        "visible": true,
+        "renderOrder": -20,
+        "worldPosition": [
+          -1342.762,
+          1731.264,
+          -1018.899
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 1
+      },
+      {
+        "name": "background-3d-starfield:2",
+        "type": "Group",
+        "visible": true,
+        "renderOrder": -20,
+        "worldPosition": [
+          -1343.144,
+          1726.994,
+          -1015.693
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 1
+      }
+    ],
+    "starPointDebug": [
+      {
+        "name": "background-3d-starfield:0",
+        "totalPoints": 384,
+        "inFrontPointCount": 200,
+        "projectedPointCount": 9,
+        "screenBounds": {
+          "minX": 48.552,
+          "maxX": 1717.735,
+          "minY": 64.969,
+          "maxY": 1200.055
+        },
+        "samples": [
+          {
+            "index": 286,
+            "screen": {
+              "x": 1717.735,
+              "y": 64.969
+            },
+            "worldPosition": [
+              -516.257,
+              -10125.302,
+              19936.98
+            ],
+            "opacity": 0.142,
+            "scale": 91.789
+          },
+          {
+            "index": 304,
+            "screen": {
+              "x": 593.006,
+              "y": 166.774
+            },
+            "worldPosition": [
+              12495.032,
+              -12492.203,
+              12966.158
+            ],
+            "opacity": 0.144,
+            "scale": 64.772
+          },
+          {
+            "index": 312,
+            "screen": {
+              "x": 997.255,
+              "y": 241.588
+            },
+            "worldPosition": [
+              7176.475,
+              -13137.64,
+              15342.48
+            ],
+            "opacity": 0.773,
+            "scale": 135.577
+          },
+          {
+            "index": 317,
+            "screen": {
+              "x": 300.244,
+              "y": 387.273
+            },
+            "worldPosition": [
+              14225.872,
+              -13962.616,
+              8356.134
+            ],
+            "opacity": 0.155,
+            "scale": 89.993
+          },
+          {
+            "index": 330,
+            "screen": {
+              "x": 48.552,
+              "y": 680.107
+            },
+            "worldPosition": [
+              14771.92,
+              -15723.184,
+              3590.006
+            ],
+            "opacity": 0.601,
+            "scale": 77.051
+          },
+          {
+            "index": 333,
+            "screen": {
+              "x": 1060.003,
+              "y": 497.913
+            },
+            "worldPosition": [
+              5057.759,
+              -15886.765,
+              13818.576
+            ],
+            "opacity": 0.166,
+            "scale": 88.284
+          },
+          {
+            "index": 338,
+            "screen": {
+              "x": 473.374,
+              "y": 613.599
+            },
+            "worldPosition": [
+              11473.712,
+              -16751.428,
+              7977.92
+            ],
+            "opacity": 0.382,
+            "scale": 70.644
+          },
+          {
+            "index": 362,
+            "screen": {
+              "x": 1412.635,
+              "y": 1094.875
+            },
+            "worldPosition": [
+              -2887.449,
+              -19436.647,
+              9831.216
+            ],
+            "opacity": 0.228,
+            "scale": 86.313
+          }
+        ]
+      },
+      {
+        "name": "background-3d-starfield:1",
+        "totalPoints": 246,
+        "inFrontPointCount": 124,
+        "projectedPointCount": 10,
+        "screenBounds": {
+          "minX": 145.234,
+          "maxX": 1584.696,
+          "minY": 138.342,
+          "maxY": 1223.055
+        },
+        "samples": [
+          {
+            "index": 188,
+            "screen": {
+              "x": 145.234,
+              "y": 138.342
+            },
+            "worldPosition": [
+              19655.615,
+              -13398.04,
+              10700.457
+            ],
+            "opacity": 0.496,
+            "scale": 94.016
+          },
+          {
+            "index": 191,
+            "screen": {
+              "x": 1584.696,
+              "y": 186.523
+            },
+            "worldPosition": [
+              605.938,
+              -13905.875,
+              22220.661
+            ],
+            "opacity": 0.14,
+            "scale": 108.768
+          },
+          {
+            "index": 196,
+            "screen": {
+              "x": 730.815,
+              "y": 178.602
+            },
+            "worldPosition": [
+              12918.051,
+              -15138.197,
+              16559.87
+            ],
+            "opacity": 0.13,
+            "scale": 95.64
+          },
+          {
+            "index": 204,
+            "screen": {
+              "x": 1114.49,
+              "y": 330.397
+            },
+            "worldPosition": [
+              6493.818,
+              -16916.869,
+              18549.163
+            ],
+            "opacity": 0.555,
+            "scale": 83.555
+          },
+          {
+            "index": 209,
+            "screen": {
+              "x": 548.926,
+              "y": 442.746
+            },
+            "worldPosition": [
+              13893.742,
+              -18228.451,
+              12209.778
+            ],
+            "opacity": 0.132,
+            "scale": 86.207
+          },
+          {
+            "index": 217,
+            "screen": {
+              "x": 894.82,
+              "y": 564.756
+            },
+            "worldPosition": [
+              8078.525,
+              -19646.71,
+              14096.288
+            ],
+            "opacity": 0.131,
+            "scale": 103.582
+          },
+          {
+            "index": 222,
+            "screen": {
+              "x": 387.229,
+              "y": 779.114
+            },
+            "worldPosition": [
+              13362.956,
+              -21103.987,
+              6671.448
+            ],
+            "opacity": 0.504,
+            "scale": 115.917
+          },
+          {
+            "index": 230,
+            "screen": {
+              "x": 700.848,
+              "y": 887.918
+            },
+            "worldPosition": [
+              8533.241,
+              -23057.263,
+              8595.439
+            ],
+            "opacity": 0.479,
+            "scale": 76.085
+          }
+        ]
+      },
+      {
+        "name": "background-3d-starfield:2",
+        "totalPoints": 138,
+        "inFrontPointCount": 71,
+        "projectedPointCount": 5,
+        "screenBounds": {
+          "minX": 396.569,
+          "maxX": 1711.825,
+          "minY": 369.706,
+          "maxY": 1021.467
+        },
+        "samples": [
+          {
+            "index": 114,
+            "screen": {
+              "x": 412.307,
+              "y": 369.706
+            },
+            "worldPosition": [
+              18310.275,
+              -19532.261,
+              13167.406
+            ],
+            "opacity": 0.136,
+            "scale": 93.773
+          },
+          {
+            "index": 122,
+            "screen": {
+              "x": 788.597,
+              "y": 586.268
+            },
+            "worldPosition": [
+              11139.336,
+              -23221.135,
+              15018.003
+            ],
+            "opacity": 0.477,
+            "scale": 161.12
+          },
+          {
+            "index": 125,
+            "screen": {
+              "x": 1711.825,
+              "y": 1021.467
+            },
+            "worldPosition": [
+              -7225.563,
+              -24948.256,
+              16734.788
+            ],
+            "opacity": 0.194,
+            "scale": 111.064
+          },
+          {
+            "index": 127,
+            "screen": {
+              "x": 396.569,
+              "y": 905.966
+            },
+            "worldPosition": [
+              14121.099,
+              -25542.989,
+              6179.195
+            ],
+            "opacity": 0.118,
+            "scale": 135.453
+          },
+          {
+            "index": 130,
+            "screen": {
+              "x": 1069.5,
+              "y": 951.249
+            },
+            "worldPosition": [
+              3310.081,
+              -27432.394,
+              13068.898
+            ],
+            "opacity": 0.609,
+            "scale": 238.964
+          }
+        ]
+      }
+    ],
+    "solarDustCanvas": {
+      "display": "block",
+      "opacity": "1",
+      "visibility": "visible",
+      "width": 960,
+      "height": 672,
+      "patternCreated": false,
+      "lastRenderedAt": 134.32409999990463
+    },
+    "suspectRenderables": [
+      {
+        "path": "Scene/presentation-low-ambient",
+        "name": "presentation-low-ambient",
+        "type": "AmbientLight",
+        "visible": true,
+        "renderOrder": 0,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "childCount": 0
+      },
+      {
+        "path": "Scene/sun-main-light",
+        "name": "sun-main-light",
+        "type": "PointLight",
+        "visible": true,
+        "renderOrder": 0,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "childCount": 0
+      },
+      {
+        "path": "Scene/cinematic-world-decorative-point-light-0",
+        "name": "cinematic-world-decorative-point-light-0",
+        "type": "PointLight",
+        "visible": true,
+        "renderOrder": 0,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "childCount": 0
+      },
+      {
+        "path": "Scene/cinematic-world-decorative-point-light-1",
+        "name": "cinematic-world-decorative-point-light-1",
+        "type": "PointLight",
+        "visible": true,
+        "renderOrder": 0,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "childCount": 0
+      },
+      {
+        "path": "Scene/cinematic-world-decorative-point-light-2",
+        "name": "cinematic-world-decorative-point-light-2",
+        "type": "PointLight",
+        "visible": true,
+        "renderOrder": 0,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "childCount": 0
+      },
+      {
+        "path": "Scene/cinematic-world-decorative-point-light-3",
+        "name": "cinematic-world-decorative-point-light-3",
+        "type": "PointLight",
+        "visible": true,
+        "renderOrder": 0,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "childCount": 0
+      },
+      {
+        "path": "Scene/cinematic-ui-decorative-point-light-0",
+        "name": "cinematic-ui-decorative-point-light-0",
+        "type": "PointLight",
+        "visible": true,
+        "renderOrder": 0,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "childCount": 0
+      },
+      {
+        "path": "Scene/cinematic-ui-decorative-point-light-1",
+        "name": "cinematic-ui-decorative-point-light-1",
+        "type": "PointLight",
+        "visible": true,
+        "renderOrder": 0,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "childCount": 0
+      },
+      {
+        "path": "Scene/cinematic-ui-decorative-point-light-2",
+        "name": "cinematic-ui-decorative-point-light-2",
+        "type": "PointLight",
+        "visible": true,
+        "renderOrder": 0,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "childCount": 0
+      },
+      {
+        "path": "Scene/cinematic-ui-decorative-point-light-3",
+        "name": "cinematic-ui-decorative-point-light-3",
+        "type": "PointLight",
+        "visible": true,
+        "renderOrder": 0,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "childCount": 0
+      },
+      {
+        "path": "Scene/pending-burn-orders/burn-trajectory/burn-trajectory/burn-trajectory-core",
+        "name": "burn-trajectory-core",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 38,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "screenFootprint": {
+          "worldRadius": 235.952,
+          "screenRadius": 158.937,
+          "screenDiameter": 317.874,
+          "screenAreaPixels": 79359.565,
+          "viewportCoverage": 0.036
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/confirmed-burn-effects/burn-confirmed-ionized-transfer-solution:burn:player:moon_node:venus_node:T0/burn-confirmed-static-glints",
+        "name": "burn-confirmed-static-glints",
+        "type": "Points",
+        "visible": true,
+        "renderOrder": 39.2,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "screenFootprint": {
+          "worldRadius": 234.348,
+          "screenRadius": 157.857,
+          "screenDiameter": 315.713,
+          "screenAreaPixels": 78284.445,
+          "viewportCoverage": 0.036
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/burn-future-destinations/pending-burn-future-destination-link",
+        "name": "pending-burn-future-destination-link",
+        "type": "Points",
+        "visible": true,
+        "renderOrder": 28.8,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "screenFootprint": {
+          "worldRadius": 139.644,
+          "screenRadius": 94.064,
+          "screenDiameter": 188.128,
+          "screenAreaPixels": 27796.928,
+          "viewportCoverage": 0.013
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "PointsMaterial",
+            "transparent": true,
+            "opacity": 0.538,
+            "size": 2.143,
+            "blending": 1,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#85b6c4",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:sun",
+        "name": "body:sun",
+        "type": "Group",
+        "visible": true,
+        "renderOrder": 0,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "childCount": 8
+      },
+      {
+        "path": "Scene/body:sun/sun-corona",
+        "name": "sun-corona",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 0,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "screenFootprint": {
+          "worldRadius": 122.266,
+          "screenRadius": 82.358,
+          "screenDiameter": 164.717,
+          "screenAreaPixels": 21309.153,
+          "viewportCoverage": 0.01
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.64,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:sun/sun-animated-corona",
+        "name": "sun-animated-corona",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": -1,
+        "worldPosition": [
+          0,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 472.496,
+          "y": 488.71
+        },
+        "screenDistanceFromSun": 0,
+        "screenFootprint": {
+          "worldRadius": 119.821,
+          "screenRadius": 80.711,
+          "screenDiameter": 161.423,
+          "screenAreaPixels": 20465.311,
+          "viewportCoverage": 0.009
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:mercury_node/node:mercury_node:productive-markers/shipyard-collapsed-square:mercury_node",
+        "name": "shipyard-collapsed-square:mercury_node",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 40.2,
+        "worldPosition": [
+          0,
+          16.927,
+          -273.001
+        ],
+        "screen": {
+          "x": 333.325,
+          "y": 607.431
+        },
+        "screenDistanceFromSun": 182.929,
+        "screenFootprint": {
+          "worldRadius": 14.213,
+          "screenRadius": 10.051,
+          "screenDiameter": 20.102,
+          "screenAreaPixels": 317.362,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.86,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#f0d49a",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:mercury_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          0,
+          0,
+          -273.001
+        ],
+        "screen": {
+          "x": 336.718,
+          "y": 615.222
+        },
+        "screenDistanceFromSun": 185.582,
+        "screenFootprint": {
+          "worldRadius": 60.733,
+          "screenRadius": 42.712,
+          "screenDiameter": 85.423,
+          "screenAreaPixels": 5731.145,
+          "viewportCoverage": 0.003
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:venus/atmosphere-scattering-shell:venus",
+        "name": "atmosphere-scattering-shell:venus",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 2,
+        "worldPosition": [
+          0,
+          0,
+          441.748
+        ],
+        "screen": {
+          "x": 660.233,
+          "y": 313.785
+        },
+        "screenDistanceFromSun": 256.601,
+        "screenFootprint": {
+          "worldRadius": 19.219,
+          "screenRadius": 11.874,
+          "screenDiameter": 23.748,
+          "screenAreaPixels": 442.945,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:venus_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          0,
+          0,
+          441.748
+        ],
+        "screen": {
+          "x": 660.233,
+          "y": 313.785
+        },
+        "screenDistanceFromSun": 256.601,
+        "screenFootprint": {
+          "worldRadius": 60.733,
+          "screenRadius": 37.523,
+          "screenDiameter": 75.045,
+          "screenAreaPixels": 4423.216,
+          "viewportCoverage": 0.002
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:venus_node/node:venus_node:productive-markers/tritium-center-dot:1",
+        "name": "tritium-center-dot:1",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          7.557,
+          23.66,
+          437.373
+        ],
+        "screen": {
+          "x": 653.012,
+          "y": 302.079
+        },
+        "screenDistanceFromSun": 259.648,
+        "screenFootprint": {
+          "worldRadius": 9.944,
+          "screenRadius": 6.177,
+          "screenDiameter": 12.354,
+          "screenAreaPixels": 119.86,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:venus_node/node:venus_node:productive-markers/tritium-center-dot:0",
+        "name": "tritium-center-dot:0",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          -7.557,
+          23.66,
+          437.373
+        ],
+        "screen": {
+          "x": 660.719,
+          "y": 305.559
+        },
+        "screenDistanceFromSun": 262.626,
+        "screenFootprint": {
+          "worldRadius": 9.944,
+          "screenRadius": 6.195,
+          "screenDiameter": 12.391,
+          "screenAreaPixels": 120.585,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:venus_node/node:venus_node:productive-markers/tritium-center-dot:2",
+        "name": "tritium-center-dot:2",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          0,
+          23.66,
+          450.499
+        ],
+        "screen": {
+          "x": 661.976,
+          "y": 299.087
+        },
+        "screenDistanceFromSun": 268.066,
+        "screenFootprint": {
+          "worldRadius": 9.944,
+          "screenRadius": 6.169,
+          "screenDiameter": 12.337,
+          "screenAreaPixels": 119.547,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:moon_node/node:moon_node:ships/ship-marker/ship-collapsed-ring-silhouette/ship-collapsed-silhouette-strut-1",
+        "name": "ship-collapsed-silhouette-strut-1",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 37.94,
+        "worldPosition": [
+          -577.326,
+          1.804,
+          109.165
+        ],
+        "screen": {
+          "x": 850.982,
+          "y": 607.327
+        },
+        "screenDistanceFromSun": 396.638,
+        "screenFootprint": {
+          "worldRadius": 2.68,
+          "screenRadius": 1.985,
+          "screenDiameter": 3.969,
+          "screenAreaPixels": 12.374,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.91,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#e8fbff",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:moon_node/node:moon_node:ships/ship-marker/ship-collapsed-ring-silhouette/ship-collapsed-silhouette-strut-0",
+        "name": "ship-collapsed-silhouette-strut-0",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 37.94,
+        "worldPosition": [
+          -578.857,
+          1.804,
+          108.076
+        ],
+        "screen": {
+          "x": 851.489,
+          "y": 608.339
+        },
+        "screenDistanceFromSun": 397.425,
+        "screenFootprint": {
+          "worldRadius": 2.68,
+          "screenRadius": 1.986,
+          "screenDiameter": 3.971,
+          "screenAreaPixels": 12.387,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.91,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#e8fbff",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:moon_node/node:moon_node:ships/ship-marker/ship-collapsed-ring-silhouette/ship-collapsed-silhouette-ring",
+        "name": "ship-collapsed-silhouette-ring",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 37.92,
+        "worldPosition": [
+          -578.636,
+          1.804,
+          109.386
+        ],
+        "screen": {
+          "x": 851.883,
+          "y": 607.627
+        },
+        "screenDistanceFromSun": 397.588,
+        "screenFootprint": {
+          "worldRadius": 9.097,
+          "screenRadius": 6.737,
+          "screenDiameter": 13.475,
+          "screenAreaPixels": 142.604,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.91,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#7fe8ff",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:moon_node/node:moon_node:ships/ship-marker/ship-collapsed-ring-silhouette/ship-collapsed-silhouette-core",
+        "name": "ship-collapsed-silhouette-core",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 37.96,
+        "worldPosition": [
+          -578.636,
+          1.804,
+          109.386
+        ],
+        "screen": {
+          "x": 851.883,
+          "y": 607.627
+        },
+        "screenDistanceFromSun": 397.588,
+        "screenFootprint": {
+          "worldRadius": 1.015,
+          "screenRadius": 0.752,
+          "screenDiameter": 1.503,
+          "screenAreaPixels": 1.775,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.91,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#e8fbff",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:moon_node/node:moon_node:ships/ship-marker/ship-collapsed-dot-glow",
+        "name": "ship-collapsed-dot-glow",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 37.8,
+        "worldPosition": [
+          -578.636,
+          1.804,
+          109.386
+        ],
+        "screen": {
+          "x": 851.883,
+          "y": 607.627
+        },
+        "screenDistanceFromSun": 397.588,
+        "screenFootprint": {
+          "worldRadius": 7.75,
+          "screenRadius": 5.74,
+          "screenDiameter": 11.48,
+          "screenAreaPixels": 103.499,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.089,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#7fe8ff",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:moon_node/node:moon_node:ships/ship-marker/ship-collapsed-ring-silhouette/ship-collapsed-silhouette-strut-2",
+        "name": "ship-collapsed-silhouette-strut-2",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 37.94,
+        "worldPosition": [
+          -578.415,
+          1.804,
+          110.696
+        ],
+        "screen": {
+          "x": 852.278,
+          "y": 606.916
+        },
+        "screenDistanceFromSun": 397.753,
+        "screenFootprint": {
+          "worldRadius": 2.68,
+          "screenRadius": 1.984,
+          "screenDiameter": 3.969,
+          "screenAreaPixels": 12.37,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.91,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#e8fbff",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:moon_node/node:moon_node:ships/ship-marker/ship-collapsed-ring-silhouette/ship-collapsed-silhouette-strut-3",
+        "name": "ship-collapsed-silhouette-strut-3",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 37.94,
+        "worldPosition": [
+          -579.946,
+          1.804,
+          109.608
+        ],
+        "screen": {
+          "x": 852.785,
+          "y": 607.928
+        },
+        "screenDistanceFromSun": 398.539,
+        "screenFootprint": {
+          "worldRadius": 2.68,
+          "screenRadius": 1.985,
+          "screenDiameter": 3.971,
+          "screenAreaPixels": 12.382,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.91,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#e8fbff",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:earth/atmosphere-scattering-shell:earth",
+        "name": "atmosphere-scattering-shell:earth",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 2,
+        "worldPosition": [
+          -626.492,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 836.669,
+          "y": 679.395
+        },
+        "screenDistanceFromSun": 411.076,
+        "screenFootprint": {
+          "worldRadius": 19.543,
+          "screenRadius": 14.949,
+          "screenDiameter": 29.897,
+          "screenAreaPixels": 702.023,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:earth_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          -626.492,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 836.669,
+          "y": 679.395
+        },
+        "screenDistanceFromSun": 411.076,
+        "screenFootprint": {
+          "worldRadius": 60.733,
+          "screenRadius": 46.454,
+          "screenDiameter": 92.908,
+          "screenAreaPixels": 6779.425,
+          "viewportCoverage": 0.003
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:deimos_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          764.772,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 107.416,
+          "y": 297.55
+        },
+        "screenDistanceFromSun": 412.098,
+        "screenFootprint": {
+          "worldRadius": 42.778,
+          "screenRadius": 23.853,
+          "screenDiameter": 47.705,
+          "screenAreaPixels": 1787.405,
+          "viewportCoverage": 0.001
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:deimos_node/node:deimos_node:productive-markers/tritium-center-dot:0",
+        "name": "tritium-center-dot:0",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          756.399,
+          26.216,
+          -4.848
+        ],
+        "screen": {
+          "x": 102.299,
+          "y": 288.345
+        },
+        "screenDistanceFromSun": 420.941,
+        "screenFootprint": {
+          "worldRadius": 11.018,
+          "screenRadius": 6.194,
+          "screenDiameter": 12.387,
+          "screenAreaPixels": 120.51,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:deimos_node/node:deimos_node:productive-markers/tritium-center-dot:2",
+        "name": "tritium-center-dot:2",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          764.772,
+          26.216,
+          9.696
+        ],
+        "screen": {
+          "x": 105.933,
+          "y": 281.306
+        },
+        "screenDistanceFromSun": 421.171,
+        "screenFootprint": {
+          "worldRadius": 11.018,
+          "screenRadius": 6.169,
+          "screenDiameter": 12.339,
+          "screenAreaPixels": 119.574,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:deimos_node/node:deimos_node:productive-markers/tritium-center-dot:1",
+        "name": "tritium-center-dot:1",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          773.146,
+          26.216,
+          -4.848
+        ],
+        "screen": {
+          "x": 95.043,
+          "y": 284.56
+        },
+        "screenDistanceFromSun": 429.124,
+        "screenFootprint": {
+          "worldRadius": 11.018,
+          "screenRadius": 6.167,
+          "screenDiameter": 12.334,
+          "screenAreaPixels": 119.487,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:moon_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          -626.492,
+          0,
+          117.468
+        ],
+        "screen": {
+          "x": 885,
+          "y": 619.5
+        },
+        "screenDistanceFromSun": 432.742,
+        "screenFootprint": {
+          "worldRadius": 48.471,
+          "screenRadius": 36.077,
+          "screenDiameter": 72.153,
+          "screenAreaPixels": 4088.841,
+          "viewportCoverage": 0.002
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.58,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#7fe8ff",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:mars/atmosphere-scattering-shell:mars",
+        "name": "atmosphere-scattering-shell:mars",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 2,
+        "worldPosition": [
+          877.69,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 59.505,
+          "y": 272.463
+        },
+        "screenDistanceFromSun": 466.18,
+        "screenFootprint": {
+          "worldRadius": 13.418,
+          "screenRadius": 7.273,
+          "screenDiameter": 14.545,
+          "screenAreaPixels": 166.161,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:mars_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          877.69,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 59.505,
+          "y": 272.463
+        },
+        "screenDistanceFromSun": 466.18,
+        "screenFootprint": {
+          "worldRadius": 60.733,
+          "screenRadius": 32.918,
+          "screenDiameter": 65.837,
+          "screenAreaPixels": 3404.275,
+          "viewportCoverage": 0.002
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:mars_node/node:mars_node:productive-markers/shipyard-collapsed-square:mars_node",
+        "name": "shipyard-collapsed-square:mars_node",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 40.2,
+        "worldPosition": [
+          877.69,
+          21.962,
+          0
+        ],
+        "screen": {
+          "x": 53.971,
+          "y": 261.725
+        },
+        "screenDistanceFromSun": 476.115,
+        "screenFootprint": {
+          "worldRadius": 18.442,
+          "screenRadius": 10.038,
+          "screenDiameter": 20.076,
+          "screenAreaPixels": 316.554,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.86,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#f0d49a",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:phobos_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          990.608,
+          0,
+          0
+        ],
+        "screen": {
+          "x": 12.945,
+          "y": 248.084
+        },
+        "screenDistanceFromSun": 518.736,
+        "screenFootprint": {
+          "worldRadius": 42.778,
+          "screenRadius": 22.542,
+          "screenDiameter": 45.084,
+          "screenAreaPixels": 1596.387,
+          "viewportCoverage": 0.001
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:iapetus_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          0,
+          0,
+          1476.229
+        ],
+        "screen": {
+          "x": 990.738,
+          "y": 5.834
+        },
+        "screenDistanceFromSun": 708.339,
+        "screenFootprint": {
+          "worldRadius": 47.846,
+          "screenRadius": 23.403,
+          "screenDiameter": 46.806,
+          "screenAreaPixels": 1720.638,
+          "viewportCoverage": 0.001
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:iapetus_node/node:iapetus_node:productive-markers/tritium-center-dot:1",
+        "name": "tritium-center-dot:1",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          9.546,
+          29.886,
+          1470.702
+        ],
+        "screen": {
+          "x": 985.723,
+          "y": -8.733
+        },
+        "screenDistanceFromSun": 714.739,
+        "screenFootprint": {
+          "worldRadius": 12.561,
+          "screenRadius": 6.173,
+          "screenDiameter": 12.346,
+          "screenAreaPixels": 119.716,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:iapetus_node/node:iapetus_node:productive-markers/tritium-center-dot:0",
+        "name": "tritium-center-dot:0",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          -9.546,
+          29.886,
+          1470.702
+        ],
+        "screen": {
+          "x": 994.455,
+          "y": -5.743
+        },
+        "screenDistanceFromSun": 718.975,
+        "screenFootprint": {
+          "worldRadius": 12.561,
+          "screenRadius": 6.188,
+          "screenDiameter": 12.376,
+          "screenAreaPixels": 120.288,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:iapetus_node/node:iapetus_node:productive-markers/tritium-center-dot:2",
+        "name": "tritium-center-dot:2",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          0,
+          29.886,
+          1487.283
+        ],
+        "screen": {
+          "x": 994.487,
+          "y": -11.304
+        },
+        "screenDistanceFromSun": 722.834,
+        "screenFootprint": {
+          "worldRadius": 12.561,
+          "screenRadius": 6.157,
+          "screenDiameter": 12.314,
+          "screenAreaPixels": 119.09,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:saturn/atmosphere-scattering-shell:saturn",
+        "name": "atmosphere-scattering-shell:saturn",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 2,
+        "worldPosition": [
+          0,
+          0,
+          1849.32
+        ],
+        "screen": {
+          "x": 1083.388,
+          "y": -80.494
+        },
+        "screenDistanceFromSun": 834.975,
+        "screenFootprint": {
+          "worldRadius": 70.757,
+          "screenRadius": 31.822,
+          "screenDiameter": 63.643,
+          "screenAreaPixels": 3181.243,
+          "viewportCoverage": 0.001
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:saturn/saturn-ring-system/saturn-ring-dream-disk",
+        "name": "saturn-ring-dream-disk",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 23.5035,
+        "worldPosition": [
+          0,
+          0,
+          1849.32
+        ],
+        "screen": {
+          "x": 1083.388,
+          "y": -80.494
+        },
+        "screenDistanceFromSun": 834.975,
+        "screenFootprint": {
+          "worldRadius": 175.416,
+          "screenRadius": 78.891,
+          "screenDiameter": 157.781,
+          "screenAreaPixels": 19552.383,
+          "viewportCoverage": 0.009
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:saturn/saturn-ring-system/saturn-ring-inner-frost",
+        "name": "saturn-ring-inner-frost",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 23.5012,
+        "worldPosition": [
+          0,
+          0,
+          1849.32
+        ],
+        "screen": {
+          "x": 1083.388,
+          "y": -80.494
+        },
+        "screenDistanceFromSun": 834.975,
+        "screenFootprint": {
+          "worldRadius": 87.708,
+          "screenRadius": 39.445,
+          "screenDiameter": 78.891,
+          "screenAreaPixels": 4888.096,
+          "viewportCoverage": 0.002
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:saturn/saturn-ring-system/saturn-ring-violet-shelf",
+        "name": "saturn-ring-violet-shelf",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 23.502,
+        "worldPosition": [
+          0,
+          0,
+          1849.32
+        ],
+        "screen": {
+          "x": 1083.388,
+          "y": -80.494
+        },
+        "screenDistanceFromSun": 834.975,
+        "screenFootprint": {
+          "worldRadius": 108.345,
+          "screenRadius": 48.727,
+          "screenDiameter": 97.453,
+          "screenAreaPixels": 7458.997,
+          "viewportCoverage": 0.003
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:saturn/saturn-ring-system/saturn-ring-gold-glint",
+        "name": "saturn-ring-gold-glint",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 23.5048,
+        "worldPosition": [
+          0,
+          0,
+          1849.32
+        ],
+        "screen": {
+          "x": 1083.388,
+          "y": -80.494
+        },
+        "screenDistanceFromSun": 834.975,
+        "screenFootprint": {
+          "worldRadius": 130.702,
+          "screenRadius": 58.781,
+          "screenDiameter": 117.562,
+          "screenAreaPixels": 10854.917,
+          "viewportCoverage": 0.005
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:saturn/saturn-ring-system/saturn-ring-outer-blue",
+        "name": "saturn-ring-outer-blue",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 23.5022,
+        "worldPosition": [
+          0,
+          0,
+          1849.32
+        ],
+        "screen": {
+          "x": 1083.388,
+          "y": -80.494
+        },
+        "screenDistanceFromSun": 834.975,
+        "screenFootprint": {
+          "worldRadius": 154.778,
+          "screenRadius": 69.609,
+          "screenDiameter": 139.219,
+          "screenAreaPixels": 15222.443,
+          "viewportCoverage": 0.007
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:saturn/saturn-ring-system/saturn-ring-titan-brim",
+        "name": "saturn-ring-titan-brim",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 23.5042,
+        "worldPosition": [
+          0,
+          0,
+          1849.32
+        ],
+        "screen": {
+          "x": 1083.388,
+          "y": -80.494
+        },
+        "screenDistanceFromSun": 834.975,
+        "screenFootprint": {
+          "worldRadius": 171.976,
+          "screenRadius": 77.344,
+          "screenDiameter": 154.687,
+          "screenAreaPixels": 18793.14,
+          "viewportCoverage": 0.009
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:saturn_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          0,
+          0,
+          1849.32
+        ],
+        "screen": {
+          "x": 1083.388,
+          "y": -80.494
+        },
+        "screenDistanceFromSun": 834.975,
+        "screenFootprint": {
+          "worldRadius": 90.416,
+          "screenRadius": 40.663,
+          "screenDiameter": 81.326,
+          "screenAreaPixels": 5194.62,
+          "viewportCoverage": 0.002
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:saturn_node/node:saturn_node:productive-markers/shipyard-collapsed-square:saturn_node",
+        "name": "shipyard-collapsed-square:saturn_node",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 40.2,
+        "worldPosition": [
+          0,
+          26.469,
+          1849.32
+        ],
+        "screen": {
+          "x": 1084.664,
+          "y": -93.06
+        },
+        "screenDistanceFromSun": 844.516,
+        "screenFootprint": {
+          "worldRadius": 22.226,
+          "screenRadius": 10.031,
+          "screenDiameter": 20.061,
+          "screenAreaPixels": 316.094,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.86,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#f0d49a",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:europa_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          0,
+          0,
+          -1056.528
+        ],
+        "screen": {
+          "x": -173.563,
+          "y": 1090.68
+        },
+        "screenDistanceFromSun": 883.039,
+        "screenFootprint": {
+          "worldRadius": 47.846,
+          "screenRadius": 35.493,
+          "screenDiameter": 70.986,
+          "screenAreaPixels": 3957.672,
+          "viewportCoverage": 0.002
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:titan/atmosphere-scattering-shell:titan",
+        "name": "atmosphere-scattering-shell:titan",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 2,
+        "worldPosition": [
+          0,
+          0,
+          2032.273
+        ],
+        "screen": {
+          "x": 1124.937,
+          "y": -119.207
+        },
+        "screenDistanceFromSun": 891.764,
+        "screenFootprint": {
+          "worldRadius": 12.591,
+          "screenRadius": 5.439,
+          "screenDiameter": 10.879,
+          "screenAreaPixels": 92.949,
+          "viewportCoverage": 0
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:titan_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          0,
+          0,
+          2032.273
+        ],
+        "screen": {
+          "x": 1124.937,
+          "y": -119.207
+        },
+        "screenDistanceFromSun": 891.764,
+        "screenFootprint": {
+          "worldRadius": 47.846,
+          "screenRadius": 20.67,
+          "screenDiameter": 41.341,
+          "screenAreaPixels": 1342.298,
+          "viewportCoverage": 0.001
+        },
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/background-3d-starfield:0",
+        "name": "background-3d-starfield:0",
+        "type": "Group",
+        "visible": true,
+        "renderOrder": -20,
+        "worldPosition": [
+          -1341.669,
+          1733.831,
+          -1020.988
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 1
+      },
+      {
+        "path": "Scene/background-3d-starfield:0/background-3d-starfield-points:0",
+        "name": "background-3d-starfield-points:0",
+        "type": "Points",
+        "visible": true,
+        "renderOrder": -20,
+        "worldPosition": [
+          -1341.669,
+          1733.831,
+          -1020.988
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/background-3d-starfield:1",
+        "name": "background-3d-starfield:1",
+        "type": "Group",
+        "visible": true,
+        "renderOrder": -20,
+        "worldPosition": [
+          -1342.762,
+          1731.264,
+          -1018.899
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 1
+      },
+      {
+        "path": "Scene/background-3d-starfield:1/background-3d-starfield-points:1",
+        "name": "background-3d-starfield-points:1",
+        "type": "Points",
+        "visible": true,
+        "renderOrder": -20,
+        "worldPosition": [
+          -1342.762,
+          1731.264,
+          -1018.899
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/background-3d-starfield:2",
+        "name": "background-3d-starfield:2",
+        "type": "Group",
+        "visible": true,
+        "renderOrder": -20,
+        "worldPosition": [
+          -1343.144,
+          1726.994,
+          -1015.693
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 1
+      },
+      {
+        "path": "Scene/background-3d-starfield:2/background-3d-starfield-points:2",
+        "name": "background-3d-starfield-points:2",
+        "type": "Points",
+        "visible": true,
+        "renderOrder": -20,
+        "worldPosition": [
+          -1343.144,
+          1726.994,
+          -1015.693
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:jupiter/atmosphere-scattering-shell:jupiter",
+        "name": "atmosphere-scattering-shell:jupiter",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 2,
+        "worldPosition": [
+          0,
+          0,
+          -1359.266
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:jupiter/jupiter-ring-system/jupiter-ring-gossamer-thread",
+        "name": "jupiter-ring-gossamer-thread",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 23.5042,
+        "worldPosition": [
+          0,
+          0,
+          -1359.266
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:uranus/atmosphere-scattering-shell:uranus",
+        "name": "atmosphere-scattering-shell:uranus",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 2,
+        "worldPosition": [
+          -2388.634,
+          0,
+          0
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:uranus/uranus-ring-system/uranus-ring-charcoal-epsilon",
+        "name": "uranus-ring-charcoal-epsilon",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 23.5001,
+        "worldPosition": [
+          -2388.634,
+          0,
+          0
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:uranus/uranus-ring-system/uranus-ring-charcoal-epsilon-thread",
+        "name": "uranus-ring-charcoal-epsilon-thread",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 24.2,
+        "worldPosition": [
+          -2388.634,
+          0,
+          0
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.12,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#6db9a7",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:uranus/uranus-ring-system/uranus-ring-smoke-delta",
+        "name": "uranus-ring-smoke-delta",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 23.5003,
+        "worldPosition": [
+          -2388.634,
+          0,
+          0
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:uranus/uranus-ring-system/uranus-ring-smoke-delta-thread",
+        "name": "uranus-ring-smoke-delta-thread",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 24.2,
+        "worldPosition": [
+          -2388.634,
+          0,
+          0
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#83d2bc",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:uranus/uranus-ring-system/uranus-ring-cold-alpha",
+        "name": "uranus-ring-cold-alpha",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 23.50052,
+        "worldPosition": [
+          -2388.634,
+          0,
+          0
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:uranus/uranus-ring-system/uranus-ring-cold-alpha-thread",
+        "name": "uranus-ring-cold-alpha-thread",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 24.2,
+        "worldPosition": [
+          -2388.634,
+          0,
+          0
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.17,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#b1f1d8",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:uranus/uranus-ring-system/uranus-ring-outer-ink",
+        "name": "uranus-ring-outer-ink",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 23.50015,
+        "worldPosition": [
+          -2388.634,
+          0,
+          0
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:uranus/uranus-ring-system/uranus-ring-outer-ink-thread",
+        "name": "uranus-ring-outer-ink-thread",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 24.2,
+        "worldPosition": [
+          -2388.634,
+          0,
+          0
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.105,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#5a9e91",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:neptune/atmosphere-scattering-shell:neptune",
+        "name": "atmosphere-scattering-shell:neptune",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 2,
+        "worldPosition": [
+          2936.934,
+          0,
+          0
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:neptune/neptune-ring-system/neptune-ring-cold-adams",
+        "name": "neptune-ring-cold-adams",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 23.5012,
+        "worldPosition": [
+          2936.934,
+          0,
+          0
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/body:neptune/neptune-ring-system/neptune-ring-frost-galle",
+        "name": "neptune-ring-frost-galle",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 23.502,
+        "worldPosition": [
+          2936.934,
+          0,
+          0
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "ShaderMaterial",
+            "transparent": true,
+            "opacity": 1,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": null,
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:jupiter_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          0,
+          0,
+          -1359.266
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:jupiter_node/node:jupiter_node:productive-markers/shipyard-collapsed-square:jupiter_node",
+        "name": "shipyard-collapsed-square:jupiter_node",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 40.2,
+        "worldPosition": [
+          0,
+          16.254,
+          -1359.266
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.86,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#f0d49a",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:io_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          226.413,
+          0,
+          -1359.266
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:ganymede_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          -302.739,
+          0,
+          -1359.266
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:ganymede_node/node:ganymede_node:productive-markers/tritium-center-dot:0",
+        "name": "tritium-center-dot:0",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          -308.622,
+          18.419,
+          -1362.673
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:ganymede_node/node:ganymede_node:productive-markers/tritium-center-dot:1",
+        "name": "tritium-center-dot:1",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          -296.855,
+          18.419,
+          -1362.673
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:ganymede_node/node:ganymede_node:productive-markers/tritium-center-dot:2",
+        "name": "tritium-center-dot:2",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          -302.739,
+          18.419,
+          -1352.454
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:callisto_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          0,
+          0,
+          -1662.005
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:uranus_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          -2388.634,
+          0,
+          0
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:oberon_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          -2388.634,
+          0,
+          257.519
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:oberon_node/node:oberon_node:productive-markers/tritium-center-dot:0",
+        "name": "tritium-center-dot:0",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          -2395.493,
+          21.474,
+          253.548
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:oberon_node/node:oberon_node:productive-markers/tritium-center-dot:1",
+        "name": "tritium-center-dot:1",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          -2381.775,
+          21.474,
+          253.548
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:oberon_node/node:oberon_node:productive-markers/tritium-center-dot:2",
+        "name": "tritium-center-dot:2",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          -2388.634,
+          21.474,
+          265.461
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:titania_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          -2388.634,
+          0,
+          -140.937
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:titania_node/node:titania_node:productive-markers/shipyard-collapsed-square:titania_node",
+        "name": "shipyard-collapsed-square:titania_node",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 40.2,
+        "worldPosition": [
+          -2388.634,
+          16.116,
+          -140.937
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.86,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": false,
+            "color": "#f0d49a",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:neptune_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          2936.934,
+          0,
+          0
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:triton_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          2878.639,
+          0,
+          -130.933
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:triton_node/node:triton_node:productive-markers/tritium-center-dot:0",
+        "name": "tritium-center-dot:0",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          2865.222,
+          42.003,
+          -138.7
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:triton_node/node:triton_node:productive-markers/tritium-center-dot:1",
+        "name": "tritium-center-dot:1",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          2892.056,
+          42.003,
+          -138.7
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:triton_node/node:triton_node:productive-markers/tritium-center-dot:2",
+        "name": "tritium-center-dot:2",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          2878.639,
+          42.003,
+          -115.398
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:pluto_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          0,
+          0,
+          -3677.942
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:pluto_node/node:pluto_node:productive-markers/tritium-center-dot:0",
+        "name": "tritium-center-dot:0",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          -9.97,
+          31.214,
+          -3683.714
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:pluto_node/node:pluto_node:productive-markers/tritium-center-dot:1",
+        "name": "tritium-center-dot:1",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          9.97,
+          31.214,
+          -3683.714
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:pluto_node/node:pluto_node:productive-markers/tritium-center-dot:2",
+        "name": "tritium-center-dot:2",
+        "type": "Sprite",
+        "visible": true,
+        "renderOrder": 38.9,
+        "worldPosition": [
+          0,
+          31.214,
+          -3666.397
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "SpriteMaterial",
+            "transparent": true,
+            "opacity": 0.82,
+            "size": null,
+            "blending": 2,
+            "depthTest": false,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#ffffff",
+            "hasMap": true
+          }
+        ]
+      },
+      {
+        "path": "Scene/node:charon_node/Mesh",
+        "name": "",
+        "type": "Mesh",
+        "visible": true,
+        "renderOrder": 30.25,
+        "worldPosition": [
+          -117.468,
+          0,
+          -3677.942
+        ],
+        "screen": null,
+        "screenDistanceFromSun": null,
+        "childCount": 0,
+        "material": [
+          {
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.14,
+            "size": null,
+            "blending": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "toneMapped": true,
+            "color": "#80919d",
+            "hasMap": false
+          }
+        ]
+      }
+    ]
+  },
+  "performance": {
+    "diagnosticsEnabled": true,
+    "stats": {
+      "mode": "minimal",
+      "smoothedFrameMs": 11.072003080961633,
+      "estimatedFps": 90.3178939427415,
+      "framePacing": {
+        "windowMs": 2319.7000000476837,
+        "lastIntervalMs": 13,
+        "longestIntervalMs": 19.799999952316284,
+        "framesOver20Ms": 0,
+        "framesOver30Ms": 0,
+        "lastFrameOver20MsAgoMs": null
+      },
+      "gpuFrame": {
+        "supported": true,
+        "pendingQueries": 2,
+        "lastMs": 1.046749,
+        "averageMs": 1.0692218297098863,
+        "maxMs": 1.146205644867433
+      },
+      "slowestSection": "syncScene",
+      "sections": {
+        "frame": {
+          "lastMs": 5.300000190734863,
+          "averageMs": 8.92866543414813,
+          "maxMs": 13.227632907329546
+        },
+        "replayPreview": {
+          "lastMs": 0,
+          "averageMs": 0.0008194969218520856,
+          "maxMs": 0.09000865694829817
+        },
+        "syncScene": {
+          "lastMs": 4.700000047683716,
+          "averageMs": 4.700000047683716,
+          "maxMs": 4.700000047683716
+        },
+        "turnTransition": {
+          "lastMs": 0,
+          "averageMs": 6.3932814018344055e-9,
+          "maxMs": 0.056755603435463285
+        },
+        "camera": {
+          "lastMs": 0,
+          "averageMs": 0.009889954006122878,
+          "maxMs": 0.09850762841609119
+        },
+        "interaction": {
+          "lastMs": 0.20000004768371582,
+          "averageMs": 0.0999725088392795,
+          "maxMs": 0.20000004768371582
+        },
+        "orbitRails": {
+          "lastMs": 0,
+          "averageMs": 0,
+          "maxMs": 0
+        },
+        "nodePresentation": {
+          "lastMs": 0,
+          "averageMs": 0,
+          "maxMs": 0
+        },
+        "tactical": {
+          "lastMs": 0,
+          "averageMs": 0,
+          "maxMs": 0
+        },
+        "burnPresentation": {
+          "lastMs": 0,
+          "averageMs": 0,
+          "maxMs": 0
+        },
+        "transitMarkers": {
+          "lastMs": 0,
+          "averageMs": 2.3141365323970182e-7,
+          "maxMs": 0.06530725791255594
+        },
+        "firePresentation": {
+          "lastMs": 0,
+          "averageMs": 0,
+          "maxMs": 0
+        },
+        "firePending": {
+          "lastMs": 0,
+          "averageMs": 0,
+          "maxMs": 0
+        },
+        "fireActive": {
+          "lastMs": 0,
+          "averageMs": 0,
+          "maxMs": 0
+        },
+        "fireTargets": {
+          "lastMs": 0,
+          "averageMs": 0,
+          "maxMs": 0
+        },
+        "fireTransient": {
+          "lastMs": 0,
+          "averageMs": 0,
+          "maxMs": 0
+        },
+        "readability": {
+          "lastMs": 0,
+          "averageMs": 0.017290091018791268,
+          "maxMs": 0.16122116443264867
+        },
+        "presentationOnly": {
+          "lastMs": 1,
+          "averageMs": 4.296898542890702,
+          "maxMs": 8.593133848683635
+        },
+        "trajectoryAnimation": {
+          "lastMs": 0.2999999523162842,
+          "averageMs": 0.27622668176594717,
+          "maxMs": 2.027593496418754
+        },
+        "bodyAnimation": {
+          "lastMs": 0.20000004768371582,
+          "averageMs": 3.524476249051809,
+          "maxMs": 6.566999905109405
+        },
+        "shipAnimation": {
+          "lastMs": 0.20000004768371582,
+          "averageMs": 0.2392096226955689,
+          "maxMs": 0.3823556946019228
+        },
+        "effectAnimation": {
+          "lastMs": 0.20000004768371582,
+          "averageMs": 0.2301867884532734,
+          "maxMs": 0.35823488170338236
+        },
+        "constructionAnimation": {
+          "lastMs": 0.09999990463256836,
+          "averageMs": 0.021193715214190983,
+          "maxMs": 0.09999990463256836
+        },
+        "tritiumAnimation": {
+          "lastMs": 0,
+          "averageMs": 0.018525166402177547,
+          "maxMs": 0.09900264162421225
+        },
+        "workAnimation": {
+          "lastMs": 0,
+          "averageMs": 0.0006620014122077704,
+          "maxMs": 0.0886652664922627
+        },
+        "missileAnimation": {
+          "lastMs": 0,
+          "averageMs": 0.03819942343382675,
+          "maxMs": 0.1720768794092545
+        },
+        "lightPools": {
+          "lastMs": 0.09999990463256836,
+          "averageMs": 0.015207371033869793,
+          "maxMs": 0.09999990463256836
+        },
+        "solarDust": {
+          "lastMs": 0,
+          "averageMs": 0.008130115982507017,
+          "maxMs": 0.09752501482264067
+        },
+        "sceneRender": {
+          "lastMs": 4.1000001430511475,
+          "averageMs": 4.326273939945143,
+          "maxMs": 4.973768547914594
+        },
+        "baseRender": {
+          "lastMs": 3,
+          "averageMs": 3.1499246378040646,
+          "maxMs": 3.4133706359265625
+        },
+        "worldBloom": {
+          "lastMs": 0,
+          "averageMs": 0,
+          "maxMs": 0
+        },
+        "sunBloom": {
+          "lastMs": 0,
+          "averageMs": 0,
+          "maxMs": 0
+        },
+        "uiBloom": {
+          "lastMs": 0,
+          "averageMs": 0,
+          "maxMs": 0
+        },
+        "heatDistortion": {
+          "lastMs": 0,
+          "averageMs": 0.06690787289584899,
+          "maxMs": 0.19407454814222008
+        },
+        "labels": {
+          "lastMs": 0,
+          "averageMs": 0.059237961487178574,
+          "maxMs": 0.19310417540150898
+        }
+      },
+      "counts": {
+        "bodies": 23,
+        "nodes": 22,
+        "ships": 1,
+        "pendingBurns": 1,
+        "activeBurns": 0,
+        "pendingFires": 0,
+        "activeMissiles": 0,
+        "burnTrajectories": 1,
+        "fireTrajectories": 0,
+        "labels": 24,
+        "sceneObjects": 977,
+        "visibleRenderables": 206,
+        "visibleWorldRenderables": 151,
+        "visibleUiBloomRenderables": 51,
+        "visibleShipRenderables": 8,
+        "drawCalls": 126,
+        "triangles": 128531,
+        "geometries": 691,
+        "textures": 22,
+        "rendererPixelRatio": 1,
+        "rendererPixels": 2193030
+      }
+    },
+    "sectionTimingNote": null
+  },
+  "warningProjectionAudit": [],
+  "command": {
+    "dvHistory": [
+      {
+        "player": 50
+      }
+    ],
+    "timelineEntryCount": 0,
+    "timelineEntriesRecent": [],
+    "scrollbackRowCount": 0,
+    "scrollbackRecent": []
+  },
+  "replay": {
+    "transitionCount": 0,
+    "transitionsRecent": [],
+    "entryCount": 0,
+    "entriesRecent": []
+  },
+  "diagnostics": {
+    "matchDebugEventCount": 0,
+    "matchDebugEventsRecent": [],
+    "matchResolutionEventCount": 0,
+    "matchResolutionEventsRecent": [],
+    "victoryAudit": null,
+    "mapOutcomeAudit": null,
+    "postMatchReport": null
+  }
+}
