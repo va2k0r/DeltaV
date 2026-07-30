@@ -178,6 +178,18 @@ describe("game glossary", () => {
     );
   });
 
+  it("names tritium infrastructure plainly before introducing the technical component", () => {
+    const plant = getGameGlossaryEntry("tritium-breeding");
+    const playerCopy = gameGlossaryEntries
+      .flatMap((entry) => [entry.label, entry.short, ...entry.detail])
+      .join(" ");
+
+    expect(plant?.label).toBe("TRITIUM PLANT");
+    expect(plant?.short).toContain("manufactures tritium");
+    expect(plant?.detail.join(" ")).toMatch(/Inside the plant, a breeder blanket/iu);
+    expect(playerCopy).not.toMatch(/breeder banks?/iu);
+  });
+
   it("hides a sparse, linked chronology inside relevant lore", () => {
     const milestoneYears = ["2043", "2058", "2069", "2076"];
 

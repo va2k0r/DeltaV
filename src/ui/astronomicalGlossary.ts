@@ -115,7 +115,7 @@ const astronomicalRecords = [
     detail: [
       "Radius 69,911 km; mass 1.898 × 10²⁷ kg; mean solar distance 5.203 AU.",
       "The planet rotates in about 9 h 56 min and completes one orbit in 11.86 Earth years.",
-      "Its hydrogen-helium atmosphere contains deuterium feedstock; usable tritium still requires lithium-6 breeding.",
+      "Its hydrogen-helium atmosphere contains deuterium feedstock; tritium plants still require processed lithium-6.",
       "Radiation, gravity and enormous moon-system traffic make every approach an infrastructure problem."
     ]
   },
@@ -176,7 +176,7 @@ const astronomicalRecords = [
       "A ringed gas giant whose distant industrial traffic became the first theatre of open corporate war.",
     detail: [
       "Radius 58,232 km; mean solar distance 9.54 AU; orbital period 29.45 Earth years.",
-      "Its hydrogen-helium atmosphere and wide moon system support skimming, breeding and distributed depots.",
+      "Its hydrogen-helium atmosphere and wide moon system support skimming, tritium production and distributed depots.",
       "The rings are mostly water ice; their beauty conceals a dense navigation and surveillance environment.",
       "In 2079 a registered ship was deliberately destroyed here. Earth learned roughly eighty minutes later.",
       "By the time a physical response could be organised, the local fleets had already chosen the war's next geometry."

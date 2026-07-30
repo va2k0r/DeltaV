@@ -19,10 +19,10 @@ export const worldLoreGlossaryEntries = [
     aliases: ["FUSION", "FUSION ENERGY", "FUSION POWER", "FUSION FUEL"],
     short: "2079's abundant firm power: mature, industrial and still brutally thermal.",
     detail: [
-      "In 2058, a commercial D-T station first closed a full breeding cycle while exporting firm power.",
+      "In 2058, a commercial D-T station first replaced all the tritium it consumed while exporting firm power.",
       "Neutrons damage walls, activate components and breed replacement tritium from lithium-6.",
       "AI made the materials cycle fast enough to industrialise. Robotic maintenance made the plants economical.",
-      "Power is abundant. Magnets, breeder stock, turbines and heat rejection remain finite."
+      "Power is abundant. Magnets, enriched lithium, turbines and heat rejection remain finite."
     ]
   },
   {
@@ -155,14 +155,23 @@ export const worldLoreGlossaryEntries = [
   },
   {
     id: "tritium-breeding",
-    label: "TRITIUM BREEDING",
-    aliases: ["TRITIUM BREEDING", "BREEDER BLANKET", "BREEDER BLANKETS", "BREEDER", "BREEDING"],
-    short: "The neutron-driven conversion of lithium-6 into replacement tritium.",
+    label: "TRITIUM PLANT",
+    aliases: [
+      "TRITIUM PLANT",
+      "TRITIUM PLANTS",
+      "TRITIUM PRODUCTION",
+      "TRITIUM BREEDING",
+      "BREEDER BLANKET",
+      "BREEDER BLANKETS",
+      "BREEDER",
+      "BREEDING"
+    ],
+    short: "An industrial plant that manufactures tritium from lithium-6 and fusion neutrons.",
     detail: [
       "Tritium is never mined as a primordial seam: its 12.3-year half-life erased those long ago.",
-      "A fusion blanket captures reactor neutrons in lithium-6, produces tritium and returns it to the fuel loop.",
-      "A small breeding surplus starts new reactors. A small deficit slowly kills an industrial system.",
-      "TRITIUM nodes are therefore breeder banks and refineries, not holes full of radioactive hydrogen."
+      "Inside the plant, a breeder blanket captures reactor neutrons in lithium-6 and returns the resulting tritium to the fuel loop.",
+      "The plant must make slightly more tritium than its reactors burn; that surplus starts new reactors and fuels ships.",
+      "TRITIUM nodes are production plants and refineries, not holes full of radioactive hydrogen."
     ]
   },
   {
@@ -174,7 +183,7 @@ export const worldLoreGlossaryEntries = [
     detail: [
       "Gas-giant skimmers separate deuterium from immense hydrogen flows.",
       "The separation plant is large, but the source is effectively inexhaustible on the scale of the conflict.",
-      "Deuterium supplies one half of D-T fuel. Lithium breeders manufacture the scarce half.",
+      "Deuterium supplies one half of D-T fuel. Tritium plants manufacture the scarce half from lithium-6.",
       "Operational ledgers report both industries as usable TRITIUM output."
     ]
   },
@@ -182,10 +191,10 @@ export const worldLoreGlossaryEntries = [
     id: "lithium-six",
     label: "LITHIUM-6",
     aliases: ["LITHIUM-6", "LITHIUM 6", "LI-6", "LITHIUM"],
-    short: "The breeder feedstock from which neutron-rich fusion plants manufacture tritium.",
+    short: "The stable feedstock from which fusion plants manufacture tritium.",
     detail: [
       "Lithium-6 is stable, transportable and far easier to stockpile than the tritium it will become.",
-      "Moon and asteroid refineries enrich it before shipment to orbital breeder blankets.",
+      "Moon and asteroid refineries enrich it before shipment to the neutron blankets inside tritium plants.",
       "The strategic shortage is rarely raw lithium. It is enriched stock inside a functioning, neutron-tight fuel cycle.",
       "Destroying that cycle turns abundant rock into unusable potential."
     ]
@@ -229,9 +238,9 @@ export const worldLoreGlossaryEntries = [
     id: "year-2058",
     label: "2058",
     aliases: ["2058"],
-    short: "The year commercial fusion closed its breeder and maintenance cycle.",
+    short: "The year commercial fusion closed its tritium and maintenance cycle.",
     detail: [
-      "One D-T station exported firm power while breeding its replacement tritium across a full accounting year.",
+      "One D-T station exported firm power while producing all its replacement tritium across a full accounting year.",
       "Robotic hot-cell replacement made neutron damage an operating cost instead of a terminal experiment.",
       "Twenty-one years later, in 2079, fusion is infrastructure rather than a demonstration."
     ]

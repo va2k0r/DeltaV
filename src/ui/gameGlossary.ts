@@ -387,7 +387,7 @@ const mechanicGlossaryEntries = [
     detail: [
       "One eligible WORK result produces +2 ΔV during the economy phase.",
       "Stored as global faction reserve; the simulation tracks no canister, convoy or local inventory.",
-      "The physical output is certified D-T fusion fuel, reaction mass and breeder margin compressed into one number.",
+      "The physical output is certified D-T fusion fuel, reaction mass and tritium production margin compressed into one number.",
       "Natural tritium exists only in traces. Gas-giant skimmers harvest deuterium; lithium-6 blankets breed the tritium.",
       "Its 12.3-year half-life makes stockpiles perishable and bookkeeping strategic.",
       "CONTESTED state or BURN, FIRE and EVADE prevent income.",
@@ -528,7 +528,7 @@ const mechanicGlossaryEntries = [
     aliases: ["FACTION", "FACTIONS", "PLAYER", "ENEMY"],
     short: "One side in the conflict, sharing ships, production and a global ΔV reserve.",
     detail: [
-      "A FACTION is one corporate industrial network: ships, yards, breeder banks, compute and command authority.",
+      "A FACTION is one corporate industrial network: ships, yards, tritium plants, compute and command authority.",
       "All ships pay from one ΔV reserve, so they compete for the same future movement and survival budget.",
       "On Earth the corporation remains subject to law, tax, sanctions and arrest.",
       "In the outer system no government owns a comparable fleet already close enough to intervene.",
@@ -575,7 +575,7 @@ const mechanicGlossaryEntries = [
     short: "The year corporate war begins beyond the protected Earth-Moon corridor.",
     detail: [
       "Fusion power is mature; AI-scale compute expands until electricity, fabrication and discarded heat become the limits.",
-      "Robotic mines, atmospheric skimmers and breeder banks have made the first outer systems independent of terrestrial fuel.",
+      "Robotic mines, atmospheric skimmers and tritium plants have made the first outer systems independent of terrestrial fuel.",
       "Earth and MOON remain PROTECTED. Their law reaches every registered ship; their force does not.",
       "Corporate FACTIONS own the only complete industrial fleets near the gas and ice giants.",
       "The first attributable hostile action occurs near Saturn. Debate, sanctions and warrants begin on Earth the same day.",
