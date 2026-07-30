@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,6 +9,56 @@ import {
 } from "../../src/ui/gameGlossary";
 
 describe("game glossary", () => {
+  it("reserves the first activation for context and closes it before the log action", () => {
+    const controllerSource = readFileSync(
+      join(process.cwd(), "src/ui/gameGlossaryController.ts"),
+      "utf8"
+    );
+    const styles = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
+    const clickStart = controllerSource.indexOf("  function handleGlossaryClick");
+    const clickEnd = controllerSource.indexOf("  function handleGlossaryKeydown", clickStart);
+    const clickSource = controllerSource.slice(clickStart, clickEnd);
+    const keydownStart = clickEnd;
+    const keydownEnd = controllerSource.indexOf("  function scheduleHover", keydownStart);
+    const keydownSource = controllerSource.slice(keydownStart, keydownEnd);
+
+    expect(clickSource).toContain("if (isDetailOpenForToken(glossaryId, token)) {");
+    expect(clickSource).toContain("if (shouldPassTutorialReplayCueActivationThrough(token)) {");
+    expect(clickSource.indexOf("if (isDetailOpenForToken(glossaryId, token)) {")).toBeLessThan(
+      clickSource.indexOf("event.stopImmediatePropagation();")
+    );
+    expect(keydownSource).toContain("if (isDetailOpenForToken(glossaryId, token)) {");
+    expect(keydownSource).toContain("if (shouldPassTutorialReplayCueActivationThrough(token)) {");
+    expect(keydownSource.indexOf("if (isDetailOpenForToken(glossaryId, token)) {")).toBeLessThan(
+      keydownSource.indexOf("event.stopImmediatePropagation();")
+    );
+    expect(controllerSource).toContain("detailSourceToken === token");
+    expect(controllerSource).toContain(
+      'cueLine.classList.contains("is-command-scrollback-review-target")'
+    );
+    expect(controllerSource).toContain("const handledActivationEvents = new WeakSet<Event>();");
+    expect(clickSource).toContain("handledActivationEvents.has(event)");
+    expect(clickSource).toContain("handledActivationEvents.add(event);");
+    expect(keydownSource).toContain("handledActivationEvents.has(event)");
+    expect(keydownSource).toContain("handledActivationEvents.add(event);");
+    expect(controllerSource).toContain('detailPanel.dataset["sourceLineKey"] === sourceLineKey');
+    expect(controllerSource).toContain(
+      'detailPanel.dataset["sourceLineKey"] = detailSourceLineKey;'
+    );
+    expect(controllerSource).toContain('detailPanel.removeAttribute("data-source-line-key");');
+    expect(controllerSource).toContain("return `row:${rowKey}`;");
+    expect(controllerSource).toContain('detailPanel.classList.contains("is-visible")');
+    expect(clickSource).toContain("closeAll();");
+    expect(keydownSource).toContain("closeAll();");
+    expect(styles).toContain(
+      ".command-console__line--linked-event.is-command-scrollback-review-target > span"
+    );
+    expect(styles).toContain(
+      ".command-console__line--tutorial-replay-cue.is-command-scrollback-review-target"
+    );
+    expect(styles).toContain("animation: none;");
+  });
+
   it("keeps identifiers and aliases unique", () => {
     const ids = gameGlossaryEntries.map((entry) => entry.id);
     const aliases = gameGlossaryEntries.flatMap((entry) =>

@@ -1520,6 +1520,7 @@ const enemyContactChasePitch = 0.24;
 const tutorialWideFireFramePitch = 0.54;
 const didacticShotUiMinOpacity = 0.5;
 const didacticShotUiVisibilityMs = 1800;
+const extremeZoomBillboardMinOpacity = 0.04;
 const relaxedFocusDoubleClickMs = 520;
 const deliberateFireClickMinMs = 560;
 const deliberateFireClickMaxMs = 2400;
@@ -11586,9 +11587,13 @@ export class CinematicSolarSystemRenderer {
         this.renderSolarDust(elapsed);
         this.renderCinematicScene();
         this.renderer.domElement.dispatchEvent(new CustomEvent("deltav:frame-rendered"));
+        // The selection bracket is screen-space UI tied directly to the current camera and
+        // display-scale projection. Keep it at render cadence even when label layout is throttled;
+        // continuous wheel zoom deliberately rebuilds tactical geometry on frames where reduced
+        // and minimal performance modes skip the more expensive label pass.
+        this.updateSelectedNodeMarker();
         if (this.shouldUpdateLabelPresentation(elapsed)) {
           this.updateLabels();
-          this.updateSelectedNodeMarker();
           this.updateInvalidActionBillboard(now);
         }
         this.stabilizeTrajectoryLabelOffsetsForCameraMotion = false;
@@ -11653,10 +11658,10 @@ export class CinematicSolarSystemRenderer {
         }
       });
       this.renderer.domElement.dispatchEvent(new CustomEvent("deltav:frame-rendered"));
+      this.updateSelectedNodeMarker();
       if (this.shouldUpdateLabelPresentation(elapsed)) {
         this.measurePerformanceSection("labels", () => {
           this.updateLabels();
-          this.updateSelectedNodeMarker();
           this.updateInvalidActionBillboard(now);
         });
       } else {
@@ -19770,6 +19775,7 @@ export class CinematicSolarSystemRenderer {
       opacity: number;
       scale: number;
     }> = [];
+    const extremeZoomBillboardOpacityMultiplier = this.getExtremeZoomBillboardOpacityMultiplier();
 
     for (const label of this.labels.values()) {
       const shouldShow = this.shouldShowLabel(label);
@@ -19814,11 +19820,12 @@ export class CinematicSolarSystemRenderer {
         this.tuning.labelDistanceFadeEnd
       );
       const baseOpacity = isFocused ? this.tuning.labelFocusOpacity : this.tuning.labelOpacity;
-      const opacity = clamp(
+      const distanceOpacity = clamp(
         baseOpacity * fade + (isFocused ? this.tuning.labelHoverBoost : 0),
         0.18,
         1
       );
+      const opacity = distanceOpacity * extremeZoomBillboardOpacityMultiplier;
       const scale = clamp(
         this.tuning.labelMinScale + fade * 0.18 + (isFocused ? 0.08 : 0),
         this.tuning.labelMinScale,
@@ -21588,10 +21595,8 @@ export class CinematicSolarSystemRenderer {
         }));
 
     return (
-      (performanceMode === "full" &&
-        (hasResolvingBurnWithdrawal ||
-          hasResolvingFireWithdrawal ||
-          hasAdvancingFutureOrbitTiming)) ||
+      hasAdvancingFutureOrbitTiming ||
+      (performanceMode === "full" && (hasResolvingBurnWithdrawal || hasResolvingFireWithdrawal)) ||
       (this.getTutorialAttentionPulse?.() ?? null) !== null
     );
   }
@@ -21672,6 +21677,17 @@ export class CinematicSolarSystemRenderer {
         : this.tuning.extremeZoomUiFadeMinOpacity;
 
     return THREE.MathUtils.lerp(1, minOpacity, fadeProgress);
+  }
+
+  private getExtremeZoomBillboardOpacityMultiplier(): number {
+    const detailProgress = getShipDetailProgress(this.distance, this.tuning);
+    const fadeProgress = smoothStep(
+      this.tuning.extremeZoomUiFadeStartDetail,
+      this.tuning.extremeZoomUiFadeEndDetail,
+      detailProgress
+    );
+
+    return THREE.MathUtils.lerp(1, extremeZoomBillboardMinOpacity, fadeProgress);
   }
 
   private getExtremeZoomCelestialGhostOpacityMultiplier(): number {
@@ -25818,21 +25834,16 @@ export class CinematicSolarSystemRenderer {
       return null;
     }
 
-    const previewLaunchKey = "id" in plan ? String(plan.id) : getBurnPreviewLaunchKey(plan);
+    const previewLaunchKey = getBurnPreviewLaunchKey(plan);
     const transferArcDirection = this.getStableBurnPlanArcDirection(plan);
-    const factionId = this.getBurnPlanFactionId(plan);
-    const renderedLaunchPosition =
-      factionId === null
-        ? undefined
-        : (this.getRenderedShipMarkerWorldPosition(plan.originNodeId, factionId) ?? undefined);
 
     return createLaunchOriginRenderData({
       baseOrigin,
       destination,
-      // Follow the rendered ship while the order is a preview. The launch transition samples
-      // this same marker, so the trajectory cannot jump from a hashed orbit slot to the ship's
-      // physical position for one frame when the order becomes active.
-      capturedLaunchPosition: renderedLaunchPosition,
+      // Keep the planned departure curl fixed while the ship continues orbiting. Once Next Turn
+      // starts, captureDepartingBurnLaunchSamples replaces this presentation-only anchor with the
+      // ship's physical position so it travels around the origin orbit to the same tangent exit.
+      capturedLaunchPosition: undefined,
       launchAngle: getStableBurnTransferFieldAngle(previewLaunchKey),
       currentTurn: plan.issuedTurn,
       etaTurns: plan.etaTurns,

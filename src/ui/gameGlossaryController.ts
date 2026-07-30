@@ -83,6 +83,9 @@ export function createGameGlossaryController(
   let hoveredGlossaryToken: HTMLElement | null = null;
   let detailAnimationFrame: number | null = null;
   let detailGeneration = 0;
+  let detailSourceToken: HTMLElement | null = null;
+  let detailSourceLineKey: string | null = null;
+  const handledActivationEvents = new WeakSet<Event>();
 
   const bindRoot = (root: HTMLElement): void => {
     root.addEventListener("pointerover", handlePointerOver, true);
@@ -146,28 +149,54 @@ export function createGameGlossaryController(
   }
 
   function handleGlossaryClick(event: MouseEvent): void {
-    const glossaryId = getGlossaryToken(event.target)?.dataset["glossaryId"];
+    const token = getGlossaryToken(event.target);
+    const glossaryId = token?.dataset["glossaryId"];
 
-    if (glossaryId === undefined) {
+    if (glossaryId === undefined || token === null || handledActivationEvents.has(event)) {
+      return;
+    }
+
+    handledActivationEvents.add(event);
+
+    if (shouldPassTutorialReplayCueActivationThrough(token)) {
+      closeAll();
+      return;
+    }
+
+    if (isDetailOpenForToken(glossaryId, token)) {
+      closeAll();
       return;
     }
 
     event.preventDefault();
     event.stopImmediatePropagation();
-    openDetail(glossaryId);
+    openDetail(glossaryId, token);
   }
 
   function handleGlossaryKeydown(event: KeyboardEvent): void {
-    const glossaryId = getGlossaryToken(event.target)?.dataset["glossaryId"];
+    const token = getGlossaryToken(event.target);
+    const glossaryId = token?.dataset["glossaryId"];
 
-    if (glossaryId === undefined) {
+    if (glossaryId === undefined || token === null || handledActivationEvents.has(event)) {
       return;
     }
 
     if (event.key === "Enter" || event.key === " ") {
+      handledActivationEvents.add(event);
+
+      if (shouldPassTutorialReplayCueActivationThrough(token)) {
+        closeAll();
+        return;
+      }
+
+      if (isDetailOpenForToken(glossaryId, token)) {
+        closeAll();
+        return;
+      }
+
       event.preventDefault();
       event.stopImmediatePropagation();
-      openDetail(glossaryId);
+      openDetail(glossaryId, token);
       return;
     }
 
@@ -272,17 +301,54 @@ export function createGameGlossaryController(
     hoverPanel.style.top = `${Math.round(line.getBoundingClientRect().top)}px`;
   }
 
-  function openDetail(glossaryId: string): void {
+  function isDetailOpenForToken(glossaryId: string, token: HTMLElement): boolean {
+    const sourceLineKey = getGlossarySourceLineKey(token);
+
+    return (
+      (detailSourceToken === token ||
+        (sourceLineKey !== null && detailPanel.dataset["sourceLineKey"] === sourceLineKey)) &&
+      detailPanel.dataset["glossaryId"] === glossaryId &&
+      detailPanel.classList.contains("is-visible")
+    );
+  }
+
+  function shouldPassTutorialReplayCueActivationThrough(token: HTMLElement): boolean {
+    const cueLine = token.closest<HTMLElement>(".command-console__line--tutorial-replay-cue");
+
+    if (cueLine === null) {
+      return false;
+    }
+
+    if (cueLine.classList.contains("is-command-scrollback-review-target")) {
+      return true;
+    }
+
+    const sourceLineKey = getGlossarySourceLineKey(token);
+    return (
+      sourceLineKey !== null &&
+      detailPanel.dataset["sourceLineKey"] === sourceLineKey &&
+      detailPanel.classList.contains("is-visible")
+    );
+  }
+
+  function openDetail(glossaryId: string, sourceToken: HTMLElement): void {
     const entry = getGameGlossaryEntry(glossaryId);
 
     if (entry === undefined) {
       return;
     }
 
+    detailSourceToken = sourceToken;
+    detailSourceLineKey = getGlossarySourceLineKey(sourceToken);
     detailGeneration += 1;
     const generation = detailGeneration;
     cancelDetailAnimation();
     detailPanel.dataset["glossaryId"] = entry.id;
+    if (detailSourceLineKey === null) {
+      detailPanel.removeAttribute("data-source-line-key");
+    } else {
+      detailPanel.dataset["sourceLineKey"] = detailSourceLineKey;
+    }
     detailPanel.classList.remove("is-hidden");
     detailPanel.classList.add("is-visible", "is-typewriting");
     detailPanel.setAttribute("aria-hidden", "false");
@@ -379,9 +445,12 @@ export function createGameGlossaryController(
   }
 
   function clearDetail(): void {
+    detailSourceToken = null;
+    detailSourceLineKey = null;
     detailGeneration += 1;
     cancelDetailAnimation();
     detailPanel.removeAttribute("data-glossary-id");
+    detailPanel.removeAttribute("data-source-line-key");
     detailPanel.classList.remove("is-visible", "is-typewriting");
     detailPanel.classList.add("is-hidden");
     detailPanel.setAttribute("aria-hidden", "true");
@@ -462,6 +531,34 @@ function getGlossaryToken(target: EventTarget | null): HTMLElement | null {
   return target instanceof Element
     ? target.closest<HTMLElement>(".command-glossary-token[data-glossary-id]")
     : null;
+}
+
+function getGlossarySourceLineKey(token: HTMLElement): string | null {
+  const line = token.closest<HTMLElement>(".command-console__line");
+
+  if (line === null) {
+    return null;
+  }
+
+  const eventId = line.dataset["eventId"];
+
+  if (eventId !== undefined) {
+    return `event:${eventId}`;
+  }
+
+  const rowKey = line.dataset["rowKey"];
+
+  if (rowKey !== undefined) {
+    return `row:${rowKey}`;
+  }
+
+  const entryId = line.dataset["entryId"];
+
+  if (entryId !== undefined) {
+    return `entry:${entryId}:row:${line.dataset["rowIndex"] ?? ""}`;
+  }
+
+  return `text:${line.textContent ?? ""}`;
 }
 
 function asNode(value: EventTarget | null): Node | null {

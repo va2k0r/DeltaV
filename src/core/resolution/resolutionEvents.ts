@@ -144,6 +144,7 @@ function createPlayerFacingResolutionEvent(
         actorFactionId: event.factionId,
         nodeId: event.nodeId,
         progress: event.progress,
+        result: event.reason,
         criticality: "routine",
         sourceDebugEventTypes: [event.type],
         sourceDebugEventIndices: [eventIndex]

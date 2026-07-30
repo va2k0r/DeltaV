@@ -6,6 +6,7 @@ import {
 } from "../../src/ui/tutorial/cameraHintDisplay";
 import { shouldPanTutorialTarget } from "../../src/ui/tutorial/cameraPolicy";
 import { findFirstTutorialEnemyKillResolutionEvent } from "../../src/ui/tutorial/firstEnemyKillReplay";
+import { isTutorialSupportProductionDestinationAllowed } from "../../src/ui/tutorial/productiveBurnDestination";
 import {
   getTutorialRequiredShipSelectionRecoveryTargetKey,
   isTutorialTargetInputAllowed
@@ -43,6 +44,58 @@ import {
   shouldRestoreTutorialAutoAdvanceLock
 } from "../../src/ui/tutorial/runtimeState";
 import { getTutorialAiPlanningFactionIds } from "../../src/ui/tutorial/turnControl";
+
+describe("tutorial support production destinations", () => {
+  const emptyAlternateShipyard = {
+    originNodeId: "deimos_node",
+    destinationNodeId: "titan_node",
+    contestedShipyardNodeId: "mars_node",
+    destinationType: "shipyard",
+    isDestinationContested: false,
+    hasOpponentShip: false,
+    wouldPlayerStack: false
+  };
+
+  it("accepts an empty alternate shipyard", () => {
+    expect(isTutorialSupportProductionDestinationAllowed(emptyAlternateShipyard)).toBe(true);
+  });
+
+  it("rejects the enemy shipyard named as the contested lesson target", () => {
+    expect(
+      isTutorialSupportProductionDestinationAllowed({
+        ...emptyAlternateShipyard,
+        destinationNodeId: "mars_node"
+      })
+    ).toBe(false);
+  });
+
+  it("rejects destinations that cannot produce an uncontested support ship", () => {
+    expect(
+      isTutorialSupportProductionDestinationAllowed({
+        ...emptyAlternateShipyard,
+        hasOpponentShip: true
+      })
+    ).toBe(false);
+    expect(
+      isTutorialSupportProductionDestinationAllowed({
+        ...emptyAlternateShipyard,
+        isDestinationContested: true
+      })
+    ).toBe(false);
+    expect(
+      isTutorialSupportProductionDestinationAllowed({
+        ...emptyAlternateShipyard,
+        destinationType: "barren"
+      })
+    ).toBe(false);
+    expect(
+      isTutorialSupportProductionDestinationAllowed({
+        ...emptyAlternateShipyard,
+        wouldPlayerStack: true
+      })
+    ).toBe(false);
+  });
+});
 
 describe("tutorial row modules", () => {
   it("keeps arrival pans active after the opening turn", () => {

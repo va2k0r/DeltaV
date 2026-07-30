@@ -55,6 +55,16 @@ function createPlayerFacingResolutionRow(
         ]
       };
     case "WORK_SHIPYARD":
+      if (event.result === "captured-progress") {
+        return {
+          parts: [
+            { text: numberPrefix },
+            { text: "CAPTURE", className: factionClass },
+            { text: `  ${nodeName}  Shipyard ${event.progress ?? "?"}/5` }
+          ]
+        };
+      }
+
       return {
         parts: [
           { text: numberPrefix },
@@ -90,7 +100,7 @@ function createPlayerFacingResolutionRow(
           { text: numberPrefix },
           { text: "BURN", className: factionClass },
           {
-            text: `  ${formatResolutionNodeName(content, event.originNodeId)} -> ${formatResolutionNodeName(content, event.destinationNodeId)}  T+${event.etaTurns ?? "?"}  -${event.cost ?? "?"} ΔV`
+            text: `  ${formatResolutionNodeName(content, event.originNodeId)} -> ${formatResolutionNodeName(content, event.destinationNodeId)}  T+${event.etaTurns ?? "?"}  -${event.cost ?? "?"}\u00a0ΔV`
           }
         ]
       };
@@ -125,6 +135,26 @@ function createPlayerFacingResolutionRow(
         ]
       };
     case "SIGNAL_LOST":
+      if (event.result === "MISSILE_SOLUTION_BROKEN") {
+        return {
+          parts: [
+            { text: numberPrefix },
+            { text: "MISSILE SOLUTION BROKEN", className: factionClass },
+            { text: ` — TARGET ESCAPED at ${nodeName}` }
+          ]
+        };
+      }
+
+      if (event.result === "MISSILE_MISSED") {
+        return {
+          parts: [
+            { text: numberPrefix },
+            { text: "MISSILE MISSED", className: factionClass },
+            { text: ` — TARGET SAFE at ${nodeName}` }
+          ]
+        };
+      }
+
       return {
         parts: [
           { text: numberPrefix },

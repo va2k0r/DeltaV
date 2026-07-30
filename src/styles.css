@@ -1665,6 +1665,17 @@ select {
     0 1px 8px rgba(0, 0, 0, 0.48);
 }
 
+.command-console__line--linked-event.is-command-scrollback-review-target > span {
+  color: inherit;
+  text-shadow: inherit;
+}
+
+.command-console__line--tutorial-replay-cue.is-command-scrollback-review-target
+  .command-console__crew-lost-cue {
+  animation: none;
+  opacity: 1;
+}
+
 .command-console__line--linked-event.is-command-scrub-primed {
   color: rgba(241, 248, 255, 0.94);
   text-shadow:

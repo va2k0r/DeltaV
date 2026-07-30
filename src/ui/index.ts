@@ -141,6 +141,7 @@ import {
   sampleFixedTimelineReviewPosition
 } from "./replayPacing";
 import { normalizeCommandLogWheelDelta } from "./commandLogScroll";
+import { shiftPlanningTimerDeadlinesAfterPause } from "./planningTimerPause";
 import {
   countRemainingShips,
   createMapOutcomeAudit,
@@ -181,6 +182,8 @@ import {
 } from "./tutorial/cameraHintDisplay";
 import { shouldPanTutorialTarget } from "./tutorial/cameraPolicy";
 import { findFirstTutorialEnemyKillResolutionEvent } from "./tutorial/firstEnemyKillReplay";
+import { ensureTutorialOpponentFactionState } from "./tutorial/opponentFaction";
+import { isTutorialSupportProductionDestinationAllowed } from "./tutorial/productiveBurnDestination";
 import {
   getTutorialRequiredShipSelectionRecoveryTargetKey,
   isTutorialTargetInputAllowed
@@ -189,6 +192,8 @@ import { isCinematicGameplayInteractionLocked } from "./input/interactionLock";
 import {
   createTutorialRuntimeDiagnosticDump,
   createTutorialRuntimeState,
+  driveTutorialBurnToDestination,
+  findTrackedTutorialMandatoryLaunchBurn,
   findTutorialQueuedFireOrder,
   getTutorialMandatoryLaunchResumePhase,
   recoverTutorialQueuedFireLessonAfterCancellation,
@@ -1207,6 +1212,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let fallbackBeatSyncStartedAtMs = performance.now();
   let planningTimerState: PlanningTimerState = createDisabledPlanningTimerState(0);
   let planningTimerFrame: number | null = null;
+  let planningTimerPausedAtMs: number | null = null;
   let hasConsumedZeroTimerInitialCountdown = false;
   let zeroTimerAutoRestartTimer: number | null = null;
   let isZeroTimerAutoRestarting = false;
@@ -1234,8 +1240,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   const commandLogTimeReviewDurations = {
     replayTurnMs: fixedTimelineReviewReplayTurnDurationMs
   };
-  // Temporary development gate: contextual tutorial/glossary interactions currently own log clicks.
-  const commandLogTemporalReviewTemporarilyDisabled = true;
   const commandLogReplayFocusBeforePlaybackMs = 340;
   const commandScrollbackLineSelector =
     ".command-console__line--linked-event[data-entry-id], .command-console__line--linked-event[data-row-key]";
@@ -1378,7 +1382,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   function restartPlanningTimerForCurrentTurn(
     options: Readonly<{ authority?: PlanningTimerAuthority; deadlineAtMs?: number }> = {}
   ): void {
+    const shouldRemainPausedForGameMenu = isInGameMenuActive;
     stopPlanningTimerLoop();
+    planningTimerPausedAtMs = shouldRemainPausedForGameMenu ? performance.now() : null;
 
     if (!isPlanningTimerEnabledForCurrentState()) {
       planningTimerState = createDisabledPlanningTimerState(state.turn);
@@ -1418,6 +1424,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   function stopPlanningTimer(): void {
     stopPlanningTimerLoop();
+    planningTimerPausedAtMs = null;
     planningTimerState = createDisabledPlanningTimerState(state.turn);
     renderPlanningTimerPanel();
   }
@@ -1543,7 +1550,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function startPlanningTimerLoop(): void {
-    if (planningTimerFrame !== null) {
+    if (planningTimerFrame !== null || planningTimerPausedAtMs !== null) {
       return;
     }
 
@@ -1561,6 +1568,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   function updatePlanningTimerFrame(now: number): void {
     planningTimerFrame = null;
+
+    if (planningTimerPausedAtMs !== null) {
+      renderPlanningTimerPanel();
+      return;
+    }
 
     if (planningTimerState.phase === "planning") {
       const remainingMs = getPlanningTimerRemainingMs(now);
@@ -1636,6 +1648,35 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   function getPlanningTimerRemainingMs(now = performance.now()): number {
     return Math.max(0, planningTimerState.deadlineAtMs - now);
+  }
+
+  function pausePlanningTimerForGameMenu(): void {
+    if (planningTimerPausedAtMs !== null) {
+      return;
+    }
+
+    planningTimerPausedAtMs = performance.now();
+    stopPlanningTimerLoop();
+  }
+
+  function resumePlanningTimerAfterGameMenu(): void {
+    if (planningTimerPausedAtMs === null) {
+      return;
+    }
+
+    const pausedDurationMs = performance.now() - planningTimerPausedAtMs;
+    const shiftedDeadlines = shiftPlanningTimerDeadlinesAfterPause(
+      planningTimerState.phase,
+      planningTimerState,
+      pausedDurationMs
+    );
+    planningTimerPausedAtMs = null;
+    planningTimerState = {
+      ...planningTimerState,
+      ...shiftedDeadlines
+    };
+    renderPlanningTimerPanel();
+    startPlanningTimerLoop();
   }
 
   function renderPlanningTimerPanel(): void {
@@ -2188,6 +2229,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
+    pausePlanningTimerForGameMenu();
     isInGameMenuActive = true;
     gameMenuScreen = "main";
     gameMenuMainActions = null;
@@ -2204,6 +2246,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     isInGameMenuActive = false;
+    resumePlanningTimerAfterGameMenu();
     gameMenuScreen = "main";
     renderGameMenu();
     cinematicRenderer?.setCameraInputEnabled(true);
@@ -6943,6 +6986,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       tutorial.productiveBurnPromptStartedAt = startedAt;
       tutorial.productiveBurnReselectionStartedAt = null;
       const shouldUseShipyardHintPulse =
+        tutorial.shipyardContestedRecoveryActive !== true &&
         tutorial.productiveBurnOriginNodeId === tutorialEnemyFireNodeId;
       const promptDelayMs = shouldUseShipyardHintPulse
         ? tutorialProductiveShipyardHintDelayMs
@@ -7036,13 +7080,22 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   function getTutorialProductiveBurnPromptTargetKeys(originNodeId: string): readonly string[] {
     const originType = content.nodes.find((node) => node.id === originNodeId)?.type ?? "barren";
     const recoveryNeedsShipyard = tutorialState?.shipyardContestedRecoveryActive === true;
+    const contestedShipyardNodeId =
+      recoveryNeedsShipyard && tutorialState !== null
+        ? getTutorialShipyardContestedTargetNodeId(tutorialState)
+        : null;
 
     return content.nodes
       .flatMap((node) => {
         if (
           node.id === originNodeId ||
           !isSuggestedBurnGuidanceNode(node) ||
-          (recoveryNeedsShipyard && node.type !== "shipyard") ||
+          (recoveryNeedsShipyard &&
+            !isTutorialSupportProductionShipyardDestination(
+              originNodeId,
+              node.id,
+              contestedShipyardNodeId
+            )) ||
           (node.type !== "tritium" && node.type !== "shipyard")
         ) {
           return [];
@@ -7603,12 +7656,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       line.tabIndex = 0;
       line.setAttribute("role", "button");
       line.setAttribute("aria-label", createCommandScrollbackRowLabel(metadata));
-      line.title =
-        metadata.kind === "live"
-          ? metadata.rowKey?.startsWith("warning:") === true
-            ? "Focus this warning"
-            : "Focus this command"
-          : "Review this log point";
     }
 
     if (metadata.rowKey !== undefined) {
@@ -9321,6 +9368,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     cancelCommandLogTimeReviewAnimation();
+    setCommandScrollbackPlayingEvent(targetEventId);
+    reviewState.eventId = targetEventId;
+    reviewState.activeCommandRowKey = activeCommandRowKey;
     const preserveCurrentCameraAndFocus = options.preserveCurrentCameraAndFocus === true;
 
     if (preserveCurrentCameraAndFocus) {
@@ -9371,9 +9421,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     replayCancelRequested = false;
     replayIndicator.textContent = isRewind ? "REWIND" : "REPLAY";
     replayIndicator.classList.remove("is-hidden");
-    setCommandScrollbackPlayingEvent(targetEventId);
-    reviewState.eventId = targetEventId;
-    reviewState.activeCommandRowKey = activeCommandRowKey;
     reviewState.transitionIndex = Math.min(
       Math.floor(clampedTarget),
       Math.max(0, replayTape.transitions.length - 1)
@@ -9795,11 +9842,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function isCommandLogTemporalReviewEnabled(): boolean {
-    return (
-      !commandLogTemporalReviewTemporarilyDisabled &&
-      !isTutorialCommandLogLocked() &&
-      replayTape.transitions.length > 0
-    );
+    return !isTutorialCommandLogLocked() && replayTape.transitions.length > 0;
   }
 
   function handleCommandLogTransportHotkey(event: KeyboardEvent): boolean {
@@ -11475,7 +11518,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         originNodeId === tutorial.productiveBurnOriginNodeId &&
         destinationNodeId !== originNodeId &&
         (tutorial.shipyardContestedRecoveryActive !== true ||
-          content.nodes.find((node) => node.id === destinationNodeId)?.type === "shipyard")
+          isTutorialSupportProductionShipyardDestination(
+            originNodeId,
+            destinationNodeId,
+            getTutorialShipyardContestedTargetNodeId(tutorial)
+          ))
       );
     }
 
@@ -12287,49 +12334,24 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   function recoverTutorialMandatoryLaunchAutoDestination(
     tutorial: TutorialRuntimeState
   ): string | null {
-    if (tutorial.tutorialBurnDestinationNodeId !== null) {
+    if (tutorial.phase !== "mandatoryLaunchQueued") {
       return tutorial.tutorialBurnDestinationNodeId;
     }
 
-    if (tutorial.phase !== "mandatoryLaunchQueued") {
-      return null;
-    }
-
-    const pendingFromShipyard = state.pendingBurnOrders.find((order) => {
-      return order.factionId === "player" && order.originNodeId === tutorial.shipyardLessonNodeId;
+    const trackedBurn = findTrackedTutorialMandatoryLaunchBurn({
+      burns: [...state.pendingBurnOrders, ...state.activeBurnTransits],
+      activeMandatoryLaunchId: tutorial.activeMandatoryLaunchId,
+      cachedDestinationNodeId: tutorial.tutorialBurnDestinationNodeId,
+      shipyardLessonNodeId: tutorial.shipyardLessonNodeId,
+      currentTurn: state.turn
     });
-    const pendingBurn =
-      pendingFromShipyard ??
-      state.pendingBurnOrders.find((order) => {
-        return order.factionId === "player";
-      });
 
-    if (pendingBurn !== undefined) {
-      tutorial.tutorialBurnDestinationNodeId = pendingBurn.destinationNodeId;
-      tutorial.tutorialBurnArrivalTurn = pendingBurn.arrivalTurn;
-      return pendingBurn.destinationNodeId;
+    if (trackedBurn !== undefined) {
+      tutorial.tutorialBurnDestinationNodeId = trackedBurn.destinationNodeId;
+      tutorial.tutorialBurnArrivalTurn = trackedBurn.arrivalTurn;
     }
 
-    const transitFromShipyard = state.activeBurnTransits.find((transit) => {
-      return (
-        transit.factionId === "player" &&
-        transit.originNodeId === tutorial.shipyardLessonNodeId &&
-        transit.arrivalTurn >= state.turn
-      );
-    });
-    const activeTransit =
-      transitFromShipyard ??
-      state.activeBurnTransits.find((transit) => {
-        return transit.factionId === "player" && transit.arrivalTurn >= state.turn;
-      });
-
-    if (activeTransit === undefined) {
-      return null;
-    }
-
-    tutorial.tutorialBurnDestinationNodeId = activeTransit.destinationNodeId;
-    tutorial.tutorialBurnArrivalTurn = activeTransit.arrivalTurn;
-    return activeTransit.destinationNodeId;
+    return tutorial.tutorialBurnDestinationNodeId;
   }
 
   function isTutorialMandatoryLaunchAutoAdvancePending(): boolean {
@@ -13366,6 +13388,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     const line = getCommandScrollbackLineFromPointer(event);
+    commandGlossaryController.closeAll();
 
     if (handleTutorialFirstEnemyKillReplayCueInput(line)) {
       event.preventDefault();
@@ -13424,6 +13447,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     const line = getCommandScrollbackLine(event.target);
+    commandGlossaryController.closeAll();
 
     if (handleTutorialFirstEnemyKillReplayCueInput(line)) {
       event.preventDefault();
@@ -13489,6 +13513,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         });
         showTutorialFirstEnemyKillReplayFollowupHint(tutorial);
         completeTutorialFirstEnemyKillReplayCue();
+        scrollCommandTranscriptToEnd();
         return;
       }
 
@@ -13528,13 +13553,17 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     pushLiveTutorialTimelineRows(
       [
         {
-          parts: [{ text: "Left click the blinking log line to rewind to that point in time." }],
+          parts: [
+            {
+              text: "Left click the blinking log line a second time to rewind to that point in time."
+            }
+          ],
           className: tutorialLiveHintClassName,
           key: `${key}:rewind`
         },
         createTutorialSpacerRow(`${key}:spacer`),
         {
-          parts: [{ text: "Left click the blinking log line again to resume." }],
+          parts: [{ text: "Left click the blinking log line a third time to resume." }],
           className: tutorialLiveHintClassName,
           key: `${key}:replay`
         }
@@ -14614,6 +14643,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     hasRenderedLiveCommandRows = false;
     shouldTypeNextLiveCommandBlock = true;
     planningTimerState = createDisabledPlanningTimerState(state.turn);
+    planningTimerPausedAtMs = null;
     stopPlanningTimerLoop();
     setCommandLogReviewPromptDimmed(false);
     previousLiveDynamicCommandRows = [];
@@ -15235,23 +15265,25 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     updateInteractionLocks();
     updateTutorialCommandConsoleWithTypewriter();
 
-    const remainingTurns =
-      tutorial.tutorialBurnArrivalTurn === null
-        ? maxTurns
-        : Math.max(1, Math.min(maxTurns, tutorial.tutorialBurnArrivalTurn - state.turn + 1));
-
     try {
-      for (let index = 0; index < remainingTurns; index += 1) {
-        if (
-          tutorialState !== tutorial ||
-          tutorial.phase !== expectedPhase ||
-          hasTutorialBurnReachedDestination(tutorial, destinationNodeId)
-        ) {
-          break;
-        }
+      await driveTutorialBurnToDestination({
+        maxTurns,
+        observe: () => {
+          if (expectedPhase === "mandatoryLaunchQueued") {
+            recoverTutorialMandatoryLaunchAutoDestination(tutorial);
+          }
 
-        await resolveTutorialAutoFramedTurn();
-      }
+          return {
+            turn: state.turn,
+            isActive: tutorialState === tutorial && tutorial.phase === expectedPhase,
+            hasReachedDestination:
+              tutorialState === tutorial &&
+              tutorial.phase === expectedPhase &&
+              hasTutorialBurnReachedDestination(tutorial, destinationNodeId)
+          };
+        },
+        advanceTurn: resolveTutorialAutoFramedTurn
+      });
     } finally {
       if (tutorialState === tutorial) {
         tutorial.inputLocked = false;
@@ -17102,6 +17134,28 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     burnCost: number;
   }>;
 
+  function isTutorialSupportProductionShipyardDestination(
+    originNodeId: string,
+    destinationNodeId: string,
+    contestedShipyardNodeId: string | null
+  ): boolean {
+    const destinationNode = content.nodes.find((node) => node.id === destinationNodeId);
+
+    if (destinationNode === undefined) {
+      return false;
+    }
+
+    return isTutorialSupportProductionDestinationAllowed({
+      originNodeId,
+      destinationNodeId,
+      contestedShipyardNodeId,
+      destinationType: destinationNode.type,
+      isDestinationContested: isSnapshotNodeContested(destinationNodeId),
+      hasOpponentShip: hasFactionShipAtNode(state, destinationNodeId, "opponent"),
+      wouldPlayerStack: wouldPlayerStackAtDestination(destinationNodeId)
+    });
+  }
+
   function findTutorialSupportShipyardBurnOption(
     contestedNodeId: string
   ): TutorialSupportShipyardBurnOption | null {
@@ -17117,10 +17171,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       .flatMap((occupancy) => {
         return content.nodes.flatMap((node) => {
           if (
-            node.id === occupancy.nodeId ||
-            node.id === contestedNodeId ||
-            node.type !== "shipyard" ||
-            wouldPlayerStackAtDestination(node.id)
+            !isTutorialSupportProductionShipyardDestination(
+              occupancy.nodeId,
+              node.id,
+              contestedNodeId
+            )
           ) {
             return [];
           }
@@ -18426,21 +18481,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function ensureTutorialOpponentFaction(nextState: GameState): GameState {
-    if (nextState.factions.some((faction) => faction.id === "opponent")) {
-      return {
-        ...nextState,
-        factionDv: {
-          ...nextState.factionDv,
-          opponent: Math.max(getFactionDv(nextState, "opponent"), 50)
-        },
-        factions: nextState.factions.map((faction) => {
-          return faction.id === "opponent"
-            ? { ...faction, displayName: "ENEMY", controlType: "human" }
-            : faction;
-        })
-      };
-    }
-
     const opponentFaction: FactionIdentity = {
       id: "opponent",
       displayName: "ENEMY",
@@ -18449,14 +18489,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       controlType: "human"
     };
 
-    return {
-      ...nextState,
-      factions: [...nextState.factions, opponentFaction],
-      factionDv: {
-        ...nextState.factionDv,
-        opponent: 50
-      }
-    };
+    return ensureTutorialOpponentFactionState(nextState, opponentFaction, 50);
   }
 
   function withTutorialOccupancy(
