@@ -371,3 +371,8 @@ The 2079 Saturn incident is the first confirmed use of a registered ship weapon 
 registered vessel. No fixed duration is canonical for the conflict that follows. Match length,
 turn count, and provisional development estimates must not be converted into an in-world campaign
 duration.
+
+Player-facing copy calls every simulated position an `orbit`, always in lowercase. `node` is a
+deprecated internal identifier and never appears in the log, tutorial, hover copy, or reports.
+Economic copy names the actual site or facility (tritium plant, shipyard, yard, access); it never
+uses `production orbit`.

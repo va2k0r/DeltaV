@@ -171,7 +171,7 @@ export const worldLoreGlossaryEntries = [
       "Tritium is never mined as a primordial seam: its 12.3-year half-life erased those long ago.",
       "Inside the plant, a breeder blanket captures reactor neutrons in lithium-6 and returns the resulting tritium to the fuel loop.",
       "The plant must make slightly more tritium than its reactors burn; that surplus starts new reactors and fuels ships.",
-      "TRITIUM nodes are production plants and refineries, not holes full of radioactive hydrogen."
+      "Tritium sites are production plants and refineries, not holes full of radioactive hydrogen."
     ]
   },
   {

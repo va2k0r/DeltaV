@@ -820,7 +820,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   shipModelSelect.value = "ring-hex";
 
   const focusSelect = document.createElement("select");
-  focusSelect.ariaLabel = "Focus body or node";
+  focusSelect.ariaLabel = "Focus body or orbit";
   focusSelect.autocomplete = "off";
 
   const aiVsAiButton = document.createElement("button");
@@ -1339,7 +1339,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     const matchState = postMatchReportText === null ? "" : " | MATCH ENDED";
     const beautyState = isBeautyModeActive ? " | BEAUTY · CLEAN UI · SLOW PAN/ZOOM" : "";
     syncFactionColorVariables();
-    status.textContent = `Turn ${snapshot.turn} | ΔV ${playerDv}${projectedDv} | ${snapshot.nodes.length} active nodes | ${selectedMapPreset.statusLabel}${burnState}${fireState}${launchState}${matchState}${beautyState}`;
+    status.textContent = `Turn ${snapshot.turn} | ΔV ${playerDv}${projectedDv} | ${snapshot.nodes.length} active orbits | ${selectedMapPreset.statusLabel}${burnState}${fireState}${launchState}${matchState}${beautyState}`;
     updateInteractionLocks();
     updateDebugPanel();
     updateCommandConsoleModeControls();
@@ -8974,7 +8974,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         "",
         "The guided operation has concluded.",
         `Final turn: ${snapshot.turn}`,
-        `Active nodes: ${snapshot.nodes.length}`
+        `Active orbits: ${snapshot.nodes.length}`
       ].join("\n")
     );
     updateStatus();
@@ -12131,7 +12131,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     if (isSnapshotNodeContested(originNodeId)) {
-      return "NODE CONTESTED";
+      return "orbit CONTESTED";
     }
 
     if (
@@ -17438,7 +17438,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           parts: [
             { text: "Ships occupying a " },
             { text: "CONTESTED", className: "command-console__event-contested" },
-            { text: " node cannot " },
+            { text: " orbit cannot " },
             { text: "EVADE", className: getCommandFactionClass("opponent") },
             { text: "." }
           ],

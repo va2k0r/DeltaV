@@ -216,8 +216,8 @@ function formatVictoryRecoveryTritiumAudit(
 }
 
 function formatVictoryRecoveryThreat(threat: FactionRecoveryKnownThreat): string {
-  const node = threat.nodeId === undefined ? "" : ` node ${threat.nodeId}`;
-  return `${threat.kind}${node} T${threat.eventTurn} projected ${threat.projectedDvAtEvent} cost ${threat.cost} ${threat.status} ${threat.reason}`;
+  const orbit = threat.nodeId === undefined ? "" : ` orbit ${threat.nodeId}`;
+  return `${threat.kind}${orbit} T${threat.eventTurn} projected ${threat.projectedDvAtEvent} cost ${threat.cost} ${threat.status} ${threat.reason}`;
 }
 
 function createVictoryEvaluationState(recoveryState: GameState): GameState {

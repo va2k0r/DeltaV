@@ -71,7 +71,7 @@ const mechanicGlossaryEntries = [
     aliases: ["LEFT CLICK", "LEFT-CLICK"],
     short: "Select once; when a valid preview is visible, confirm the proposed order.",
     detail: [
-      "A single LEFT CLICK selects a ship or node. With a valid BURN or FIRE preview already visible, it confirms and queues that order.",
+      "A single LEFT CLICK selects a ship or orbit. With a valid BURN or FIRE preview already visible, it confirms and queues that order.",
       "The log records the queued command before EXECUTE, so its ETA, destination and projected ΔV cost can still be inspected."
     ]
   },
@@ -89,7 +89,7 @@ const mechanicGlossaryEntries = [
     id: "double-click",
     label: "DOUBLE CLICK",
     aliases: ["DOUBLE CLICK", "DOUBLE-CLICK"],
-    short: "Focus the camera on the selected body, node, ship or trajectory.",
+    short: "Focus the camera on the selected body, orbit, ship or trajectory.",
     detail: [
       "DOUBLE CLICK changes only camera focus. It never issues a gameplay order or changes simulation state.",
       "Single LEFT CLICK remains selection; DOUBLE CLICK is the deliberate focus gesture."
@@ -122,7 +122,7 @@ const mechanicGlossaryEntries = [
     short: "Change camera distance toward the current focus or screen centre.",
     detail: [
       "ZOOM changes visual scale only.",
-      "It cannot alter ORBIT geometry, BURN cost, FIRE timing or selection state."
+      "It cannot alter orbit geometry, BURN cost, FIRE timing or selection state."
     ]
   },
   {
@@ -149,7 +149,7 @@ const mechanicGlossaryEntries = [
     id: "select",
     label: "SELECT",
     aliases: ["SELECT", "SELECTS", "SELECTED", "SELECTING", "SELECTION"],
-    short: "Choose the ship, node or command that subsequent input will address.",
+    short: "Choose the ship, orbit or command that subsequent input will address.",
     detail: [
       "SELECT establishes interaction context without resolving an action.",
       "The selected target may expose BURN or FIRE previews; only confirmation queues an order."
@@ -179,7 +179,7 @@ const mechanicGlossaryEntries = [
     id: "destination",
     label: "DESTINATION",
     aliases: ["DESTINATION", "DESTINATIONS"],
-    short: "The node where a valid BURN will arrive or a FIRE solution expects its target.",
+    short: "The orbit where a valid BURN will arrive or a FIRE solution expects its target.",
     detail: [
       "A DESTINATION must be reachable under current route, occupancy, protection and ΔV rules.",
       "Selecting it previews; confirming it queues."
@@ -189,7 +189,7 @@ const mechanicGlossaryEntries = [
     id: "origin",
     label: "ORIGIN",
     aliases: ["ORIGIN", "ORIGINS"],
-    short: "The node or transfer state from which the active ship issues its order.",
+    short: "The orbit or transfer state from which the active ship issues its order.",
     detail: [
       "ORIGIN determines the starting geometry and gravity modifier.",
       "The queued order remains attached to its issuing SHIP."
@@ -271,10 +271,10 @@ const mechanicGlossaryEntries = [
     label: "INTERCEPT",
     aliases: ["INTERCEPT", "INTERCEPTS", "INTERCEPTED", "INTERCEPTING"],
     short:
-      "A BURN against a moving ship that cancels its transfer and creates a temporary contested node.",
+      "A BURN against a moving ship that cancels its transfer and creates a temporary contested orbit.",
     detail: [
-      "INTERCEPT targets a ship already in transfer. A successful intercept cancels that transfer and places the target and interceptor in a temporary CONTESTED intercept node.",
-      "No WORK is possible there. The temporary node disappears when one ship BURNS out or is destroyed."
+      "INTERCEPT targets a ship already in transfer. A successful intercept cancels that transfer and places the target and interceptor in a temporary CONTESTED orbit.",
+      "No WORK is possible there. The temporary orbit disappears when one ship BURNS out or is destroyed."
     ]
   },
   {
@@ -283,7 +283,7 @@ const mechanicGlossaryEntries = [
     aliases: ["CONTESTED", "CONTEST", "CONTESTS", "CONTESTING"],
     short: "Two opposing factions share an orbit: both are physically locked and pay upkeep.",
     detail: [
-      "Two FACTIONS occupy one NODE. Physical lock, not damage; maximum one SHIP per faction.",
+      "Two FACTIONS occupy the same orbit. Physical lock, not damage; maximum one SHIP per faction.",
       "2 ΔV upkeep per contested ship and faction, paid first each TURN.",
       "WORK, FIRE, EVADE and INTERCEPT are blocked.",
       "STAY and BURN OUT remain legal.",
@@ -351,12 +351,12 @@ const mechanicGlossaryEntries = [
     short: "The automatic productive outcome when an eligible ship receives no conflicting action.",
     detail: [
       "Automatic productive SHIP outcome.",
-      "Requires a productive NODE, no contest, presence before movement, and no BURN, FIRE or EVADE.",
+      "Requires an operating tritium plant or SHIPYARD, no contest, presence before movement, and no BURN, FIRE or EVADE.",
       "TRITIUM produces +2 ΔV during the economy phase.",
       "SHIPYARD advances construction by 1/5.",
       "A ship arriving by BURN this TURN waits until the following turn.",
-      "CONTESTED state, active order, EVADE, BARREN and PROTECTED nodes deny work.",
-      "A pre-existing worker stops if the node becomes contested before the economy phase."
+      "CONTESTED state, active order, EVADE, BARREN and PROTECTED locations deny work.",
+      "A pre-existing worker stops if the site becomes contested before the economy phase."
     ]
   },
   {
@@ -376,7 +376,7 @@ const mechanicGlossaryEntries = [
     short: "The faction-wide reserve spent on movement, evasion and contested upkeep.",
     detail: [
       "ΔV is global to the faction, not stored on individual ships. Every BURN draws from the same reserve used by automatic EVADE and CONTESTED upkeep.",
-      "WORK at TRITIUM nodes replenishes the reserve. Spending ΔV is therefore spending future mobility and survival, even when the immediate order is legal."
+      "WORK at tritium plants replenishes the reserve. Spending ΔV is therefore spending future mobility and survival, even when the immediate order is legal."
     ]
   },
   {
@@ -398,11 +398,11 @@ const mechanicGlossaryEntries = [
     id: "shipyard",
     label: "SHIPYARD",
     aliases: ["SHIPYARD", "SHIPYARDS"],
-    short: "A productive node that assembles one new ship after five eligible WORK turns.",
+    short: "A shipbuilding facility that assembles one new ship after five eligible WORK turns.",
     detail: [
-      "Productive NODE. Converts time into one new SHIP.",
+      "A SHIPYARD converts time into one new SHIP.",
       "Progress increases by 1/5 per eligible WORK turn.",
-      "Progress belongs to the node, not the faction. It can be captured and continued.",
+      "Progress belongs to the yard, not the faction. It can be captured and continued.",
       "BURN, FIRE, EVADE, CONTESTED state or same-turn ARRIVAL prevents progress.",
       "Stored hull modules are mated around a docking spine; the incumbent supplies fuel and one reserve crew.",
       "At 5/5, the assembled ship remains at the yard and the incumbent performs MANDATORY LAUNCH.",
@@ -415,19 +415,20 @@ const mechanicGlossaryEntries = [
     aliases: ["PROTECTED"],
     short: "An orbit where warfare and contesting are disabled.",
     detail: [
-      "PROTECTED nodes represent the enforced Earth-Moon corridor. They cannot be contested; weapons are offline.",
+      "PROTECTED orbits represent the enforced Earth-Moon corridor. They cannot be contested; weapons are offline.",
       "Here law and force share a clock: launches are registered, nuclear packages remain safed and interceptors are already present.",
       "Outside the corridor the same law persists, but a public enforcement ship may be months or years away.",
-      "Protection is a node rule and does not extend to ordinary destinations."
+      "Protection applies only within designated orbits and does not extend to ordinary destinations."
     ]
   },
   {
     id: "barren",
     label: "BARREN",
     aliases: ["BARREN", "STAGING"],
-    short: "A non-productive node whose value is position, timing and access.",
+    short:
+      "An orbit without a tritium plant or shipyard; its value is position, timing and access.",
     detail: [
-      "BARREN nodes cannot WORK, but ships can occupy them, FIRE from them, EVADE there, contest them and use them as transfer or INTERCEPT positions.",
+      "A BARREN orbit cannot support WORK, but ships can occupy it, FIRE from it, EVADE there, contest it and use it for TRANSFER or INTERCEPT.",
       "A barren orbit should matter because it changes a decision: route timing, missile geometry, support or escape."
     ]
   },
@@ -490,22 +491,12 @@ const mechanicGlossaryEntries = [
   },
   {
     id: "orbit",
-    label: "ORBIT",
-    aliases: ["ORBIT", "ORBITS", "ORBITAL"],
+    label: "orbit",
+    aliases: ["orbit", "orbits", "orbital"],
     short: "The moving playable position attached to a planet or moon.",
     detail: [
-      "Commands target playable ORBIT nodes, not the visual planet or moon itself. Bodies provide gravity and moving spatial reference.",
+      "Commands target an orbit, not the visual planet or moon itself. Bodies provide gravity and moving spatial reference.",
       "Orbital phase changes transfer timing and cost, but camera position and visual scale never change the simulation."
-    ]
-  },
-  {
-    id: "node",
-    label: "NODE",
-    aliases: ["NODE", "NODES"],
-    short: "A playable orbit that can hold ships, production or a contested lock.",
-    detail: [
-      "A NODE is the simulation location attached to a body. Nodes can be TRITIUM, SHIPYARD, BARREN or PROTECTED.",
-      "Bodies, labels and effects are presentation; occupancy, production and order legality belong to the headless node state."
     ]
   },
   {
@@ -552,7 +543,7 @@ const mechanicGlossaryEntries = [
     short: "Be the only faction with a strategically viable path to continuing tritium access.",
     detail: [
       "VICTORY occurs when only one faction remains tritium-viable within the short operational window.",
-      "The check includes production, movement, contesting and imminent shipyard output. It is not a score threshold or a requirement to occupy every node."
+      "The check includes production, movement, contesting and imminent shipyard output. It is not a score threshold or a requirement to occupy every orbit."
     ]
   },
   {
@@ -585,7 +576,7 @@ const mechanicGlossaryEntries = [
     id: "production",
     label: "PRODUCTION",
     aliases: ["PRODUCTION", "PRODUCES", "PRODUCE", "PROGRESS"],
-    short: "The economy-phase result of eligible WORK at tritium nodes or shipyards.",
+    short: "The economy-phase result of eligible WORK at tritium plants or shipyards.",
     detail: [
       "PRODUCTION happens after actions. TRITIUM work adds ΔV; SHIPYARD work advances assembly by one step.",
       "BURN, FIRE, EVADE, same-turn arrival and CONTESTED state can all prevent a ship from contributing production that turn."
@@ -862,7 +853,7 @@ function createDynamicGameGlossaryEntry(id: string): GameGlossaryEntry | undefin
       detail: [
         `${raw} is stored SHIPYARD assembly progress.`,
         "The numerator is completed eligible WORK. The denominator is completion.",
-        "Progress belongs to the NODE and can be captured."
+        "Progress belongs to the yard and can be captured."
       ]
     };
   }
@@ -967,7 +958,7 @@ function getOrdinaryWordGlossaryCopy(
       on: {
         short: "Locative relation: attached to, occupying or acting upon the following object.",
         detail: [
-          "ON identifies the surface, node or target receiving the described relation.",
+          "ON identifies the surface, orbit or target receiving the described relation.",
           "The following game term supplies the rule."
         ]
       },

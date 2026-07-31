@@ -1283,7 +1283,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("continueTutorialShipyardContestedFireToEnemyDestroyed");
     expect(uiSource).toContain("tutorial.shipyardContestedRecoveryActive = true;");
     expect(uiSource).toContain('{ text: "Ships occupying a " }');
-    expect(uiSource).toContain('{ text: " node cannot " }');
+    expect(uiSource).toContain('{ text: " orbit cannot " }');
     expect(uiSource).toContain('"tutorial:shipyard-contested-evade-unavailable:before"');
     expect(uiSource).toContain('"tutorial:shipyard-contested-evade-unavailable:after"');
     expect(uiSource).toContain(" orbit to force enemy ships to either ");
