@@ -860,7 +860,10 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(styles).toContain("--execute-question-pulse");
     expect(uiSource).toContain("--execute-question-blink-opacity");
     expect(uiSource).toContain('launch.textContent = "MANDATORY LAUNCH"');
-    expect(resolutionRowsSource).toContain("MANDATORY LAUNCH REQUIRED");
+    expect(resolutionRowsSource).toContain('{ text: "MANDATORY LAUNCH", className: factionClass }');
+    expect(resolutionRowsSource).toContain(
+      " is required at ${nodeName}; select a BURN destination."
+    );
     expect(resolutionRowsSource).toContain("MANDATORY LAUNCH FAILED");
     expect(uiSource).toContain("executeQuestionBlinkLitPhase = 0.54");
     expect(uiSource).toContain("getExecuteQuestionBeatBlinkOpacity");
@@ -1070,40 +1073,50 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(tutorialRuntimeSource).toContain('"awaitingFirstBurnPreview"');
     expect(tutorialRuntimeSource).toContain('"mandatoryLaunch"');
     expect(tutorialRuntimeSource).toContain('"awaitingBurnOut"');
-    expect(tutorialCommandRowsSource).toContain("Left click on the orbit to select a ship.");
+    expect(tutorialCommandRowsSource).toContain("Left-click the ship in Moon orbit to select it.");
     expect(uiSource).not.toContain("Hover a node to preview burn transfer.");
     expect(tutorialCommandRowsSource).toContain('{ text: "BURN", className: playerClassName }');
-    expect(tutorialCommandRowsSource).toContain('{ text: " costs ΔV." }');
+    expect(tutorialCommandRowsSource).toContain(
+      '{ text: " spends ΔV to move a ship between orbits." }'
+    );
     expect(tutorialCommandRowsSource).toContain(
       'createTutorialSpacerRow("tutorial:first-burn-cost:spacer")'
     );
     expect(tutorialCommandRowsSource).toContain(
-      "ΔV is a global resource shared among all your ships."
+      "All of your ships share one ΔV reserve, so an expensive transfer leaves less available for later movement, EVADE and contested upkeep."
     );
-    expect(tutorialCommandRowsSource).toContain('{ text: "Left click to confirm transfer " }');
+    expect(tutorialCommandRowsSource).toContain(
+      '{ text: "Left-click the destination to confirm the " }'
+    );
     expect(uiSource).not.toContain("Left click to confirm transfer burn.");
     expect(uiSource).toContain(
-      "Fusion torch drives burn extraordinary amounts of TRITIUM to sustain continuous acceleration."
+      "Fusion torch drives consume tritium to sustain acceleration, so every faction depends on a continuing fuel cycle."
     );
     expect(uiSource).toContain(
-      "A ship that starts the turn on a TRITIUM orbit extracts the equivalent of +2 ΔV unless it "
+      "A ship that begins the turn at a tritium plant produces +2 ΔV if it remains eligible to WORK. It produces nothing if it "
     );
     expect(tutorialCommandRowsSource).toContain(
-      "The faction working a shipyard at 5/5 must execute a "
+      "At 5/5, the new ship stays at the yard and the incumbent must execute a "
     );
     expect(tutorialCommandRowsSource).toContain(
-      " to another valid destination or hull assembly progress resets to 0/5."
+      " to another valid destination. Keep enough ΔV and at least one useful route available before the final WORK turn."
     );
     expect(tutorialCommandRowsSource).toContain(
       'createTutorialSpacerRow("tutorial:mandatory-launch-contest-spacer")'
     );
     expect(uiSource).not.toContain("The faction controlling a shipyard at 5/5");
-    expect(uiSource).toContain("BURN to a different orbit to cancel all firing solutions.");
     expect(uiSource).toContain(
-      "An orbit occupied by ships from two different factions becomes CONTESTED."
+      "BURN to another orbit before impact; departure breaks every firing solution aimed at that ship."
     );
-    expect(uiSource).toContain("Earth and lunar orbits are interdicted zones for nuclear warfare.");
-    expect(uiSource).toContain("Translunar orbital conflict is unsanctioned.");
+    expect(tutorialCommandRowsSource).toContain(
+      "An orbit occupied by ships from two different factions becomes "
+    );
+    expect(uiSource).toContain(
+      "Nuclear warfare is actively interdicted in Earth and lunar orbits."
+    );
+    expect(uiSource).toContain(
+      "Beyond that protected corridor, the same acts remain unlawful but immediate enforcement is no longer available."
+    );
     expect(uiSource).not.toContain(
       "Earth and Moon nodes are interdicted from orbital nuclear warfare."
     );
@@ -1212,8 +1225,10 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("shipyardEnemyFireImpactTurn");
     expect(uiSource).toContain("hasPlayerFireSolutionTargetingOpponentNode");
     expect(uiSource).toContain("presentTutorialShipyardEnemyEvadeLesson");
-    expect(uiSource).toContain("hard-kill kinetic point defense");
-    expect(uiSource).toContain("EVADE costs 1 ΔV per incoming missile that turn.");
+    expect(uiSource).toContain("with its hard-kill defenses.");
+    expect(uiSource).toContain(
+      "The faction pays 1 ΔV for each missile impacting that ship in the turn."
+    );
     expect(uiSource).toContain("startTutorialShipyardEnemyContestedApproach");
     expect(uiSource).toContain("completeTutorialShipyardProductionLesson");
     expect(uiSource).toContain("frameTutorialNodeShipCloseup(originNodeId)");
@@ -1228,34 +1243,35 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("rows.map((text, rowIndex) =>");
     expect(uiSource).toContain("tutorial: createTutorialRuntimeDiagnosticDump(tutorialState)");
     expect(tutorialCommandRowsSource).toContain(
-      'parts: [{ text: "SHIPYARDS store disassembled hulls." }]'
+      "A SHIPYARD stores a disassembled hull and turns five eligible WORK results into one new ship."
     );
     expect(tutorialCommandRowsSource).toContain(
-      'parts: [{ text: "Crew splits from active ship to commission them." }]'
+      "When assembly finishes, a reserve crew transfers from the incumbent ship to commission the new hull. Production itself costs no ΔV."
     );
     expect(tutorialCommandRowsSource).toContain(
-      "A ship that starts the turn on a SHIPYARD orbit advances Production by 1/5 unless it "
+      "A ship that began the turn at the yard adds 1/5 progress if it remains eligible to WORK. It makes no progress if it "
     );
     expect(tutorialCommandRowsSource).toContain(
       '{ text: "WARNING:", className: "command-console__event-contested" }'
     );
     expect(shipyardFirePromptRowsSource).not.toContain("createTutorialSpacerRow()");
-    expect(shipyardFirePromptRowsSource).toContain('{ text: " enemy contact. " }');
     expect(shipyardFirePromptRowsSource).toContain(
-      '{ text: "Ships in transit can be targeted by firing at their destination." }'
+      "enemy contact. A ship in transit can be targeted through its destination, because FIRE predicts where the target will be when the missile arrives."
     );
-    expect(shipyardFirePromptRowsSource).not.toContain('{ text: "Right click to enter " }');
+    expect(shipyardFirePromptRowsSource).not.toContain(
+      '{ text: "Right click anywhere to enter " }'
+    );
     expect(tutorialCommandRowsSource).not.toContain(
       "Compact nuclear warheads are the primary weapon of orbital warfare."
     );
     expect(tutorialCommandRowsSource).toContain("createTutorialSpacerRow()");
     expect(tutorialCommandRowsSource).toContain(
-      "Ships in transit can be targeted by firing at their destination."
+      "A ship in transit can be targeted through its destination, because FIRE predicts where the target will be when the missile arrives."
     );
     expect(tutorialCommandRowsSource).not.toContain("Left click to confirm the firing solution.");
     expect(tutorialCommandRowsSource).toContain("A ship can either ");
     expect(tutorialCommandRowsSource).toContain('{ text: "WORK", className: playerClassName }');
-    expect(tutorialCommandRowsSource).toContain(" in the same turn, not both.");
+    expect(tutorialCommandRowsSource).toContain(" in a turn, not both.");
     expect(tutorialCommandRowsSource).toContain(
       "An orbit occupied by ships from two different factions becomes "
     );
@@ -1291,8 +1307,10 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain('{ text: " orbit cannot " }');
     expect(uiSource).toContain('"tutorial:shipyard-contested-evade-unavailable:before"');
     expect(uiSource).toContain('"tutorial:shipyard-contested-evade-unavailable:after"');
-    expect(uiSource).toContain(" orbit to force enemy ships to either ");
-    expect(uiSource).toContain(" to a different orbit or be destroyed.");
+    expect(uiSource).toContain(" orbit from this outside support ship. The enemy must either ");
+    expect(uiSource).toContain(
+      " out before impact or be destroyed, because it cannot EVADE while the lock remains."
+    );
     const contestedSupportFirePromptStart = uiSource.indexOf(
       "function presentTutorialShipyardContestedSupportFirePrompt"
     );
@@ -1406,10 +1424,14 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(defensiveContestedSource).not.toContain("focusTarget(");
     expect(defensiveContestedSource).toContain("selectTutorialTarget(`node:${contestedNodeId}`)");
     expect(tutorialCommandRowsSource).toContain(
-      " orbits cannot extract Tritium or advance production. Both factions must each spend 2 ΔV at the beginning of the turn or lose their ship."
+      " ships cannot WORK, FIRE or EVADE. Each faction pays 2 ΔV at the start of every turn to keep its ship in the lock."
     );
-    expect(tutorialCommandRowsSource).toContain("Left click to confirm firing solution.");
-    expect(tutorialCommandRowsSource).toContain("Left click to confirm burn.");
+    expect(tutorialCommandRowsSource).toContain(
+      "Left-click the target marker to confirm this firing solution."
+    );
+    expect(tutorialCommandRowsSource).toContain(
+      "Left-click a valid destination to confirm the BURN."
+    );
     expect(tutorialCommandRowsSource).toContain("options?.zoomHintText");
     expect(tutorialCommandRowsSource).toContain("options?.cameraPanOrbitHintText");
     expect(tutorialCommandRowsSource).toContain("key: `${key}:zoom-hint`");
@@ -1474,16 +1496,18 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).not.toContain("ORDER PLANNED");
     expect(tutorialConstantsSource).toContain("const tutorialCameraGuidancePaused = true");
     expect(tutorialConstantsSource).toContain(
-      '"Left click and drag to pan camera, right click and drag to orbit."'
+      '"Drag with the left button to pan the camera, or with the right button to orbit it."'
     );
-    expect(tutorialConstantsSource).toContain('"Mouse wheel to zoom in / out."');
-    expect(tutorialConstantsSource).toContain('"Right click and drag to orbit."');
-    expect(tutorialConstantsSource).toContain('"Left click and drag to pan."');
-    expect(tutorialConstantsSource).toContain('"Double click to focus."');
+    expect(tutorialConstantsSource).toContain('"Use the mouse wheel to zoom in or out."');
+    expect(tutorialConstantsSource).toContain('"Drag with the right button to orbit the camera."');
+    expect(tutorialConstantsSource).toContain('"Drag with the left button to pan the camera."');
+    expect(tutorialConstantsSource).toContain(
+      '"Double-click a visible target to focus the camera on it."'
+    );
     expect(tutorialConstantsSource).not.toContain("tutorialConfirmCameraPanOrbitHintDelayMs");
     expect(tutorialConstantsSource).not.toContain("tutorialVeryZoomedOutHintDelayMs");
     expect(tutorialConstantsSource).toContain(
-      '"Left click and drag to pan. Right click and drag to orbit."'
+      '"Drag with the left button to pan, or with the right button to orbit the camera."'
     );
     expect(uiSource).toContain('gesture === "wheel-zoom-out"');
     expect(uiSource).toContain("tutorial.hasZoomedOutCamera = true;");
@@ -1701,11 +1725,11 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("tutorial:live-enter-shipyard-fire-mode");
     expect(uiSource).toContain("tutorial:live-reselect-burn-out-ship");
     expect(uiSource).toContain("tutorial:live-confirm-burn-out");
-    expect(tutorialCommandRowsSource).toContain('{ text: "Right click to enter " }');
+    expect(tutorialCommandRowsSource).toContain('{ text: "Right-click anywhere to enter " }');
     expect(tutorialCommandRowsSource).toContain('{ text: "Every " }');
     expect(tutorialCommandRowsSource).toContain('{ text: "BURN", className: playerClassName }');
     expect(tutorialCommandRowsSource).toContain(
-      '{ text: " requires time (T=Earth-Moon transfer ~3 days) and ΔV." }'
+      " commits both time and ΔV. Its T+ value is the number of turns before the ship reaches its destination; one Earth-Moon transfer is roughly three days."
     );
     expect(tutorialCommandRowsSource).toContain(
       'createTutorialSpacerRow("tutorial:first-burn-time-cost:lead-spacer")'
@@ -1717,7 +1741,9 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain('row.key === "tutorial:first-burn-time-cost"');
     expect(uiSource).toContain("tutorialLiveHintClassName");
     expect(tutorialCommandRowsSource).toContain("tutorialDelayedLiveHintClassName");
-    expect(tutorialCommandRowsSource).toContain('{ text: "Left click to confirm transfer " }');
+    expect(tutorialCommandRowsSource).toContain(
+      '{ text: "Left-click the destination to confirm the " }'
+    );
     expect(uiSource).not.toContain("Left click to confirm transfer burn.");
     expect(uiSource).toContain("includeTutorialHints: false");
     expect(uiSource).toContain("return rows.filter((row) => row.key !== undefined);");
@@ -6377,7 +6403,7 @@ describe("Cinematic 3D architecture boundary", () => {
     );
     const bindHoverSource = glossaryControllerSource.slice(bindHoverStart, bindHoverEnd);
 
-    expect(uiSource).toContain("const gameMenuGlossaryHoverDwellMs = 360;");
+    expect(uiSource).toContain("const gameMenuGlossaryHoverDwellMs = 240;");
     expect(uiSource).toContain("commandGlossaryController.bindHoverRoot(gameMenu, {");
     expect(uiSource).toContain("dwellMs: gameMenuGlossaryHoverDwellMs");
     expect(uiSource).toContain('applyGameMenuHoverCopy(title, "DELTAV", "ORBITAL STRATEGY");');
@@ -7106,10 +7132,8 @@ describe("Cinematic 3D architecture boundary", () => {
       "showTutorialFirstEnemyKillReplayFollowupHint(tutorial);\n    updateInteractionLocks();"
     );
     expect(uiSource).toContain("tutorial:first-enemy-kill-replay-followup-hint");
-    expect(uiSource).toContain(
-      "Left click the blinking log line a second time to rewind to that point in time."
-    );
-    expect(uiSource).toContain("Left click the blinking log line a third time to resume.");
+    expect(uiSource).toContain("Left-click the blinking log line again to rewind to that event.");
+    expect(uiSource).toContain("Left-click the same line once more to resume from the present.");
     expect(uiSource).toContain(
       "commandLogTimeReviewState !== null) {\n        freezeTutorialFirstEnemyKillReplayFollowupHints();"
     );
@@ -7501,11 +7525,11 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(rowsSource).toContain("function createPlayerFacingResolutionRow(");
     expect(rowsSource).toContain("events: readonly ResolutionEvent[]");
     expect(rowsSource).toContain(
-      '{ text: "CONTESTED", className: "command-console__event-contested" }'
+      '{ text: "CONTESTED upkeep", className: "command-console__event-contested" }'
     );
     expect(rowsSource).toContain('const crewLostCueClassName = "command-console__crew-lost-cue";');
     expect(rowsSource).toContain('text: "CREW LOST"');
-    expect(rowsSource).toContain("text: ` at ${nodeName}`");
+    expect(rowsSource).toContain("text: ` at ${nodeName}; `");
     expect(rowsSource).not.toContain("events: readonly TurnDebugEvent[]");
     expect(rowsSource).not.toContain(".message");
   });

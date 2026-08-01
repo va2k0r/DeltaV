@@ -7,6 +7,7 @@ export type GameGlossaryEntry = Readonly<{
   aliases: readonly string[];
   short: string;
   detail: readonly string[];
+  advice?: readonly string[];
 }>;
 
 export type GameGlossaryTextToken = Readonly<{
@@ -28,101 +29,101 @@ const mechanicGlossaryEntries = [
     id: "burn-out",
     label: "BURN OUT",
     aliases: ["BURN OUT", "BURNS OUT", "BURNED OUT"],
-    short: "Leave the current orbit or contested lock by committing a transfer BURN.",
+    short: "Use an ordinary BURN to leave the current orbit, including a contested lock.",
     detail: [
-      "BURN OUT is not a separate action from BURN. It means choosing a valid destination and leaving the current orbit.",
-      "A contested ship may STAY or BURN OUT. Departing breaks every active firing solution aimed at that ship, but the faction must still afford the transfer cost."
+      "BURN OUT is not a separate command: choose a valid destination and confirm a normal BURN. The ship pays the transfer cost and leaves its orbit.",
+      "Departing ends a contested lock and breaks every firing solution aimed at that ship. It is the reliable escape, provided you reserved enough ΔV to use it."
     ]
   },
   {
     id: "mandatory-launch",
     label: "MANDATORY LAUNCH",
     aliases: ["MANDATORY LAUNCH", "MANDATORY LAUNCHES"],
-    short:
-      "A completed shipyard forces its incumbent ship to BURN out before resolution continues.",
+    short: "When a shipyard finishes a hull, its incumbent ship must BURN to make room.",
     detail: [
-      "After five eligible WORK turns, the newly assembled ship remains at the SHIPYARD. The incumbent ship must execute a legal BURN to another destination.",
-      "Mandatory launch departures resolve before missile impacts and ordinary arrivals. If the required departure cannot be completed, the launch requirement fails under the current scenario rules."
+      "After five eligible WORK turns, the new ship remains at the shipyard while the incumbent must BURN to another valid destination.",
+      "This departure resolves before missile impacts and ordinary arrivals. Plan the final WORK turn with enough ΔV and a useful route, or production can leave you with a forced loss."
     ]
   },
   {
     id: "firing-solution",
     label: "FIRING SOLUTION",
     aliases: ["FIRING SOLUTION", "FIRING SOLUTIONS", "MISSILE SOLUTION", "MISSILE SOLUTIONS"],
-    short: "The live prediction connecting a fired missile to one specific target ship.",
+    short: "A delayed missile attack tied to one predicted target ship and impact time.",
     detail: [
-      "FIRE creates a firing solution rather than immediate damage. Its ETA follows the same transfer timing model as BURN.",
-      "The solution remains attached to its target until impact or until the target departs with BURN. EVADE absorbs missiles paid for at impact; it does not erase unrelated future solutions."
+      "FIRE does not deal immediate damage. It creates a firing solution whose ETA follows the same orbital timing model used by an equivalent BURN.",
+      "The solution follows that ship until impact, unless the target BURNS and breaks it. EVADE can absorb the impact, but other future solutions remain active.",
+      "A useful solution threatens future ΔV and WORK. Several timed solutions can be stronger than one isolated shot because the target must keep paying, moving or giving up production."
     ]
   },
   {
     id: "tritium-access",
     label: "tritium access",
     aliases: ["TRITIUM ACCESS"],
-    short: "The faction can still produce TRITIUM or realistically regain access to it soon.",
+    short: "A faction can still produce TRITIUM or can realistically regain access soon.",
     detail: [
-      "A faction retains tritium access while it controls an operating tritium plant or can credibly reach or contest one within the short operational window.",
-      "When only one faction retains tritium access, that faction wins."
+      "A faction retains tritium access while it can operate a tritium plant, reach one, contest one or use imminent shipyard output to restore that route.",
+      "Victory depends on this practical access rather than current ownership alone. A temporary retreat is survivable if ships and ΔV still make recovery credible."
     ]
   },
   {
     id: "tritium-collapse",
     label: "tritium collapse",
     aliases: ["TRITIUM COLLAPSE"],
-    short: "The victory state: only one faction retains tritium access.",
+    short: "The match ends when only one faction retains a credible route to tritium.",
     detail: [
-      "Victory is not awarded for score or abstract territory. A faction wins when every rival has lost a plausible short-term route to produce or contest TRITIUM.",
-      "Tritium access considers current ships, ΔV, active transfers, nearby routes and imminent shipyard output."
+      "Tritium collapse is not a score threshold or a count of occupied orbits. It occurs when every rival has lost any plausible short-term route to produce or contest TRITIUM.",
+      "The check considers ships, shared ΔV, active transfers, nearby routes and imminent shipyard output. Denying recovery can therefore be more decisive than taking another empty orbit."
     ]
   },
   {
     id: "left-click",
     label: "LEFT CLICK",
     aliases: ["LEFT CLICK", "LEFT-CLICK"],
-    short: "Select once; when a valid preview is visible, confirm the proposed order.",
+    short: "Select a target, or confirm the valid order currently shown in preview.",
     detail: [
-      "A single LEFT CLICK selects a ship or orbit. With a valid BURN or FIRE preview already visible, it confirms and queues that order.",
-      "The log records the queued command before EXECUTE, so its ETA, destination and projected ΔV cost can still be inspected."
+      "A single LEFT CLICK selects a ship or orbit. If a valid BURN or FIRE preview is already visible, the same gesture confirms and queues that order.",
+      "Queued commands appear in the log before EXECUTE, so you can still inspect their destination, ETA and projected ΔV cost before committing the turn."
     ]
   },
   {
     id: "right-click",
     label: "RIGHT CLICK",
     aliases: ["RIGHT CLICK", "RIGHT-CLICK"],
-    short: "Enter FIRE mode for a selected ship; dragging the right button orbits the camera.",
+    short: "Enter FIRE mode with a click, or orbit the camera by dragging the right button.",
     detail: [
-      "A stationary RIGHT CLICK enters FIRE mode when the selected ship can fire. RIGHT CLICK and drag is reserved for camera orbit.",
-      "The interaction is contextual: the renderer may distinguish a click from a drag, but neither gesture changes core simulation rules."
+      "A stationary RIGHT CLICK enters FIRE mode when the selected ship is allowed to fire. Holding and dragging the same button orbits the camera instead.",
+      "The gesture changes only your planning context until you confirm a target; merely entering FIRE mode never queues a shot."
     ]
   },
   {
     id: "double-click",
     label: "DOUBLE CLICK",
     aliases: ["DOUBLE CLICK", "DOUBLE-CLICK"],
-    short: "Focus the camera on the selected body, orbit, ship or trajectory.",
+    short: "Centre the camera on a visible body, orbit, ship or trajectory.",
     detail: [
-      "DOUBLE CLICK changes only camera focus. It never issues a gameplay order or changes simulation state.",
-      "Single LEFT CLICK remains selection; DOUBLE CLICK is the deliberate focus gesture."
+      "DOUBLE CLICK changes camera focus without issuing an order or altering the simulation. Use a single LEFT CLICK when you mean to select.",
+      "Focusing a moving body can make routes easier to read, but it never changes their cost, ETA or legality."
     ]
   },
   {
     id: "mouse-wheel",
     label: "MOUSE WHEEL",
     aliases: ["MOUSE WHEEL", "WHEEL"],
-    short: "Zoom toward the current focus or the screen centre.",
+    short: "Move the camera closer to or farther from its focus or the screen centre.",
     detail: [
-      "The MOUSE WHEEL controls camera distance. Zoom is presentation state only and never affects range, ETA or the legality of an order.",
-      "Transfer and firing calculations remain identical at every camera scale."
+      "The MOUSE WHEEL controls camera distance only. Transfer and firing calculations remain identical at every visual scale.",
+      "Zoom out to compare routes and threats; zoom in when overlapping markers make a selection difficult."
     ]
   },
   {
     id: "camera",
     label: "CAMERA",
     aliases: ["CAMERA"],
-    short: "Presentation viewpoint only; it cannot change any simulation result.",
+    short: "Your viewpoint on the map; camera movement cannot alter a simulation result.",
     detail: [
-      "The CAMERA owns focus, distance, orbit and pan.",
-      "It never owns gameplay position, range, ΔV, ETA, legality or resolution."
+      "The CAMERA controls focus, distance, orbit and pan, while ships and bodies keep their simulated positions independently.",
+      "Changing the view can improve your reading of the map, but it never changes range, ΔV, ETA, order legality or resolution."
     ]
   },
   {
@@ -131,262 +132,230 @@ const mechanicGlossaryEntries = [
     aliases: ["ZOOM", "ZOOMS", "ZOOMED", "ZOOMING"],
     short: "Change camera distance toward the current focus or screen centre.",
     detail: [
-      "ZOOM changes visual scale only.",
-      "It cannot alter orbit geometry, BURN cost, FIRE timing or selection state."
+      "ZOOM changes only the visual scale. It cannot alter orbit geometry, BURN cost, FIRE timing or the selected gameplay target.",
+      "Use a wider view for route comparison and a closer view for precise interaction."
     ]
   },
   {
     id: "pan",
     label: "PAN",
     aliases: ["PAN", "PANS", "PANNED", "PANNING"],
-    short: "Translate the camera's visual focus without moving any body or ship.",
+    short: "Move the viewed region without moving any body or ship in the simulation.",
     detail: [
-      "PAN changes the viewed region while preserving simulation positions.",
-      "LEFT CLICK and drag performs the gesture; a stationary click remains selection."
+      "PAN shifts the camera across the map while every simulated position remains unchanged.",
+      "Drag with the left button to pan. A stationary LEFT CLICK still selects or confirms, so release without dragging when you intend to act."
     ]
   },
   {
     id: "focus",
     label: "FOCUS",
     aliases: ["FOCUS", "FOCUSES", "FOCUSED", "FOCUSING"],
-    short: "Make one visible target the camera's tracked centre.",
+    short: "Make one visible target the centre followed by the camera.",
     detail: [
-      "FOCUS is presentation state.",
-      "DOUBLE CLICK assigns it. A moving focused body may remain centred while TURN animation advances."
+      "FOCUS belongs to the camera, not to the simulation. DOUBLE CLICK assigns it to a visible body, orbit, ship or trajectory.",
+      "A moving focused body remains centred as TURN animation advances, which helps you follow a local engagement without changing its outcome."
     ]
   },
   {
     id: "select",
     label: "SELECT",
     aliases: ["SELECT", "SELECTS", "SELECTED", "SELECTING", "SELECTION"],
-    short: "Choose the ship, orbit or command that subsequent input will address.",
+    short: "Choose the ship, orbit or command that your next input will address.",
     detail: [
-      "SELECT establishes interaction context without resolving an action.",
-      "The selected target may expose BURN or FIRE previews; only confirmation queues an order."
+      "SELECT establishes the current interaction context but does not spend ΔV or resolve an action.",
+      "A selected ship exposes legal BURN or FIRE previews. Only a later confirmation queues the order, so you can inspect alternatives safely."
     ]
   },
   {
     id: "confirm",
     label: "CONFIRM",
     aliases: ["CONFIRM", "CONFIRMS", "CONFIRMED", "CONFIRMING"],
-    short: "Accept the currently visible valid preview as a queued order.",
+    short: "Turn the currently visible valid preview into a queued order.",
     detail: [
-      "CONFIRM copies the previewed origin, destination, target, cost and ETA into planning state.",
-      "The order remains pending until EXECUTE."
+      "CONFIRM records the previewed origin, destination or target, cost and ETA in the current plan.",
+      "The order remains pending until EXECUTE. Read the projected ΔV and log entry before committing if several ships draw from the same reserve."
     ]
   },
   {
     id: "transfer",
     label: "TRANSFER",
     aliases: ["TRANSFER", "TRANSFERS", "TRANSIT", "DEPARTURE", "DEPARTURES"],
-    short: "The deterministic interval between BURN departure and arrival.",
+    short: "The deterministic interval between a BURN departure and its destination.",
     detail: [
-      "A TRANSFER begins when BURN spends ΔV and removes the SHIP from its origin.",
-      "It ends at T+ETA. FIRE uses the equivalent travel model for missile timing."
+      "A TRANSFER begins when BURN spends ΔV and the ship leaves its origin. The ship reaches its destination at the displayed T+ETA.",
+      "FIRE uses the equivalent travel model for missile timing. Compare the two clocks when deciding whether movement will escape or meet a threat."
     ]
   },
   {
     id: "destination",
     label: "DESTINATION",
     aliases: ["DESTINATION", "DESTINATIONS"],
-    short: "The orbit where a valid BURN will arrive or a FIRE solution expects its target.",
+    short: "The orbit a BURN will reach or a firing solution predicts for its target.",
     detail: [
-      "A DESTINATION must be reachable under current route, occupancy, protection and ΔV rules.",
-      "Selecting it previews; confirming it queues."
+      "A DESTINATION must satisfy the current route, occupancy, protection and ΔV rules before it can be confirmed.",
+      "Selecting a destination previews the result without commitment. Check its future position and timing, because the body continues moving during the transfer."
     ]
   },
   {
     id: "origin",
     label: "ORIGIN",
     aliases: ["ORIGIN", "ORIGINS"],
-    short: "The orbit or transfer state from which the active ship issues its order.",
+    short: "The orbit or transfer state from which the active ship issues an order.",
     detail: [
-      "ORIGIN determines the starting geometry and gravity modifier.",
-      "The queued order remains attached to its issuing SHIP."
+      "The ORIGIN supplies the starting geometry and gravity modifier used to calculate a route.",
+      "A queued order remains attached to the ship that issued it. Another ship at a different origin may see a different cost and ETA for the same destination."
     ]
   },
   {
     id: "route",
     label: "ROUTE",
     aliases: ["ROUTE", "ROUTES"],
-    short: "The currently legal connection used to calculate cost and ETA.",
+    short: "The legal connection currently used to calculate transfer cost and ETA.",
     detail: [
-      "A ROUTE is simulation data, not the decorative trajectory line.",
-      "Orbital state can change its transfer score, cost and timing."
+      "A ROUTE is calculated from the current orbital state; the visible trajectory is only its presentation.",
+      "As bodies move, the same pair of orbits can produce a different cost or ETA. Timing a BURN well can preserve ΔV for survival and later operations."
     ]
   },
   {
     id: "crew",
     label: "CREW",
     aliases: ["CREW"],
-    short: "The people operating this ship—and the reserve complements for hulls not yet launched.",
+    short: "The people operating a ship, including reserve teams assigned to future hulls.",
     detail: [
-      "Ships are manned. Automation reduces watch size; it does not hold legal responsibility for lethal release.",
-      "A minimum independent complement is twelve: command, flight, reactor, weapons, systems and medicine.",
-      "A typical opening ship carries four complements—48 people—to crew itself and three expected SHIPYARD outputs.",
-      "Reserve teams use the parent ship's life-support capacity until commissioning.",
-      "CREW has no separate game statistic. SIGNAL LOST means those people were not recovered."
+      "Ships are manned because automation can reduce the watch but cannot assume legal responsibility for lethal release.",
+      "An independent complement needs at least twelve people across command, flight, reactor, weapons, systems and medicine.",
+      "A typical opening ship carries four complements, or 48 people: one active complement and three reserve crews for expected shipyard output.",
+      "Reserve teams share the parent ship's life support until commissioning. CREW has no separate statistic, but SIGNAL LOST means those people were not recovered."
     ]
   },
   {
     id: "hull",
     label: "HULL",
     aliases: ["DISASSEMBLED HULLS", "DISASSEMBLED HULL", "HULL", "HULLS", "DISASSEMBLED"],
-    short: "A disassembled ship body completed by five eligible SHIPYARD work steps.",
+    short: "A disassembled ship body that a shipyard completes through five WORK steps.",
     detail: [
-      "SHIPYARDS park pressure sections, docking spines, radiators and drive modules as protected subassemblies.",
-      "WORK mates, tests and fuels them. At 5/5 the output becomes one ordinary SHIP.",
-      "Crew, tritium canisters and command keys arrive from the incumbent ship during commissioning.",
-      "HULL is production language, not a separate game inventory."
+      "Shipyards store pressure sections, docking spines, radiators and drive modules as protected subassemblies. Each eligible WORK mates and tests more of them.",
+      "At 5/5 the hull becomes an ordinary ship. The incumbent supplies its crew, fuel canisters and command keys during commissioning.",
+      "HULL describes what the yard is assembling; players do not manage hulls as a separate inventory."
     ]
   },
   {
     id: "resource",
     label: "RESOURCE",
     aliases: ["RESOURCE", "RESOURCES"],
-    short: "A spendable or productive quantity; current gameplay exposes only global ΔV.",
+    short:
+      "A quantity that can be produced or spent; current command accounting exposes global ΔV.",
     detail: [
-      "The current rules have no cargo or local ship inventories.",
-      "TRITIUM WORK adds to the faction-wide ΔV reserve."
+      "Command accounting does not ask you to move cargo or maintain a separate inventory aboard each ship.",
+      "Eligible WORK at a tritium plant adds to the faction-wide ΔV reserve, which every ship then uses for movement, survival and contested upkeep."
     ]
   },
   {
     id: "cost",
     label: "COST",
     aliases: ["COST", "COSTS", "COSTING"],
-    short: "A quantity removed from the faction-wide ΔV reserve when its rule resolves.",
+    short: "The ΔV removed from the faction-wide reserve when an action or obligation resolves.",
     detail: [
-      "BURN pays at departure. EVADE pays at impact. CONTESTED upkeep pays first each TURN.",
-      "FIRE and completed SHIP production cost 0 ΔV."
+      "BURN pays at departure, EVADE at impact and CONTESTED upkeep at the start of the turn. These obligations all draw from the same reserve.",
+      "FIRE and completed ship production cost zero ΔV, but FIRE still gives up that ship's WORK. A zero fuel cost is therefore not a free strategic choice."
     ]
   },
   {
     id: "execute",
     label: "EXECUTE",
     aliases: ["EXECUTE", "EXECUTED", "EXECUTES"],
-    short: "Commit the planned orders and resolve the current turn in its fixed phase order.",
+    short: "Commit every queued order and resolve the current turn in a fixed phase order.",
     detail: [
-      "Freeze every queued order. Advance the deterministic simulation one TURN.",
-      "01  CONTESTED upkeep.",
-      "02  MANDATORY LAUNCH departures.",
-      "03  MISSILE IMPACT and automatic EVADE.",
-      "04  BURN arrivals and INTERCEPT resolution.",
-      "05  WORK eligibility, FIRE, BURN and INTERCEPT orders.",
-      "06  TRITIUM income, SHIPYARD progress, production completion.",
-      "The log reports causes and consequences in this exact order."
+      "EXECUTE locks the current plan and advances one deterministic TURN. Before committing, make sure projected ΔV still covers the survival costs you expect.",
+      "Resolution pays contested upkeep first, then moves mandatory launches, resolves missile impacts and EVADE, handles arrivals and INTERCEPT, and finally resolves ordinary actions and the economy.",
+      "The log reports events in this same causal order, so an earlier entry can explain why a later action failed or never occurred."
     ]
   },
   {
     id: "intercept",
     label: "INTERCEPT",
     aliases: ["INTERCEPT", "INTERCEPTS", "INTERCEPTED", "INTERCEPTING"],
-    short:
-      "A BURN against a moving ship that cancels its transfer and creates a temporary contested orbit.",
+    short: "A BURN aimed at a moving ship to cancel its transfer and lock it in combat.",
     detail: [
-      "INTERCEPT targets a ship already in transfer. A successful intercept cancels that transfer and places the target and interceptor in a temporary CONTESTED orbit.",
-      "No WORK is possible there. The temporary orbit disappears when one ship BURNS out or is destroyed."
+      "INTERCEPT can target a ship already in transfer. If successful, it cancels that transfer and places both ships in a temporary CONTESTED orbit.",
+      "Neither ship can WORK there, and the temporary orbit disappears when one ship BURNS out or is destroyed.",
+      "Use INTERCEPT when merely threatening a future EVADE is too weak: it trades your interceptor's freedom for immediate movement denial."
     ]
   },
   {
     id: "contested",
     label: "CONTESTED",
     aliases: ["CONTESTED", "CONTEST", "CONTESTS", "CONTESTING"],
-    short: "Two opposing factions share an orbit: both are physically locked and pay upkeep.",
+    short:
+      "Opposing ships share one orbit, locking each other down while both factions pay upkeep.",
     detail: [
-      "Two FACTIONS occupy the same orbit. Physical lock, not damage; maximum one SHIP per faction.",
-      "2 ΔV upkeep per contested ship and faction, paid first each TURN.",
-      "WORK, FIRE, EVADE and INTERCEPT are blocked.",
-      "STAY and BURN OUT remain legal.",
-      "Physically, both ships circle for the other's blind angle, kill exposed drones and spend thrust denying a clean terminal geometry.",
-      "The duel consumes every outward weapon and defensive schedule; neither side can perform a separate action.",
-      "A support ship outside the lock adds the second attack vector one turret cannot cover.",
-      "Same-turn arrival contests only after MISSILE IMPACT; outside ships may FIRE into the lock."
+      "CONTESTED means one ship from each faction occupies the same orbit. It is a physical lock rather than immediate damage, and neither side can add another ship there.",
+      "Each faction pays 2 ΔV at the start of every turn. The locked ships cannot WORK, FIRE, EVADE or INTERCEPT; they may only STAY or BURN OUT.",
+      "The ships circle for each other's blind angle while an outside support ship can add a second attack vector. A same-turn arrival creates the lock only after missile impacts, so it cannot block an EVADE that already resolved."
     ]
   },
   {
     id: "evade",
     label: "EVADE",
     aliases: ["EVADE", "EVADES", "EVADED", "EVADING"],
-    short:
-      "Automatic survival at missile impact: pay 1 ΔV for each incoming missile or lose the ship.",
+    short: "Automatic survival at impact: pay 1 ΔV per incoming missile or lose the ship.",
     detail: [
-      "Automatic defensive outcome. Not a preventive player order.",
-      "Triggered when a MISSILE reaches a non-CONTESTED target.",
-      "Costs 1 ΔV per missile IMPACTING that SHIP this TURN.",
-      "Each paid impact is absorbed. If the next 1 ΔV cannot be paid, that missile destroys the target.",
-      "The evading ship cannot WORK that turn.",
-      "CONTESTED ships cannot evade.",
-      "Resolves before same-turn BURN arrivals.",
-      "Paid impacts are absorbed. Unrelated future FIRING SOLUTIONS remain active."
+      "EVADE is automatic rather than a preventive order. When a missile reaches a non-CONTESTED ship, the faction pays 1 ΔV for that impact and the ship survives.",
+      "Several missiles arriving in the same turn each demand payment. If the next 1 ΔV is unavailable, or the target is already CONTESTED, that missile destroys the ship.",
+      "An evading ship cannot WORK that turn, and later firing solutions remain active. EVADE also resolves before same-turn arrivals, so reserve ΔV for every known impact instead of relying on late support."
     ]
   },
   {
     id: "fire",
     label: "FIRE",
     aliases: ["FIRE", "FIRES", "FIRED", "FIRING"],
-    short: "Give up this ship's WORK to create a future missile threat at zero ΔV cost.",
+    short: "Give up this ship's WORK to create a delayed missile threat at zero ΔV cost.",
     detail: [
-      "Active SHIP outcome.",
-      "Costs 0 ΔV.",
-      "The firing ship cannot WORK that TURN.",
-      "Creates one delayed MISSILE and one FIRING SOLUTION. No immediate damage.",
-      "Uses the same travel model as the equivalent BURN.",
-      "Creates future EVADE cost, denied WORK, ΔV pressure and forced movement.",
-      "Multiple ships may FIRE at one target.",
-      "Target BURN breaks every firing solution attached to that departing ship.",
-      "CONTESTED ships cannot fire."
+      "FIRE costs zero ΔV but consumes the ship's action, so a productive ship gives up WORK for that turn. A CONTESTED ship cannot FIRE.",
+      "The order launches one delayed missile and creates a firing solution; it deals no immediate damage and uses the same timing model as an equivalent BURN.",
+      "At impact, the target must pay for EVADE, lose its WORK, move earlier or be destroyed. BURNING away before impact breaks every firing solution attached to that ship."
     ]
   },
   {
     id: "burn",
     label: "BURN",
     aliases: ["BURN", "BURNS", "BURNED", "BURNING"],
-    short: "Move a ship by spending shared ΔV now and waiting for its transfer ETA.",
+    short: "Move a ship by spending shared ΔV now and waiting for the displayed transfer ETA.",
     detail: [
-      "Active SHIP outcome and movement order.",
-      "Requires one ORIGIN, one valid DESTINATION and one current ROUTE.",
-      "Costs the route plus the origin gravity modifier. Paid from global faction ΔV at departure.",
-      "Deterministic transfer shown as T+ETA. Normally T+2 to T+7.",
-      "The burning ship cannot WORK or FIRE that TURN.",
-      "The ship follows its committed transfer until it reaches the destination.",
-      "Arrival can CONTEST immediately. It cannot WORK until the following turn.",
-      "Departure breaks every FIRING SOLUTION targeting that ship.",
-      "A CONTESTED ship may exit. It pays prior upkeep, then the normal transfer cost."
+      "BURN requires an origin, a legal destination and a current route. Its cost includes the route and origin gravity modifier, paid from global faction ΔV at departure.",
+      "The deterministic ETA is usually T+2 to T+7. The ship cannot WORK or FIRE on departure, and after arrival it must wait until the following turn before it can WORK.",
+      "Departure breaks every firing solution aimed at the ship. A CONTESTED ship can also escape this way after paying that turn's upkeep and the normal transfer cost."
     ]
   },
   {
     id: "work",
     label: "WORK",
     aliases: ["WORK", "WORKS", "WORKED", "WORKING"],
-    short: "The automatic productive outcome when an eligible ship receives no conflicting action.",
+    short: "The automatic productive outcome when an eligible ship takes no conflicting action.",
     detail: [
-      "Automatic productive SHIP outcome.",
-      "Requires an operating tritium plant or SHIPYARD, no contest, presence before movement, and no BURN, FIRE or EVADE.",
-      "TRITIUM produces +2 ΔV during the economy phase.",
-      "SHIPYARD advances construction by 1/5.",
-      "A ship arriving by BURN this TURN waits until the following turn.",
-      "CONTESTED state, active order, EVADE, BARREN and PROTECTED locations deny work.",
-      "A pre-existing worker stops if the site becomes contested before the economy phase."
+      "WORK happens automatically when a ship began the turn at an operating tritium plant or shipyard, remains uncontested and neither BURNS, FIRES nor EVADES.",
+      "A tritium plant adds +2 ΔV, while a shipyard advances by 1/5. You issue no WORK order, but a ship that arrives during the turn must wait until the next one.",
+      "An enemy that contests the orbit before the economy phase stops production. Every BURN or FIRE by a worker therefore includes the output surrendered that turn."
     ]
   },
   {
     id: "stay",
     label: "STAY",
     aliases: ["STAY", "STAYS", "STAYED", "STAYING"],
-    short: "Issue no movement order and remain in the current orbit through this turn.",
+    short: "Remain in the current orbit instead of issuing a movement order this turn.",
     detail: [
-      "STAY means the ship remains where it is. Outside CONTESTED, an otherwise eligible ship may automatically WORK.",
-      "Inside CONTESTED, staying preserves the physical lock and incurs contested upkeep, but no productive or offensive action is possible."
+      "STAY leaves the ship in place. Outside CONTESTED, an otherwise eligible ship will automatically WORK without another command.",
+      "Inside CONTESTED, staying preserves the lock and costs upkeep but permits no productive or offensive action. Hold only when denying the orbit is worth the continuing ΔV."
     ]
   },
   {
     id: "delta-v",
     label: "ΔV",
     aliases: ["ΔV", "DELTA-V", "DELTA V"],
-    short: "The faction-wide reserve spent on movement, evasion and contested upkeep.",
+    short: "The faction-wide reserve used for movement, evasion and contested upkeep.",
     detail: [
-      "ΔV is global to the faction, not stored on individual ships. Every BURN draws from the same reserve used by automatic EVADE and CONTESTED upkeep.",
-      "WORK at tritium plants replenishes the reserve. Spending ΔV is therefore spending future mobility and survival, even when the immediate order is legal."
+      "ΔV belongs to the faction rather than individual ships. Every BURN draws from the same reserve used by automatic EVADE and CONTESTED upkeep.",
+      "WORK at tritium plants replenishes it. A legal order can still be strategically unaffordable if it leaves another ship unable to evade or maintain a vital lock."
     ]
   },
   {
@@ -395,207 +364,350 @@ const mechanicGlossaryEntries = [
     aliases: ["TRITIUM"],
     short: "The productive resource that restores ΔV and ultimately determines victory.",
     detail: [
-      "One eligible WORK result produces +2 ΔV during the economy phase.",
-      "Command accounting folds physical fuel, reaction mass and resupply into the global faction ΔV reserve.",
-      "The physical output is certified D-T fusion fuel, reaction mass and tritium production margin compressed into one number.",
-      "Natural tritium exists only in traces. Gas-giant skimmers harvest deuterium; lithium-6 blankets breed the tritium.",
-      "Its 12.3-year half-life makes stockpiles perishable and bookkeeping strategic.",
-      "CONTESTED state or BURN, FIRE and EVADE prevent income.",
-      "Losing every viable short-window route to tritium causes tritium collapse."
+      "One eligible WORK result at a tritium plant produces +2 ΔV during the economy phase. BURN, FIRE, EVADE or CONTESTED status prevents that income.",
+      "Natural tritium survives only in traces. Gas-giant skimmers harvest deuterium, while lithium-6 blankets breed tritium whose 12.3-year half-life makes stockpiles perishable.",
+      "Command accounting combines fuel and resupply margin in the faction reserve, with no separate reserve for each hull. Losing every credible short-term route to tritium ends the match."
     ]
   },
   {
     id: "shipyard",
     label: "SHIPYARD",
     aliases: ["SHIPYARD", "SHIPYARDS"],
-    short: "A shipbuilding facility that assembles one new ship after five eligible WORK turns.",
+    short: "A facility that assembles one new ship after five eligible WORK turns.",
     detail: [
-      "A SHIPYARD converts time into one new SHIP.",
-      "Progress increases by 1/5 per eligible WORK turn.",
-      "Progress belongs to the yard, not the faction. It can be captured and continued.",
-      "BURN, FIRE, EVADE, CONTESTED state or reaching the yard that turn prevents progress.",
-      "Stored hull modules are mated around a docking spine; the incumbent supplies fuel and one reserve crew.",
-      "At 5/5, the assembled ship remains at the yard and the incumbent performs MANDATORY LAUNCH.",
-      "Production itself costs 0 ΔV."
+      "A SHIPYARD adds 1/5 progress for each eligible WORK turn and produces one new ship at 5/5. Production costs no ΔV.",
+      "The worker must begin the turn there and remain available; BURN, FIRE, EVADE or CONTESTED status prevents progress. Stored progress belongs to the yard and can be captured.",
+      "At completion, the new ship stays at the yard while the incumbent supplies a reserve crew and performs MANDATORY LAUNCH. Reserve a destination and its cost in advance."
     ]
   },
   {
     id: "protected",
     label: "PROTECTED",
     aliases: ["PROTECTED"],
-    short: "An orbit where warfare and contesting are disabled.",
+    short: "An orbit where warfare and contesting are disabled by immediate enforcement.",
     detail: [
-      "PROTECTED orbits represent the enforced Earth-Moon corridor. They cannot be contested; weapons are offline.",
-      "Here law and force share a clock: launches are registered, nuclear packages remain safed and interceptors are already present.",
-      "Outside the corridor the same law persists, but a public enforcement ship may be months or years away.",
-      "Protection applies only within designated orbits and does not extend to ordinary destinations."
+      "PROTECTED orbits form the enforced Earth-Moon corridor. Weapons remain offline and opposing ships cannot create a contested lock there.",
+      "Launches are registered, nuclear packages remain safed and interceptors are already present, so legal prohibition and physical response operate on the same clock.",
+      "The law continues beyond the corridor, but immediate protection does not. Ordinary destinations remain open to FIRE and CONTESTED occupation."
     ]
   },
   {
     id: "barren",
     label: "BARREN",
     aliases: ["BARREN", "STAGING"],
-    short:
-      "An orbit without a tritium plant or shipyard; its value is position, timing and access.",
+    short: "An orbit with no tritium plant or shipyard, valued for position and timing.",
     detail: [
-      "A BARREN orbit cannot support WORK, but ships can occupy it, FIRE from it, EVADE there, contest it and use it for TRANSFER or INTERCEPT.",
-      "A barren orbit should matter because it changes a decision: route timing, missile geometry, support or escape."
+      "A BARREN orbit cannot support WORK, but ships can occupy, contest or escape through it, FIRE from it and use it for TRANSFER or INTERCEPT.",
+      "Its value is positional: a barren orbit may shorten a route, open a second firing angle, support a contested lock or provide an affordable escape."
     ]
   },
   {
     id: "missile",
     label: "MISSILE",
     aliases: ["MISSILE", "MISSILES"],
-    short: "A delayed FIRE threat travelling toward one target ship and one future impact.",
+    short: "A delayed FIRE threat aimed at one target ship and one future impact.",
     detail: [
-      "FIRE launches one autonomous nuclear missile-drone from a magazine of roughly ten to twelve.",
-      "It attacks predicted geometry, watches defensive tracers and jinks toward the single turret's blind angle.",
-      "The deterministic ETA creates no immediate damage.",
-      "At IMPACT a non-CONTESTED target automatically EVADES if its faction can pay 1 ΔV.",
-      "BURN before impact breaks the firing solution; no affordable geometry means the ship is destroyed."
+      "FIRE launches one autonomous nuclear missile-drone from a magazine of roughly ten to twelve. It pursues predicted geometry rather than the target's present position.",
+      "The missile watches defensive tracers and jinks toward the single turret's blind angle, but its deterministic ETA causes no immediate damage.",
+      "At impact, a non-CONTESTED target automatically EVADES if its faction can pay 1 ΔV. BURNING earlier breaks the solution; failing either defense destroys the ship."
     ]
   },
   {
     id: "impact",
     label: "IMPACT",
     aliases: ["IMPACT", "IMPACTS", "IMPACTING"],
-    short: "The resolution moment when an incoming missile forces EVADE or destroys its target.",
+    short: "The moment an incoming missile forces EVADE or destroys its target.",
     detail: [
-      "Missile IMPACT resolves after mandatory departures and before same-turn ship arrivals.",
-      "Because arrivals happen later, a ship arriving on the impact turn cannot contest the target early enough to block that target's EVADE."
+      "Missile IMPACT resolves after mandatory departures but before ships reach their destinations in the same turn.",
+      "A ship arriving on the impact turn is therefore too late to create a contest and block the target's EVADE. To deny EVADE, establish the lock one turn earlier."
     ]
   },
   {
     id: "eta",
     label: "ETA / T±",
     aliases: ["ETA", "T+", "T-"],
-    short: "Turns until an arrival or impact; T+ marks arrival, T- marks an approaching threat.",
+    short: "Turns until a destination or impact; T+ marks transfer time and T- an incoming threat.",
     detail: [
-      "ETA is measured in turns. A BURN order is displayed as T+N to show its arrival horizon; an inbound missile is displayed as T-N to show turns remaining before impact.",
-      "Transfer timing is deterministic for the current orbital state. The preview shows the plan that can be executed now."
+      "ETA is measured in turns. A BURN displays T+N for its transfer horizon, while an inbound missile displays T-N for the turns remaining before impact.",
+      "Timing is deterministic for the current orbital state. Compare these clocks to see whether a BURN escapes a missile, reaches support or arrives too late to matter."
     ]
   },
   {
     id: "projection-arrow",
     label: "->",
     aliases: ["->"],
-    short: "Separates the current value from its projected value after queued orders.",
+    short: "Separates the current value from its projection after queued orders.",
     detail: [
-      "Read left to right: current state, then projected state.",
-      "The right-hand value includes queued planning effects but is not committed until EXECUTE."
+      "Read the arrow from left to right: the first value is current and the second includes the effects of all queued planning.",
+      "The projection remains uncommitted until EXECUTE. Use it to catch a plan that spends the ΔV another ship needs for upkeep or EVADE."
     ]
   },
   {
     id: "turn",
     label: "TURN",
     aliases: ["TURN", "TURNS"],
-    short: "One simultaneous planning and deterministic resolution cycle.",
+    short: "One simultaneous planning phase followed by a deterministic resolution cycle.",
     detail: [
-      "Every FACTION queues orders against one shared visible state.",
-      "EXECUTE freezes the plan.",
-      "Resolution is deterministic, simultaneous and phase-ordered.",
-      "T=Earth-Moon transfer ≈3 days.",
-      "WORK resolves after movement and actions.",
-      "The command log is the player-facing chronology."
+      "Every faction plans against the same visible state. EXECUTE then freezes all orders and resolves them simultaneously through a fixed sequence of phases.",
+      "One turn corresponds roughly to an Earth-Moon transfer of three days, although the interface advances in whole turns rather than continuous time.",
+      "Movement and actions resolve before WORK and the economy. The command log preserves this chronology so you can trace each result to its cause."
     ]
   },
   {
     id: "orbit",
     label: "orbit",
     aliases: ["orbit", "orbits", "orbital"],
-    short: "The moving playable position attached to a planet or moon.",
+    short: "A moving playable position associated with a planet or moon.",
     detail: [
-      "Commands target an orbit, not the visual planet or moon itself. Bodies provide gravity and moving spatial reference.",
-      "Orbital phase changes transfer timing and cost, but camera position and visual scale never change the simulation."
+      "Commands target an orbit rather than the visible surface of its planet or moon. The body supplies gravity and a moving spatial reference.",
+      "As orbital phase changes, transfer timing and cost can change with it. Camera position and visual scale never affect those calculations."
     ]
   },
   {
     id: "ship",
     label: "SHIP",
     aliases: ["SHIP", "SHIPS"],
-    short: "A manned fusion vessel, weapons platform and carrier for the crews of future ships.",
+    short: "A manned vessel that moves, fights, works and carries crews for future ships.",
     detail: [
-      "Operational unit: each TURN resolves as WORK, EVADE, BURN or FIRE, subject to CONTESTED restrictions.",
-      "A docking spine carries replaceable habitat, reactor, radiator and weapon modules.",
-      "The weapon section mounts one rapid-fire turret and approximately ten to twelve nuclear missile-drones.",
-      "Life support is provisioned for the active complement and the reserve crews expected to commission new hulls.",
-      "Ships physically carry canisters and reaction mass, while command accounting reports no separate reserve for each hull.",
-      "Every cost is paid from the global faction ΔV reserve."
+      "A ship resolves each turn through WORK, EVADE, BURN or FIRE, subject to the restrictions of a CONTESTED orbit.",
+      "Its modular spine carries habitat, reactor, radiator and weapon sections, including one rapid-fire turret and ten to twelve missiles. Life support covers the active complement and reserve crews for future hulls.",
+      "Ships carry physical canisters and reaction mass, but command accounting keeps no separate reserve for each hull. Every cost comes from global faction ΔV."
     ]
   },
   {
     id: "faction",
     label: "FACTION",
     aliases: ["FACTION", "FACTIONS", "PLAYER", "ENEMY"],
-    short: "One side in the conflict, sharing ships, production and a global ΔV reserve.",
+    short: "One side in the conflict, sharing ships, industry and a global ΔV reserve.",
     detail: [
-      "A FACTION is one corporate industrial network: ships, yards, tritium plants, compute and command authority.",
-      "All ships pay from one ΔV reserve, so they compete for the same future movement and survival budget.",
-      "On Earth the corporation remains subject to law, tax, sanctions and arrest.",
-      "In the outer system no government owns a comparable fleet already close enough to intervene.",
-      "Tritium access, rather than score or formal sovereignty, determines VICTORY."
+      "A FACTION represents one corporate industrial network, including ships, yards, tritium plants, compute and command authority.",
+      "All of its ships draw from one ΔV reserve, so every order competes with future movement, EVADE and contested upkeep elsewhere.",
+      "The corporation remains subject to terrestrial law, but distant enforcement cannot control events in real time. Victory depends on practical tritium access rather than score or territorial totals."
     ]
   },
   {
     id: "upkeep",
     label: "UPKEEP",
     aliases: ["UPKEEP"],
-    short: "The 2 ΔV paid each turn for every faction ship held in a contested orbit.",
+    short: "The 2 ΔV each faction pays per turn for a ship held in a contested orbit.",
     detail: [
-      "CONTESTED upkeep resolves first. Each contested ship and faction pays 2 ΔV before mandatory departures, missile impacts or ordinary actions.",
-      "Holding a physical lock is therefore a continuing claim on the same global reserve used for BURN and EVADE."
+      "CONTESTED upkeep resolves before mandatory departures, missile impacts and ordinary actions. Each faction pays 2 ΔV for its locked ship.",
+      "A contested orbit can deny valuable production, but the lock draws from the same reserve used for BURN and EVADE. Leave when the denial is no longer worth that cost."
     ]
   },
   {
     id: "victory",
     label: "VICTORY",
     aliases: ["VICTORY", "WINS", "WIN"],
-    short: "Be the only faction that retains tritium access.",
+    short: "Become the only faction that still has a credible route to tritium.",
     detail: [
-      "VICTORY occurs when every rival has lost any realistic short-term route to TRITIUM.",
-      "Tritium access includes extraction, movement, contesting and imminent shipyard output. It is not a score threshold or a requirement to occupy every orbit."
+      "VICTORY occurs when every rival has lost any realistic short-term route to TRITIUM, while your own faction still retains one.",
+      "Access includes current extraction, movement, contesting and imminent shipyard output. You do not need to occupy every orbit; you need to remove every credible recovery route."
     ]
   },
   {
     id: "signal-lost",
     label: "SIGNAL LOST",
     aliases: ["SIGNAL LOST", "CREW LOST"],
-    short: "The log has confirmed that a ship was destroyed or irrecoverably lost.",
+    short: "The log has confirmed that a ship was destroyed and its crew was not recovered.",
     detail: [
-      "SIGNAL LOST confirms destruction; the surrounding entries preserve the resolved mechanical cause.",
-      "Ships are manned. A normal loss kills at least one twelve-person watch and may erase several reserve complements.",
-      "The first openly attributable loss near Saturn converted industrial competition into a murder investigation and armed conflict.",
-      "Earth receives the telemetry in about eighty minutes. No enforcement fleet can arrive on that clock.",
-      "The message is a consequence, not a separate action."
+      "SIGNAL LOST records the result of destruction, while the preceding log entries preserve the action, impact or unpaid cost that caused it.",
+      "Every ship is manned. A loss kills at least one twelve-person watch and may also erase the reserve complements carried for future hulls.",
+      "The first attributable loss near Saturn turned industrial competition into both a murder investigation and an armed conflict.",
+      "Earth receives such telemetry after roughly eighty minutes, far sooner than any enforcement fleet can reach the scene."
     ]
   },
   {
     id: "year-2079",
     label: "2079",
     aliases: ["2079"],
-    short: "The year corporate war begins beyond the protected Earth-Moon corridor.",
+    short: "The year open corporate war begins beyond the protected Earth-Moon corridor.",
     detail: [
-      "Fusion power is mature; AI-scale compute expands until electricity, fabrication and discarded heat become the limits.",
-      "Robotic mines, atmospheric skimmers and tritium plants have made the first outer systems independent of terrestrial fuel.",
-      "Earth and MOON remain PROTECTED. Registered ships remain under terrestrial jurisdiction; enforcement assets are concentrated in the corridor.",
-      "Corporate FACTIONS own the only complete industrial fleets near the gas and ice giants.",
-      "The first attributable hostile action occurs near Saturn. Terrestrial authorities begin legal and diplomatic review after receiving the telemetry."
+      "Fusion is mature, while AI-scale compute expands until electricity, fabrication capacity and heat rejection become the practical limits.",
+      "Robotic mines, atmospheric skimmers and tritium plants have made parts of the outer system independent of terrestrial fuel deliveries.",
+      "Earth and the MOON remain PROTECTED, and registered ships still fall under terrestrial jurisdiction, but enforcement assets are concentrated near home.",
+      "Corporate factions therefore own the only complete industrial fleets near the gas and ice giants when the first attributable hostile action occurs near Saturn."
     ]
   },
   {
     id: "production",
     label: "PRODUCTION",
     aliases: ["PRODUCTION", "PRODUCES", "PRODUCE", "PROGRESS"],
-    short: "The economy-phase result of eligible WORK at tritium plants or shipyards.",
+    short: "The economy-phase result of eligible WORK at a tritium plant or shipyard.",
     detail: [
-      "PRODUCTION happens after actions. TRITIUM work adds ΔV; SHIPYARD work advances assembly by one step.",
-      "BURN, FIRE, EVADE, same-turn arrival and CONTESTED state can all prevent a ship from contributing production that turn."
+      "PRODUCTION resolves after movement and actions. Tritium WORK adds ΔV, while shipyard WORK advances assembly by one step.",
+      "BURN, FIRE, EVADE, same-turn arrival and CONTESTED status all prevent production. Protecting eligibility is often as important as occupying the facility."
     ]
   }
 ] as const satisfies readonly GameGlossaryEntry[];
 
+const mechanicAdviceById: Readonly<Record<string, readonly string[]>> = {
+  "burn-out": [
+    "Leave before impact to break every firing solution on that ship; waiting until the impact turn is too late if the orbit is already contested.",
+    "Compare the escape cost with the next upkeep payment. A costly exit can still be cheaper than maintaining a lock that no longer denies anything valuable."
+  ],
+  "mandatory-launch": [
+    "Before the yard reaches 5/5, reserve enough ΔV for a legal departure and identify a destination that improves tritium access or support geometry.",
+    "An enemy can time pressure around completion because the incumbent's departure is compulsory and resolves before ordinary arrivals."
+  ],
+  "firing-solution": [
+    "One solution usually taxes 1 ΔV and one WORK result; several timed solutions can exhaust the reserve or keep a productive ship idle for several turns.",
+    "A single BURN breaks all solutions on the departing ship, so combine missile pressure with route denial or a contested lock when possible."
+  ],
+  "tritium-access": [
+    "Count safe plants, threatened plants and recovery routes separately. Current ownership is weak if no ship can survive long enough to WORK there.",
+    "A shipyard close to completion can preserve access indirectly by producing the ship needed to contest or recover a plant."
+  ],
+  "tritium-collapse": [
+    "To finish a rival, remove every short recovery path rather than merely taking its present plant.",
+    "Protect at least one affordable fallback route of your own; a large ΔV balance cannot prevent collapse if no ship can reach tritium."
+  ],
+  "left-click": [
+    "Preview first and confirm second; the log lets you compare cost and ETA before EXECUTE commits the order."
+  ],
+  "right-click": [
+    "Entering FIRE mode is reversible. Use it to inspect possible targets before deciding whether the lost WORK is justified."
+  ],
+  "double-click": [
+    "Focus dense engagements when markers overlap, then return to a wider view before comparing long routes."
+  ],
+  "mouse-wheel": [
+    "Zoom out for strategic comparison and back in for precise confirmation; scale never changes legality."
+  ],
+  camera: [
+    "Use camera changes to improve information, then judge orders only by their displayed cost, ETA and consequences."
+  ],
+  zoom: [
+    "A wide view exposes competing routes, while a close view reduces accidental target selection."
+  ],
+  pan: [
+    "Pan without changing focus when you need to compare a nearby support ship with the orbit it may defend."
+  ],
+  focus: [
+    "Follow the threatened orbit during resolution, but inspect the full map again before planning the next turn."
+  ],
+  select: ["Selection is safe to change. Compare several previews before you spend shared ΔV."],
+  confirm: [
+    "After confirmation, read the projected faction balance; another ship may need that reserve for EVADE or upkeep."
+  ],
+  transfer: [
+    "Compare the transfer clock with missile impacts, enemy movement and the first turn on which the ship can WORK.",
+    "A faster route is not automatically better if its cost removes the reserve needed on arrival."
+  ],
+  destination: [
+    "Prefer destinations that provide production, a second attack vector, route access or a credible escape on the following turn."
+  ],
+  origin: [
+    "The same destination can be cheap from one orbit and wasteful from another, so compare which ship should make the move."
+  ],
+  route: [
+    "Recheck routes each turn: orbital motion can turn an expensive transfer into an affordable window, or close a window you planned to use."
+  ],
+  resource: [
+    "Treat every ΔV point as shared insurance as well as fuel; local gains and losses affect every ship in the faction."
+  ],
+  cost: [
+    "Evaluate a cost together with the income surrendered and the survival reserve left afterward, not as an isolated number."
+  ],
+  execute: [
+    "Before EXECUTE, check the projected balance against 1 ΔV for each known impact and 2 ΔV for each contested ship.",
+    "Use phase order deliberately: a mandatory departure can escape before impact, while a same-turn friendly arrival cannot enable EVADE."
+  ],
+  intercept: [
+    "INTERCEPT is strongest against a reinforcement or recovery ship whose destination matters more than your interceptor's freedom.",
+    "Plan an exit or outside support before creating the lock, because both ships lose WORK and the interceptor also begins paying upkeep."
+  ],
+  contested: [
+    "Project at least two upkeep payments before entering a lock. If the opponent can outlast your reserve, the apparent denial may become a trap.",
+    "A lock on a tritium plant or nearly complete yard can justify the cost; a lock on an empty orbit usually needs a route or firing advantage.",
+    "Outside support converts the target's inability to EVADE into a kill threat, so preserve one uncontested firing ship when you can."
+  ],
+  evade: [
+    "Reserve 1 ΔV for every missile shown on the same impact turn, not merely for every targeted ship.",
+    "FIRE against a worker can be effective without a kill because each EVADE also removes that turn's income or shipyard progress."
+  ],
+  fire: [
+    "Compare your lost WORK with the target's expected loss: an isolated shot often trades one production result for one future production result.",
+    "Time FIRE to arrive when upkeep, another missile or a forced launch already constrains the target's ΔV.",
+    "A support shot into CONTESTED is especially dangerous because the target cannot EVADE unless it BURNS out before impact."
+  ],
+  burn: [
+    "After subtracting the BURN cost, keep enough reserve for known EVADE impacts and any contested upkeep due before the next income.",
+    "Judge the destination by the first useful turn after arrival, because a ship cannot WORK on the turn it reaches the orbit.",
+    "Use departure defensively when it breaks more future missile cost than the transfer itself consumes."
+  ],
+  work: [
+    "A productive ship has an implicit income value each turn: +2 ΔV at tritium or 1/5 of a hull at a yard.",
+    "When comparing FIRE or BURN, include that lost output in the price of the order.",
+    "Denying enemy WORK for several turns can be more valuable than occupying a barren orbit or launching an isolated missile."
+  ],
+  stay: [
+    "Staying is an economic action when it preserves WORK, and a denial action when it maintains a contested lock."
+  ],
+  "delta-v": [
+    "Forecast the reserve as current ΔV minus queued BURN, upkeep and known EVADE costs, plus only the income that can still resolve.",
+    "A low enemy reserve makes timed pressure valuable, but only if the target cannot simply BURN away and erase every solution.",
+    "Do not spend to zero while a ship faces an impact, a contested payment or a mandatory launch."
+  ],
+  tritium: [
+    "Stable tritium income compounds: protecting one worker for three turns creates 6 ΔV that can fund several later transfers.",
+    "Pressure an enemy plant when denying +2 ΔV also makes its future EVADE, upkeep or recovery route unaffordable."
+  ],
+  shipyard: [
+    "Treat progress near 5/5 as a timed objective. Defend the final WORK turn and pre-plan the incumbent's mandatory departure.",
+    "Because progress is capturable, contesting a rival yard at 4/5 can deny a ship now and provide one to you later."
+  ],
+  protected: [
+    "Use protected orbits as safe endpoints only when their routes advance a wider plan; they cannot be used to create combat pressure."
+  ],
+  barren: [
+    "A barren orbit earns its cost only through timing, access, escape or a second firing angle."
+  ],
+  missile: [
+    "Read every missile by impact turn. Several impacts on one turn create a burst cost; impacts across several turns can deny repeated WORK.",
+    "If the target has an affordable BURN route, pair missile pressure with route denial or accept that the shot may force movement rather than destruction."
+  ],
+  impact: [
+    "Establish CONTESTED one turn before impact if you intend to block EVADE; an arrival on the impact turn resolves too late."
+  ],
+  eta: [
+    "Compare T+ and T- values directly to identify escapes, interceptions, support windows and turns in which production will be denied."
+  ],
+  "projection-arrow": [
+    "Treat the right-hand balance as a warning about committed obligations, then inspect the exact BURN, upkeep and impact entries that create it."
+  ],
+  turn: [
+    "Plan across at least the next two turns when upkeep or missiles are involved; a plan that survives only the current EXECUTE is not solvent."
+  ],
+  orbit: [
+    "An orbit is valuable when it improves production, access, timing or attack geometry; occupancy alone does not advance victory."
+  ],
+  ship: [
+    "Preserve ships with unique access or support geometry. Equal hulls can have very different strategic value because of position and ETA."
+  ],
+  faction: [
+    "Evaluate the whole reserve and fleet together: one ship's aggressive move can make another ship's automatic defense fail."
+  ],
+  upkeep: [
+    "Enter a contested lock only if the denied production, delayed movement or support opportunity is worth 2 ΔV every turn."
+  ],
+  victory: [
+    "Attack recovery capacity in order: safe tritium, affordable routes, supporting ships and imminent yard output."
+  ],
+  production: [
+    "Before ordering a productive ship, count the output it will forfeit and ask whether the order denies at least as much future value to the rival."
+  ]
+};
+
+const mechanicGlossaryEntriesWithAdvice = mechanicGlossaryEntries.map(
+  (entry): GameGlossaryEntry => {
+    const advice = mechanicAdviceById[entry.id];
+    return advice === undefined ? entry : { ...entry, advice };
+  }
+);
+
 export const gameGlossaryEntries = [
-  ...mechanicGlossaryEntries,
+  ...mechanicGlossaryEntriesWithAdvice,
   ...worldLoreGlossaryEntries,
   ...astronomicalGlossaryEntries
 ] as const satisfies readonly GameGlossaryEntry[];
@@ -787,9 +899,10 @@ function createDynamicGameGlossaryEntry(id: string): GameGlossaryEntry | undefin
         grammar?.short ??
         `"${word}" keeps its ordinary meaning here and names no separate game rule.`,
       detail: grammar?.detail ?? [
-        `"${word}" is part of the surrounding log sentence.`,
-        "It qualifies or connects the adjacent mechanic, body, value or action.",
-        "No independent simulation state is attached to this word."
+        `"${word}" keeps its ordinary grammatical meaning in the surrounding log sentence. It does not name an independent simulation rule.`
+      ],
+      advice: [
+        "Read this word together with the adjacent action, value or condition; that neighbouring term carries the gameplay consequence."
       ]
     };
   }
@@ -809,8 +922,10 @@ function createDynamicGameGlossaryEntry(id: string): GameGlossaryEntry | undefin
       aliases: [],
       short: `The current TURN index, displayed as ${raw}.`,
       detail: [
-        `${raw} identifies one planning and resolution cycle in the command log.`,
-        "Leading zeroes preserve column alignment. They do not change duration or resolution order."
+        `${raw} identifies one planning and resolution cycle in the command log. A leading zero aligns the column but does not change the duration.`
+      ],
+      advice: [
+        "Compare this turn with T+ and T- values to place departures, destinations and impacts on one timeline."
       ]
     };
   }
@@ -828,8 +943,10 @@ function createDynamicGameGlossaryEntry(id: string): GameGlossaryEntry | undefin
       short: `${raw} is ${meaning} on this log line.`,
       detail: [
         `Read ${raw} together with the adjacent ΔV token.`,
-        "A minus sign is expenditure. A plus sign is income. No sign is a stored or projected faction-wide balance.",
-        "The number belongs to the visible command or telemetry result; it is not a resource carried by one SHIP."
+        "A minus sign marks expenditure, a plus sign marks income, and no sign indicates a stored or projected faction-wide balance."
+      ],
+      advice: [
+        "Judge the value by the reserve left after every known BURN, upkeep payment and EVADE on the same planning horizon."
       ]
     };
   }
@@ -845,10 +962,12 @@ function createDynamicGameGlossaryEntry(id: string): GameGlossaryEntry | undefin
         : `${raw} leaves that many turns before IMPACT.`,
       detail: [
         isArrival
-          ? `${raw} is a deterministic future BURN arrival horizon.`
+          ? `${raw} is the deterministic transfer horizon for the visible BURN.`
           : `${raw} is a deterministic incoming MISSILE countdown.`,
-        "The number counts EXECUTE cycles, not animation time.",
-        "Camera motion and zoom never change it."
+        "The number counts EXECUTE cycles rather than animation time, and camera movement cannot change it."
+      ],
+      advice: [
+        "Compare this clock with competing transfers, impact times and the first turn on which a ship can WORK."
       ]
     };
   }
@@ -861,9 +980,10 @@ function createDynamicGameGlossaryEntry(id: string): GameGlossaryEntry | undefin
       aliases: [],
       short: `${completed} completed WORK steps out of ${required} required.`,
       detail: [
-        `${raw} is stored SHIPYARD assembly progress.`,
-        "The numerator is completed eligible WORK. The denominator is completion.",
-        "Progress belongs to the yard and can be captured."
+        `${raw} is the assembly progress stored at this shipyard: ${completed} eligible WORK steps are complete and ${required} finishes the hull.`
+      ],
+      advice: [
+        "Because progress belongs to the yard, count how many uninterrupted WORK turns remain and whether an enemy can contest it first."
       ]
     };
   }
@@ -875,8 +995,10 @@ function createDynamicGameGlossaryEntry(id: string): GameGlossaryEntry | undefin
       aliases: [],
       short: `${raw} Earth days supplies physical scale for the TURN reference.`,
       detail: [
-        `${raw} is a setting-scale duration, not a separate command.`,
-        "The simulation resolves in integer turns; renderer animation does not represent the full physical interval."
+        `${raw} is a physical-duration reference rather than a separate command. Resolution still advances in whole turns.`
+      ],
+      advice: [
+        "Use the value to understand the operational scale, while planning with the integer TURN and ETA shown by the interface."
       ]
     };
   }
@@ -888,8 +1010,10 @@ function createDynamicGameGlossaryEntry(id: string): GameGlossaryEntry | undefin
       aliases: [],
       short: `${raw} complete EXECUTE cycles.`,
       detail: [
-        `${raw} is a count of whole simulation turns.`,
-        "It measures deterministic rule cycles, not renderer frames or real-time seconds."
+        `${raw} counts complete deterministic turns rather than renderer frames or real-time seconds.`
+      ],
+      advice: [
+        "Multiply per-turn WORK or upkeep by this count to expose the full economic consequence of waiting."
       ]
     };
   }
@@ -901,9 +1025,10 @@ function createDynamicGameGlossaryEntry(id: string): GameGlossaryEntry | undefin
       aliases: [],
       short: `${raw} is a literal quantity; the adjacent unit or sentence gives it meaning.`,
       detail: [
-        `The log preserves ${raw} exactly as recorded.`,
-        "Read the neighbouring unit or noun to distinguish time, distance, mass, temperature, count, cost or state.",
-        "The number alone creates no additional rule."
+        `The log preserves ${raw} exactly as recorded. Its neighbouring unit or noun determines whether it describes time, distance, mass, cost or state.`
+      ],
+      advice: [
+        "Use the number only after identifying its unit and whether the line describes a current, projected or already resolved value."
       ]
     };
   }

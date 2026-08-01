@@ -305,7 +305,11 @@ describe("deterministic Trailer Capture", () => {
     expect(impactEvents[blockedIndex]?.reason).toBe("contested");
     expect(impactEvents[blockedIndex]?.contested).toBe(true);
     expect(impactEvents.some((event) => event.type === "EVADE")).toBe(false);
-    expect(rowTexts.some((text) => text.includes("EVADE BLOCKED — CONTESTED"))).toBe(true);
+    expect(
+      rowTexts.some((text) =>
+        text.includes("EVADE BLOCKED at Mars because the orbit was CONTESTED.")
+      )
+    ).toBe(true);
     expect(rowTexts.some((text) => text.includes("SIGNAL LOST"))).toBe(true);
     expect(occupiersAt(impact.afterState, "mars_node")).toEqual(["opponent"]);
   });

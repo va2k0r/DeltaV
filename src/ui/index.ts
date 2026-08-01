@@ -123,7 +123,8 @@ import {
 } from "./commandConsoleFormatting";
 import {
   createGameGlossaryController,
-  createGameGlossaryTextSpans
+  createGameGlossaryTextSpans,
+  type GameGlossaryLineContext
 } from "./gameGlossaryController";
 import { createPlayerFacingResolutionRows } from "./resolutionCommandRows";
 import {
@@ -435,6 +436,7 @@ type CommandConsoleRowMetadata = Readonly<{
   turn?: number | undefined;
   rowIndex?: number | undefined;
   rowKey?: string | undefined;
+  glossaryContext?: GameGlossaryLineContext | undefined;
 }>;
 
 type CommandScrollbackRow = Readonly<{
@@ -451,6 +453,7 @@ type CommandConsoleRow = Readonly<{
   parts: readonly CommandConsolePart[];
   className?: string;
   key?: string;
+  glossaryContext?: GameGlossaryLineContext;
   metadata?: CommandConsoleRowMetadata | undefined;
 }>;
 
@@ -475,6 +478,7 @@ type CommandTimelineRow = Readonly<{
   parts: readonly CommandTimelinePart[];
   className?: string;
   key?: string;
+  glossaryContext?: GameGlossaryLineContext;
 }>;
 
 type LiveCommandTimelineRowsOptions = Readonly<{
@@ -660,7 +664,7 @@ const gameMenuCrtFlickerMinDelayMs = 1_200;
 const gameMenuCrtFlickerMaxDelayMs = 3_400;
 const gameMenuCrtFlickerMinDurationMs = 140;
 const gameMenuCrtFlickerMaxDurationMs = 300;
-const gameMenuGlossaryHoverDwellMs = 360;
+const gameMenuGlossaryHoverDwellMs = 240;
 const tutorialLogGlossaryHandoffActiveMs = 1_250;
 const tutorialLogGlossaryHandoffMinimumVisibleMs = 1_650;
 const aiAutorunCommandTranscriptDomEntryLimit = 72;
@@ -1214,6 +1218,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   );
   applyDisplayBrightness(displayBrightness);
   let cachedWarningSnapshot: CommandWarningSnapshot | null = null;
+  const glossaryDvForecastsByState = new WeakMap<GameState, Map<FactionId, FactionRecoveryPath>>();
   let browserPerformanceCounters = createBrowserPerformanceCounterRecord();
   let browserPerformanceCounterSampleStartedAt = performance.now();
   let lastPerformanceCounterRates = createPerformanceCounterRateRecord();
@@ -2262,6 +2267,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     renderGameMenu();
     cinematicRenderer?.setCameraInputEnabled(true);
     updateCommandConsole();
+    commandGlossaryController.restoreTutorialLogbookIntroduction();
     updateInteractionLocks();
     redraw();
   }
@@ -2278,6 +2284,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   function revealCommandConsoleForActiveGame(): void {
     commandConsole.classList.remove("is-hidden");
     updateCommandConsole();
+    commandGlossaryController.restoreTutorialLogbookIntroduction();
   }
 
   function clearGameMenuDemoTimers(): void {
@@ -5731,7 +5738,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
             parts: [
               { text: "BURN", className: getCommandFactionClass(order.factionId) },
               {
-                text: `  ${formatNodeName(content, order.originNodeId)} -> ${formatNodeName(content, order.destinationNodeId)}  T+${order.etaTurns}  -${order.burnCost} ΔV`
+                text: ` from ${formatNodeName(content, order.originNodeId)} to ${formatNodeName(content, order.destinationNodeId)}; ETA T+${order.etaTurns}; cost -${order.burnCost} ΔV.`
               }
             ],
             key: `burn:${order.id}`
@@ -5757,7 +5764,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           parts: [
             { text: "FIRE", className: getCommandFactionClass(order.factionId) },
             {
-              text: `  ${formatNodeName(content, order.originNodeId)} -> ${formatNodeName(content, order.targetNodeId)}  T-${order.missileEtaTurns}${committedSuffix}`
+              text: ` from ${formatNodeName(content, order.originNodeId)} to ${formatNodeName(content, order.targetNodeId)}; impact T-${order.missileEtaTurns}.${committedSuffix}`
             }
           ],
           key: `fire:${order.id}`
@@ -5777,7 +5784,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           parts: [
             { text: "BURN", className: getCommandFactionClass(order.factionId) },
             {
-              text: `  ${formatNodeName(content, order.originNodeId)} -> ${formatNodeName(content, order.destinationNodeId)}  T+${order.etaTurns}  -${order.burnCost} ΔV${committedSuffix}`
+              text: ` from ${formatNodeName(content, order.originNodeId)} to ${formatNodeName(content, order.destinationNodeId)}; ETA T+${order.etaTurns}; cost -${order.burnCost} ΔV.${committedSuffix}`
             }
           ],
           key: `burn:${order.id}`
@@ -7315,17 +7322,29 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   function formatCommandWarningText(warning: CommandWarning): string {
     const nodeName = formatNodeName(content, warning.nodeId);
+    const projectedDv = warning.projectedDvAtEvent ?? 0;
 
     if (warning.reason === "evade-blocked-contested") {
-      return `  ${nodeName}  EVADE BLOCKED — CONTESTED`;
+      return `: EVADE will be blocked at ${nodeName} because the orbit is CONTESTED. BURN out before impact to break the firing solution.`;
     }
 
     if (warning.event === "CONTESTED") {
-      return `  ${nodeName}  ${warning.detail}`;
+      return `: ${nodeName} will become CONTESTED ${formatWarningCountdown(warning.eventTurn ?? snapshot.turn + 1)}. WORK, FIRE and EVADE will then be unavailable there.`;
     }
 
-    const warningLabel = warning.event === "LAUNCH" ? "MANDATORY LAUNCH" : warning.event;
-    return `  ${nodeName}  ${warningLabel}  ${warning.detail}`;
+    if (warning.event === "UPKEEP") {
+      return `: contested upkeep at ${nodeName} will cost 2 ΔV ${formatWarningCountdown(warning.eventTurn ?? snapshot.turn + 1)}, but the faction is projected to have ${projectedDv} ΔV.`;
+    }
+
+    if (warning.event === "EVADE") {
+      return `: ${nodeName} will need 1 ΔV to EVADE ${formatWarningCountdown(warning.eventTurn ?? snapshot.turn + 1)}, but the faction is projected to have ${projectedDv} ΔV.`;
+    }
+
+    if (warning.event === "LAUNCH") {
+      return `: MANDATORY LAUNCH is due at ${nodeName} next turn, but no valid destination is affordable with the projected ${projectedDv} ΔV.`;
+    }
+
+    return `: ${warning.event} at ${nodeName}. ${warning.detail}.`;
   }
 
   function createDvTelemetryTimelineRow(
@@ -7334,6 +7353,23 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     currentDv: number,
     projectedDv: number
   ): CommandTimelineRow {
+    const recovery = getGlossaryDvForecast(factionId);
+    const history = getCommandDvTelemetryValues(factionId, projectedDv);
+    const upkeepCost = recovery.projectedUpkeepByTurn[0] ?? 0;
+    const committedCosts = recovery.committedCostsByTurn[0] ?? upkeepCost;
+    const glossaryContext: GameGlossaryLineContext = {
+      kind: "dv",
+      factionLabel: getConsoleFactionLabel(factionId),
+      currentDv,
+      committedDv: projectedDv,
+      nextTurnDv: recovery.projectedDvByTurn[0] ?? projectedDv,
+      pendingBurnCost: Math.max(0, currentDv - recovery.currentDv),
+      upkeepCost,
+      evadeCost: Math.max(0, committedCosts - upkeepCost),
+      income: recovery.projectedIncomeByTurn[0] ?? 0,
+      history
+    };
+
     return {
       parts: [
         { text: label, className: getCommandFactionClass(factionId) },
@@ -7343,13 +7379,33 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         {
           dvBars: {
             factionId,
-            values: getCommandDvTelemetryValues(factionId, projectedDv)
+            values: history
           }
         }
       ],
       className: "command-console__line--dv-telemetry",
-      key: `dv:${factionId}`
+      key: `dv:${factionId}`,
+      glossaryContext
     };
+  }
+
+  function getGlossaryDvForecast(factionId: FactionId): FactionRecoveryPath {
+    let forecasts = glossaryDvForecastsByState.get(state);
+
+    if (forecasts === undefined) {
+      forecasts = new Map();
+      glossaryDvForecastsByState.set(state, forecasts);
+    }
+
+    const cached = forecasts.get(factionId);
+
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const forecast = evaluateFactionRecoveryPath(content, state, factionId);
+    forecasts.set(factionId, forecast);
+    return forecast;
   }
 
   function getConsoleFactionLabel(factionId: FactionId): string {
@@ -7399,7 +7455,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   ): CommandConsoleRow {
     return {
       ...row,
-      metadata
+      metadata: {
+        ...metadata,
+        ...(row.glossaryContext === undefined ? {} : { glossaryContext: row.glossaryContext })
+      }
     };
   }
 
@@ -7774,6 +7833,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     if (metadata.rowIndex !== undefined) {
       line.dataset["rowIndex"] = String(metadata.rowIndex);
     }
+
+    if (metadata.glossaryContext !== undefined) {
+      line.dataset["glossaryContext"] = JSON.stringify(metadata.glossaryContext);
+    }
   }
 
   function createCommandScrollbackRowLabel(metadata: CommandConsoleRowMetadata): string {
@@ -8055,7 +8118,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
       projected[missile.targetFactionId] = Math.max(
         0,
-        (projected[missile.targetFactionId] ?? 0) - 3
+        (projected[missile.targetFactionId] ?? 0) - 1
       );
     }
 
@@ -12006,7 +12069,13 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     if (tutorial.phase === "awaitingBurnOut" && originNodeId === tutorial.defensivePlayerNodeId) {
       tutorial.phase = "burnOutQueued";
       tutorial.defensiveEscapeNodeId = destinationNodeId;
-      appendTutorialRows(["BURN OUT", "Order queued."], "tutorial:burn-out-queued");
+      appendTutorialRows(
+        [
+          "BURN OUT order queued.",
+          "The ship will leave its contested orbit when EXECUTE resolves."
+        ],
+        "tutorial:burn-out-queued"
+      );
       updateInteractionLocks();
       updateCommandConsole();
     }
@@ -12089,7 +12158,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     if (!isTutorialBurnPlanAllowed(originNodeId, destinationNodeId)) {
-      return "TUTORIAL LOCKED";
+      return getTutorialPlanFailureReason();
     }
 
     if (originNodeId === destinationNodeId) {
@@ -12156,7 +12225,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     if (!isTutorialFirePlanAllowed(originNodeId, targetNodeId)) {
-      return "TUTORIAL LOCKED";
+      return getTutorialPlanFailureReason();
     }
 
     if (
@@ -12190,6 +12259,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     return withFireValidity(plan)?.isValidTarget === false ? "NO ENEMY TARGET" : null;
+  }
+
+  function getTutorialPlanFailureReason(): "PRESS EXECUTE?" | "TUTORIAL LOCKED" {
+    return shouldShowExecutePrompt() && getExecutePromptMode() === "execute"
+      ? "PRESS EXECUTE?"
+      : "TUTORIAL LOCKED";
   }
 
   function isMandatoryLaunchDestinationUnavailable(
@@ -13679,7 +13754,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         {
           parts: [
             {
-              text: "Left click the blinking log line a second time to rewind to that point in time."
+              text: "Left-click the blinking log line again to rewind to that event."
             }
           ],
           className: tutorialLiveHintClassName,
@@ -13687,7 +13762,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         },
         createTutorialSpacerRow(`${key}:spacer`),
         {
-          parts: [{ text: "Left click the blinking log line a third time to resume." }],
+          parts: [{ text: "Left-click the same line once more to resume from the present." }],
           className: tutorialLiveHintClassName,
           key: `${key}:replay`
         }
@@ -14165,6 +14240,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       resetRuntimeAfterGameReset({ preserveTutorial: true });
       updateCommandConsoleModeControls();
       revealCommandConsoleForActiveGame();
+      commandGlossaryController.beginTutorialLogbookIntroduction();
       const handoffPoint = pendingTutorialGlossaryHandoffPoint;
       pendingTutorialGlossaryHandoffPoint = null;
       if (handoffPoint !== null) {
@@ -14190,6 +14266,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     } catch (error) {
       tutorialState = null;
       pendingTutorialGlossaryHandoffPoint = null;
+      commandGlossaryController.endTutorialLogbookIntroduction();
       hideCommandConsoleForGameMenuLaunch();
       commandConsole.classList.remove("is-hidden");
       status.textContent = error instanceof Error ? error.message : "Tutorial failed to load.";
@@ -14753,7 +14830,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       options.preserveCamera === true ? (cinematicRenderer?.captureCameraState() ?? null) : null;
     const preservedTacticalCamera = options.preserveCamera === true ? tacticalCamera : null;
     pendingCinematicCameraRestore = null;
-    commandGlossaryController.closeAll();
+    commandGlossaryController.endTutorialLogbookIntroduction();
 
     if (options.preserveTutorial !== true) {
       clearTutorialTimers();
@@ -14990,7 +15067,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       (burnOutBrokenSolution ?? burnOutDeparted) !== undefined
     ) {
       appendTutorialRows(
-        ["MISSILE LOST TRACK", "Target left contested orbit.", "Firing solution cancelled."],
+        [
+          "The missile lost track when its target left the contested orbit.",
+          "That BURN cancelled every firing solution attached to the departing ship."
+        ],
         "tutorial:defensive-solution-broken"
       );
       void continueTutorialBurnOutToDestination();
@@ -15356,7 +15436,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     unlockTutorialForManualInteraction(tutorial);
     tutorial.phase = "complete";
     appendTutorialRows(
-      ["MANDATORY LAUNCH LOST", "Tutorial routing recovered. Continue the operation normally."],
+      [
+        "The mandatory launch route could not be completed.",
+        "Normal control has been restored, so continue the operation with the surviving ships."
+      ],
       "tutorial:mandatory-launch-recovery"
     );
     completeTutorialGuidedSegment();
@@ -15688,8 +15771,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   function getTutorialProtectedInterdictionLessonRows(): readonly string[] {
     return [
-      "Earth and lunar orbits are interdicted zones for nuclear warfare.",
-      "Translunar orbital conflict is unsanctioned."
+      "Nuclear warfare is actively interdicted in Earth and lunar orbits.",
+      "Beyond that protected corridor, the same acts remain unlawful but immediate enforcement is no longer available."
     ];
   }
 
@@ -15720,8 +15803,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       appendTutorialRows(
         [
           ...getTutorialProtectedInterdictionLessonRows(),
-          "TRITIUM orbits are indicated with THREE DOTS.",
-          "SHIPYARD orbits are indicated with a SQUARE."
+          "Three dots identify a tritium plant; a square identifies a shipyard."
         ],
         "tutorial:first-protected-branch"
       );
@@ -15732,8 +15814,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     appendTutorialRows(
       [
         ...getTutorialBarrenLessonRows(),
-        "TRITIUM orbits are indicated with THREE DOTS.",
-        "SHIPYARD orbits are indicated with a SQUARE."
+        "Three dots identify a tritium plant; a square identifies a shipyard."
       ],
       "tutorial:first-barren-branch"
     );
@@ -15888,10 +15969,16 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         {
           parts: [
             {
-              text: "Fusion torch drives burn extraordinary amounts of TRITIUM to sustain continuous acceleration. "
-            },
+              text: "Fusion torch drives consume tritium to sustain acceleration, so every faction depends on a continuing fuel cycle."
+            }
+          ],
+          className: "command-console__line--tutorial"
+        },
+        createTutorialSpacerRow("tutorial:first-tritium-branch:rule-spacer"),
+        {
+          parts: [
             {
-              text: "A ship that starts the turn on a TRITIUM orbit extracts the equivalent of +2 ΔV unless it "
+              text: "A ship that begins the turn at a tritium plant produces +2 ΔV if it remains eligible to WORK. It produces nothing if it "
             },
             { text: "BURN", className: getCommandFactionClass("player") },
             { text: "s" },
@@ -15901,9 +15988,20 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
             { text: ", " },
             { text: "EVADE", className: getCommandFactionClass("player") },
             { text: "s" },
-            { text: " or becomes CONTESTED. " },
-            { text: "SHIPYARD orbits are indicated with a SQUARE." }
+            { text: " or becomes CONTESTED." }
           ],
+          className: "command-console__line--tutorial"
+        },
+        {
+          parts: [
+            {
+              text: "Protecting this worker for three turns would produce 6 ΔV, so leaving the plant has an economic cost even when the BURN itself is cheap."
+            }
+          ],
+          className: "command-console__line--tutorial"
+        },
+        {
+          parts: [{ text: "A square identifies a shipyard orbit." }],
           className: "command-console__line--tutorial"
         }
       ],
@@ -15984,7 +16082,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       tutorial.hasIntroducedBarren = true;
     }
 
-    return ["Barren orbits cannot be used for either production or extraction."];
+    return [
+      "Barren orbits produce no tritium and contain no shipyard.",
+      "They still matter when their timing, route access or firing angle justifies the transfer cost."
+    ];
   }
 
   async function startTutorialShipyardArrivalWorkSequence(
@@ -16004,8 +16105,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       state = withTutorialOccupancy(state, shipyardNodeId, "player", 1);
       appendTutorialRows(
         [
-          "FRIENDLY SHIP ONLINE",
-          `Shipyard operations assigned to ${formatNodeName(content, shipyardNodeId)}.`
+          `A friendly ship is now online at ${formatNodeName(content, shipyardNodeId)}.`,
+          "It has been assigned to shipyard operations and will WORK automatically while it remains eligible."
         ],
         "tutorial:shipyard-training-ship"
       );
@@ -16631,12 +16732,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       [
         {
           parts: [
-            { text: "A ship can and will " },
+            { text: "When a missile reaches a non-contested ship, it automatically attempts to " },
             { text: "EVADE", className: getCommandFactionClass("opponent") },
-            { text: " incoming " },
-            { text: "FIRE", className: getCommandFactionClass("opponent") },
             {
-              text: " by engaging its hard-kill kinetic point defense. EVADE costs 1 ΔV per incoming missile that turn."
+              text: " with its hard-kill defenses. The faction pays 1 ΔV for each missile impacting that ship in the turn."
             }
           ],
           className: "command-console__line--tutorial"
@@ -16647,7 +16746,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
             { text: "EVADE", className: getCommandFactionClass("opponent") },
             { text: " and " },
             { text: "WORK", className: getCommandFactionClass("opponent") },
-            { text: " on the same turn." }
+            {
+              text: " in the same turn, so FIRE can deny production even when the target survives."
+            }
           ],
           className: "command-console__line--tutorial"
         }
@@ -17433,7 +17534,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           {
             parts: [
               { text: "BURN", className: getCommandFactionClass("player") },
-              { text: " toward another SHIPYARD orbit to produce a support ship." }
+              {
+                text: " to another shipyard and produce a support ship. The extra hull can create the second firing angle needed to break the contested lock."
+              }
             ],
             className: "command-console__line--tutorial"
           }
@@ -17466,9 +17569,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         {
           parts: [
             { text: "BURN", className: getCommandFactionClass("player") },
-            { text: " toward the enemy shipyard to " },
+            { text: " to the enemy shipyard to " },
             { text: "CONTEST", className: "command-console__event-contested" },
-            { text: " it." }
+            {
+              text: " it. The arrival will stop WORK immediately, although your ship cannot produce there until the following turn."
+            }
           ],
           className: "command-console__line--tutorial"
         }
@@ -17505,7 +17610,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
             { text: "CONTESTED", className: "command-console__event-contested" },
             { text: " orbit cannot " },
             { text: "EVADE", className: getCommandFactionClass("opponent") },
-            { text: "." }
+            {
+              text: ". They must leave before impact or face the missile without the automatic defense."
+            }
           ],
           className: "command-console__line--tutorial"
         },
@@ -17515,10 +17622,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
             { text: "FIRE", className: getCommandFactionClass("player") },
             { text: " on the " },
             { text: "CONTESTED", className: "command-console__event-contested" },
-            { text: " orbit to force enemy ships to either " },
-            { text: "BURN", className: getCommandFactionClass("player") },
+            { text: " orbit from this outside support ship. The enemy must either " },
+            { text: "BURN", className: getCommandFactionClass("opponent") },
             {
-              text: " to a different orbit or be destroyed."
+              text: " out before impact or be destroyed, because it cannot EVADE while the lock remains."
             }
           ],
           className: "command-console__line--tutorial"
@@ -18312,11 +18419,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     focusTutorialArrivalTarget(`node:${setup.enemyNodeId}`);
     appendTutorialRows(
       [
-        "ENEMY CONTACT",
-        `Hostile ship detected at ${formatNodeName(content, setup.enemyNodeId)}.`,
+        `A hostile ship has been detected at ${formatNodeName(content, setup.enemyNodeId)}.`,
         "",
-        "FIRE",
-        `${formatNodeName(content, setup.enemyNodeId)} → ${formatNodeName(content, setup.targetNodeId)} · Impact T+${fireOrder?.missileEtaTurns ?? setup.plan.missileEtaTurns}.`
+        `It FIRED from ${formatNodeName(content, setup.enemyNodeId)} toward ${formatNodeName(content, setup.targetNodeId)}; impact is due in T-${fireOrder?.missileEtaTurns ?? setup.plan.missileEtaTurns}.`
       ],
       "tutorial:enemy-fire"
     );
@@ -18375,12 +18480,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       [
         {
           parts: [
-            { text: "A ship can and will " },
+            { text: "When a missile reaches a non-contested ship, it automatically attempts to " },
             { text: "EVADE", className: getCommandFactionClass("player") },
-            { text: " incoming " },
-            { text: "FIRE", className: getCommandFactionClass("player") },
             {
-              text: " by engaging its hard-kill kinetic point defense. EVADE costs 1 ΔV per incoming missile that turn."
+              text: " with its hard-kill defenses. The faction pays 1 ΔV for each missile impacting that ship in the turn."
             }
           ],
           className: "command-console__line--tutorial"
@@ -18391,12 +18494,18 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
             { text: "EVADE", className: getCommandFactionClass("player") },
             { text: " and " },
             { text: "WORK", className: getCommandFactionClass("player") },
-            { text: " on the same turn." }
+            {
+              text: " in the same turn, so even a successful defense denies that turn's production."
+            }
           ],
           className: "command-console__line--tutorial"
         },
         {
-          parts: [{ text: "Orbits occupied by enemy ships are valid BURN targets." }],
+          parts: [
+            {
+              text: "You may BURN into an enemy-occupied orbit to create a contested lock and deny its actions, provided you can sustain the upkeep."
+            }
+          ],
           className: "command-console__line--tutorial"
         }
       ],
@@ -18456,14 +18565,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     activeTutorial.phase = "contestedFireSetup";
     appendTutorialRows(
       [
-        `Ship arrived at ${formatNodeName(content, arrivalNodeId)}.`,
-        "",
-        "An orbit occupied by ships from two different factions becomes CONTESTED.",
-        "Both ships spend 2 ΔV per turn to avoid being destroyed.",
-        "Extraction and production stop.",
-        "",
-        `${formatNodeName(content, arrivalNodeId)} is now contested.`,
-        "EVADE unavailable while contested."
+        `Your ship has reached ${formatNodeName(content, arrivalNodeId)}, where an enemy ship was already present. The orbit is now CONTESTED.`,
+        "Both factions pay 2 ΔV per turn to maintain the lock, and neither ship can WORK, FIRE or EVADE while it remains.",
+        "Holding denies the orbit to both sides; BURNING out ends the lock for the departing ship."
       ],
       "tutorial:enemy-node-contested"
     );
@@ -18527,14 +18631,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     snapshot = createSolarSystemSnapshot(content, state);
     appendTutorialRows(
       [
-        "ENEMY BURN",
-        `${formatNodeName(content, tutorialDefensiveEnemyAssaultNodeId)} → ${formatNodeName(content, targetNodeId)} · Arrival T+${assaultOrder?.etaTurns ?? "?"}.`,
+        `An enemy BURN is moving from ${formatNodeName(content, tutorialDefensiveEnemyAssaultNodeId)} to ${formatNodeName(content, targetNodeId)}; ETA T+${assaultOrder?.etaTurns ?? "?"}.`,
         "",
-        "ENEMY FIRE",
-        `${formatNodeName(content, tutorialDefensiveEnemyFireNodeId)} → ${formatNodeName(content, targetNodeId)} · Impact T+${fireOrder?.missileEtaTurns ?? "?"}.`,
+        `An enemy FIRE solution runs from ${formatNodeName(content, tutorialDefensiveEnemyFireNodeId)} to ${formatNodeName(content, targetNodeId)}; impact T-${fireOrder?.missileEtaTurns ?? "?"}.`,
         "",
-        `${formatNodeName(content, targetNodeId)} will be contested in T+${assaultOrder?.etaTurns ?? "?"} and your ship destroyed in T+${fireOrder?.missileEtaTurns ?? "?"}.`,
-        "BURN to a different orbit to cancel all firing solutions."
+        `${formatNodeName(content, targetNodeId)} will become contested before the missile arrives. Once contested, your ship cannot EVADE the impact.`,
+        "BURN to another orbit before impact; departure breaks every firing solution aimed at that ship."
       ],
       "tutorial:defensive-forecast"
     );
@@ -18567,17 +18669,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     activeTutorial.phase = "awaitingBurnOut";
     appendTutorialRows(
       [
-        `Enemy ship arrived at ${formatNodeName(content, contestedNodeId)}.`,
-        "",
-        "CONTESTED",
-        `${formatNodeName(content, contestedNodeId)} is now contested.`,
-        "EVADE unavailable.",
-        "Extraction and production stop.",
-        "Both ships spend 2 ΔV per turn to avoid being destroyed.",
-        "",
-        "Incoming FIRE impact in T+1.",
-        "CONTESTED ships cannot EVADE.",
-        "BURN to another valid orbit before impact."
+        `The enemy ship has reached ${formatNodeName(content, contestedNodeId)}, so the orbit is now CONTESTED.`,
+        "Neither ship can WORK, FIRE or EVADE, and both factions will pay 2 ΔV at the start of each turn they remain.",
+        "A missile will impact next turn. BURN to another valid orbit now, because leaving the lock will also break the incoming firing solution."
       ],
       "tutorial:defensive-contested"
     );

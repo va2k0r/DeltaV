@@ -6,11 +6,66 @@ import { astronomicalGlossaryEntries } from "../../src/ui/astronomicalGlossary";
 import {
   gameGlossaryEntries,
   getGameGlossaryEntry,
-  tokenizeGameGlossaryText
+  tokenizeGameGlossaryText,
+  type GameGlossaryEntry
 } from "../../src/ui/gameGlossary";
+import {
+  advanceTutorialLogbookIntroduction,
+  tutorialLogbookExpandInstruction,
+  tutorialLogbookHoverInstruction,
+  tutorialLogbookLabel,
+  tutorialLogbookReturnInstruction,
+  type TutorialLogbookIntroductionStep
+} from "../../src/ui/gameGlossaryController";
 import { worldLoreGlossaryEntries } from "../../src/ui/worldLoreGlossary";
 
+function getGlossaryAdvice(entry: GameGlossaryEntry): readonly string[] {
+  return entry.advice ?? [];
+}
+
 describe("game glossary", () => {
+  it("guides the tutorial through the three-step Logbook introduction", () => {
+    let step: TutorialLogbookIntroductionStep = "inactive";
+    const sequence: TutorialLogbookIntroductionStep[] = [];
+
+    for (let index = 0; index < 4; index += 1) {
+      step = advanceTutorialLogbookIntroduction(step);
+      sequence.push(step);
+    }
+
+    expect(sequence).toEqual(["hover-prompt", "expand-prompt", "return-prompt", "inactive"]);
+    expect([
+      tutorialLogbookLabel,
+      tutorialLogbookHoverInstruction,
+      tutorialLogbookExpandInstruction,
+      tutorialLogbookReturnInstruction
+    ]).toEqual([
+      "Logbook",
+      "Left-click any word in the logbook to open its explanation.",
+      "Left-click the selected term to expand it.",
+      "Left-click the title to return to the previous explanation."
+    ]);
+
+    const controllerSource = readFileSync(
+      join(process.cwd(), "src/ui/gameGlossaryController.ts"),
+      "utf8"
+    );
+    const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
+    const styles = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
+
+    expect(controllerSource).toContain("handleTutorialLogbookTokenActivation(event, token)");
+    expect(controllerSource).toContain("renderTutorialLogbookDetailPrompt();");
+    expect(controllerSource).toContain("detailLabel.textContent = tutorialLogbookLabel;");
+    expect(controllerSource).toContain(
+      'detailLabel.classList.add("can-go-back", "is-tutorial-logbook-attention");'
+    );
+    expect(uiSource).toContain("commandGlossaryController.beginTutorialLogbookIntroduction();");
+    expect(uiSource).toContain("commandGlossaryController.endTutorialLogbookIntroduction();");
+    expect(styles).toContain(".command-glossary-hover.is-tutorial-logbook-attention,");
+    expect(styles).toContain(".command-glossary-detail__line.is-tutorial-logbook-attention,");
+    expect(styles).toContain(".command-glossary-detail__label.is-tutorial-logbook-attention {");
+  });
+
   it("reserves the first activation for context and closes it before the log action", () => {
     const controllerSource = readFileSync(
       join(process.cwd(), "src/ui/gameGlossaryController.ts"),
@@ -128,7 +183,7 @@ describe("game glossary", () => {
   it("names the victory dependency tritium access without viability jargon or added caps", () => {
     const access = getGameGlossaryEntry("tritium-access");
     const playerFacingCopy = gameGlossaryEntries
-      .flatMap((entry) => [entry.label, entry.short, ...entry.detail])
+      .flatMap((entry) => [entry.label, entry.short, ...entry.detail, ...getGlossaryAdvice(entry)])
       .join(" ");
 
     expect(access?.label).toBe("tritium access");
@@ -139,7 +194,13 @@ describe("game glossary", () => {
 
   it("does not expose ARRIVAL as a billboard, log or detail label", () => {
     const playerFacingCopy = gameGlossaryEntries
-      .flatMap((entry) => [entry.label, ...entry.aliases, entry.short, ...entry.detail])
+      .flatMap((entry) => [
+        entry.label,
+        ...entry.aliases,
+        entry.short,
+        ...entry.detail,
+        ...getGlossaryAdvice(entry)
+      ])
       .join(" ");
     const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
     const lessonSource = readFileSync(join(process.cwd(), "src/ui/tutorial/lessonRows.ts"), "utf8");
@@ -214,10 +275,60 @@ describe("game glossary", () => {
     expect(controllerSource).toContain("isInsideInteractiveRoot(event.target)");
     expect(controllerSource).toContain("detailHistory.pop();");
     expect(controllerSource).toContain(
-      "renderDetail(previousEntry, previousHistoryEntry.label, false);"
+      "renderDetail(restoredEntry, previousHistoryEntry.label, false);"
     );
     expect(styles).toContain(".command-glossary-detail * {\n  user-select: none;");
     expect(styles).toContain("-webkit-touch-callout: none;");
+  });
+
+  it("separates gameplay rules from unheaded consequence bullets while leaving lore continuous", () => {
+    const controllerSource = readFileSync(
+      join(process.cwd(), "src/ui/gameGlossaryController.ts"),
+      "utf8"
+    );
+    const styles = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
+    const adviceCopy = gameGlossaryEntries.flatMap(getGlossaryAdvice);
+
+    expect(getGameGlossaryEntry("burn")?.advice?.length).toBeGreaterThanOrEqual(2);
+    expect(getGameGlossaryEntry("delta-v")?.advice?.join(" ")).toMatch(
+      /queued BURN.*upkeep.*EVADE/iu
+    );
+    expect(controllerSource).toContain(
+      'return [...entry.detail, "", ...entry.advice.map((line) => `• ${line}`)];'
+    );
+    expect(styles).toContain(".command-glossary-detail__line--spacer");
+    expect(styles).toContain(".command-glossary-detail__line--advice");
+    expect(adviceCopy.join(" ")).not.toMatch(/\b(?:AI|planner|score|weight)\b/iu);
+    expect(adviceCopy).not.toContain("STRATEGY");
+    expect(worldLoreGlossaryEntries.every((entry) => !("advice" in entry))).toBe(true);
+    expect(astronomicalGlossaryEntries.every((entry) => !("advice" in entry))).toBe(true);
+  });
+
+  it("grounds selected ΔV, BURN and progress explanations in the clicked log line", () => {
+    const controllerSource = readFileSync(
+      join(process.cwd(), "src/ui/gameGlossaryController.ts"),
+      "utf8"
+    );
+    const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
+
+    expect(controllerSource).toContain(
+      "On this line, ${telemetryContext.factionLabel} has ${telemetryContext.currentDv} ΔV now."
+    );
+    expect(controllerSource).toContain(
+      "The next-turn forecast is ${telemetryContext.nextTurnDv} ΔV."
+    );
+    expect(controllerSource).toContain(
+      "This BURN runs from ${burn.origin} to ${burn.destination}, takes ${burn.etaTurns} turns and costs ${burn.cost} ΔV."
+    );
+    expect(controllerSource).toContain(
+      'Its ΔV was removed when the departure resolved on TURN ${String(sourceTurn).padStart(2, "0")}, ${elapsedCopy}.'
+    );
+    expect(controllerSource).toContain(
+      "This yard is at ${progress}/5. It needs ${remaining} more eligible WORK"
+    );
+    expect(uiSource).toContain('line.dataset["glossaryContext"] = JSON.stringify');
+    expect(uiSource).toContain("nextTurnDv: recovery.projectedDvByTurn[0] ?? projectedDv");
+    expect(uiSource).toContain("pendingBurnCost: Math.max(0, currentDv - recovery.currentDv)");
   });
 
   it("keeps atomic commands mechanical while routing physical phrases into lore", () => {
@@ -274,7 +385,7 @@ describe("game glossary", () => {
 
   it("does not assign a canonical duration to the first armed conflict", () => {
     const playerCopy = gameGlossaryEntries
-      .flatMap((entry) => [entry.label, entry.short, ...entry.detail])
+      .flatMap((entry) => [entry.label, entry.short, ...entry.detail, ...getGlossaryAdvice(entry)])
       .join(" ");
     const inventoryCopy = [
       ...(getGameGlossaryEntry("ship")?.detail ?? []),
@@ -294,7 +405,7 @@ describe("game glossary", () => {
   it("names tritium infrastructure plainly before introducing the technical component", () => {
     const plant = getGameGlossaryEntry("tritium-breeding");
     const playerCopy = gameGlossaryEntries
-      .flatMap((entry) => [entry.label, entry.short, ...entry.detail])
+      .flatMap((entry) => [entry.label, entry.short, ...entry.detail, ...getGlossaryAdvice(entry)])
       .join(" ");
 
     expect(plant?.label).toBe("TRITIUM PLANT");
@@ -322,7 +433,7 @@ describe("game glossary", () => {
     expect(getGameGlossaryEntry("automated-mining")?.detail.join(" ")).toContain("2076");
   });
 
-  it("keeps lore pages terse, bounded and deliberately varied", () => {
+  it("keeps lore pages concise, readable and deliberately varied", () => {
     const lineCounts = new Set<number>();
 
     for (const entry of worldLoreGlossaryEntries) {
@@ -444,7 +555,8 @@ describe("game glossary", () => {
     const copy = gameGlossaryEntries.flatMap((entry) => [
       entry.label,
       entry.short,
-      ...entry.detail
+      ...entry.detail,
+      ...getGlossaryAdvice(entry)
     ]);
 
     expect(copy.every((line) => !line.includes("//"))).toBe(true);

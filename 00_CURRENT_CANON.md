@@ -357,13 +357,26 @@ Planets, moons, ships, and trajectories cross the static frame as the demo advan
 This composition is the player’s opening view of DeltaV and should remain legible as a moving
 banner rather than behaving like a gameplay focus camera.
 
-## 16. Log lore style and conflict duration
+## 16. Log, tutorial and lore style; conflict duration
 
 Extended log entries are intradiegetic except for the existing control instructions.
 
 ```text
-Write lore as a terse technical manual.
-Use direct, factual statements.
+Write in concise, connected prose: closer to rigorous science journalism than a technical incident form.
+Use complete sentences, explicit causal links and enough context for each entry to make sense on its own.
+Terse means economical, not telegraphic. Avoid fragments, equation-like shorthand and repeated
+"A does this. B does that." constructions.
+For game rules, explain the rule first, its consequence second and its strategic use when relevant.
+Resolution telemetry may remain compact, but it must use clear verbs or labels so the relationship
+between action, subject, cost and result is immediately legible.
+Expanded game explanations use two visually separate sections: concise rule text, one blank line,
+then a short bullet list of consequences, options, examples or advanced considerations. The second
+section has no heading. Lore entries remain continuous prose and do not use this structure.
+Whenever the selected log line contains concrete state, explain that instance: the named faction,
+current and projected ΔV, the costs and income behind the next-turn forecast, or that BURN's actual
+origin, destination, cost, ETA and departure turn.
+Advanced guidance describes consequences available to the player. It never exposes AI behavior,
+hidden scoring, evaluation weights or implementation terminology.
 Do not use slogans, aphorisms, punchlines, dramatic parallelism, or trailer-style phrasing.
 ```
 
