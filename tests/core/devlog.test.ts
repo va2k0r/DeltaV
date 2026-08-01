@@ -166,6 +166,12 @@ describe("public devlog", () => {
     expect(mainSource.indexOf('"deltav-runtime-host is-site-background"')).toBeLessThan(
       mainSource.indexOf("await createDeltaVApp(gameHost)")
     );
+    expect(mainSource).toContain('window.history.scrollRestoration = "manual";');
+    expect(mainSource).toContain('window.scrollTo({ top: 0, behavior: "auto" });');
+    expect(mainSource).toContain('navigationEntry?.type !== "reload"');
+    expect(mainSource).toContain("window.history.replaceState(");
+    expect(mainSource).toContain("clearSiteHashOnReload();");
+    expect(mainSource.match(/resetSiteScrollPosition\(\);/gu)).toHaveLength(2);
     expect(rendererSource).toContain("private syncSitePlanetariumExtent()");
     expect(rendererSource).toContain("private getSitePlanetariumProjectedBottom(");
     expect(rendererSource).toContain(

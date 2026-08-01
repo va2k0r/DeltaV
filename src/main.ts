@@ -51,9 +51,30 @@ function shouldOpenDirectlyInGame(searchParams: URLSearchParams): boolean {
   );
 }
 
+function resetSiteScrollPosition(): void {
+  window.history.scrollRestoration = "manual";
+  window.scrollTo({ top: 0, behavior: "auto" });
+}
+
+function clearSiteHashOnReload(): void {
+  const navigationEntry = window.performance.getEntriesByType("navigation")[0] as
+    | PerformanceNavigationTiming
+    | undefined;
+  if (navigationEntry?.type !== "reload" || window.location.hash === "") {
+    return;
+  }
+
+  window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+}
+
 async function startDeltaV(): Promise<void> {
   const searchParams = new URLSearchParams(window.location.search);
   const directGameMode = shouldOpenDirectlyInGame(searchParams);
+  if (!directGameMode) {
+    clearSiteHashOnReload();
+    resetSiteScrollPosition();
+  }
+
   const gameHost = document.createElement("div");
   gameHost.className = directGameMode
     ? "deltav-runtime-host"
@@ -66,6 +87,7 @@ async function startDeltaV(): Promise<void> {
   }
 
   createDeltaVSite(appRoot, gameHost);
+  resetSiteScrollPosition();
 }
 
 void startDeltaV().catch(showStartupFailure);

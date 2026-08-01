@@ -767,7 +767,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   controls.className = "map-controls debug-controls";
 
   const musicEngine = new DeltaVMusicEngine();
-  let isMusicEnabled = false;
+  let isMusicEnabled = true;
   const sfxEngine = new DeltaVSfxEngine();
 
   const nextTurnButton = document.createElement("button");
@@ -786,8 +786,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   const musicButton = document.createElement("button");
   musicButton.type = "button";
   musicButton.className = "music-button";
-  musicButton.textContent = "Music Off";
-  musicButton.setAttribute("aria-pressed", "false");
+  musicButton.textContent = "Music On";
+  musicButton.setAttribute("aria-pressed", "true");
   let musicAutoplayUnlockHandler: ((event: Event) => void) | null = null;
 
   const sfxButton = document.createElement("button");
