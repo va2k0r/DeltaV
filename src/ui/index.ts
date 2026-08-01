@@ -124,6 +124,7 @@ import {
 import {
   createGameGlossaryController,
   createGameGlossaryTextSpans,
+  gameMenuGlossaryHoverDwellMs,
   type GameGlossaryLineContext
 } from "./gameGlossaryController";
 import { createPlayerFacingResolutionRows } from "./resolutionCommandRows";
@@ -664,7 +665,6 @@ const gameMenuCrtFlickerMinDelayMs = 1_200;
 const gameMenuCrtFlickerMaxDelayMs = 3_400;
 const gameMenuCrtFlickerMinDurationMs = 140;
 const gameMenuCrtFlickerMaxDurationMs = 300;
-const gameMenuGlossaryHoverDwellMs = 240;
 const tutorialLogGlossaryHandoffActiveMs = 1_250;
 const tutorialLogGlossaryHandoffMinimumVisibleMs = 1_650;
 const aiAutorunCommandTranscriptDomEntryLimit = 72;
@@ -1009,7 +1009,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   executePrompt.className = "command-console__execute";
   renderExecutePrompt("execute");
 
-  const commandGlossaryController = createGameGlossaryController(document, window);
+  const commandGlossaryController = createGameGlossaryController(document, window, {
+    onTutorialLogbookIntroductionComplete() {
+      updateCommandConsole();
+      redraw();
+    }
+  });
   commandGlossaryController.bindRoot(commandTranscript);
   commandGlossaryController.bindRoot(commandLiveRows);
   commandGlossaryController.bindRoot(commandPinnedLiveRow);
@@ -6096,6 +6101,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return overlayHint === null ? [] : [overlayHint];
     }
 
+    if (isTutorialLogbookIntroductionBlockingOpening()) {
+      return [];
+    }
+
     const requiredShipSelection = getTutorialRequiredShipSelection(tutorial);
 
     if (requiredShipSelection !== null) {
@@ -6249,6 +6258,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   function getTutorialRequiredShipSelection(
     tutorial: TutorialRuntimeState
   ): TutorialRequiredShipSelection | null {
+    if (isTutorialLogbookIntroductionBlockingOpening()) {
+      return null;
+    }
+
     const selectedNodeId = getNodeIdFromTargetKey(selectedTargetKey);
 
     if (tutorial.phase === "awaitingInitialSelection") {
@@ -6899,6 +6912,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   function getTutorialGuidanceAttentionTarget(
     tutorial: TutorialRuntimeState
   ): TutorialGuidanceAttentionTarget | null {
+    if (isTutorialLogbookIntroductionBlockingOpening()) {
+      return null;
+    }
+
     const requiredShipSelection = getTutorialRequiredShipSelection(tutorial);
 
     if (requiredShipSelection !== null) {
@@ -10802,6 +10819,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       isTargetInputAllowed(targetKey: string) {
         return (
           !isCinematicGameplayInputLocked() &&
+          !isTutorialLogbookIntroductionBlockingOpening() &&
           isTutorialTargetInputAllowed(tutorialState, targetKey)
         );
       },
@@ -11260,7 +11278,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   function handleTutorialSelection(selection: CinematicSelection | null): void {
     const tutorial = tutorialState;
 
-    if (tutorial === null) {
+    if (tutorial === null || isTutorialLogbookIntroductionBlockingOpening()) {
       return;
     }
 
@@ -11343,6 +11361,13 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         updateCommandConsole();
       }
     }
+  }
+
+  function isTutorialLogbookIntroductionBlockingOpening(): boolean {
+    return (
+      tutorialState?.phase === "awaitingInitialSelection" &&
+      commandGlossaryController.isTutorialLogbookIntroductionActive()
+    );
   }
 
   function restoreTutorialRequiredShipSelectionAfterDeselect(): void {
@@ -14241,6 +14266,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       updateCommandConsoleModeControls();
       revealCommandConsoleForActiveGame();
       commandGlossaryController.beginTutorialLogbookIntroduction();
+      updateCommandConsole();
       const handoffPoint = pendingTutorialGlossaryHandoffPoint;
       pendingTutorialGlossaryHandoffPoint = null;
       if (handoffPoint !== null) {

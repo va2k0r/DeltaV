@@ -1037,7 +1037,7 @@ select {
   opacity: 1;
 }
 
-.command-glossary-hover.is-tutorial-logbook-attention,
+.command-glossary-hover__text.is-tutorial-logbook-attention,
 .command-glossary-detail__line.is-tutorial-logbook-attention,
 .command-glossary-detail__label.is-tutorial-logbook-attention {
   animation: tutorial-live-hint-blink var(--beat-tutorial-hint-duration, 1050ms) steps(2, end)
