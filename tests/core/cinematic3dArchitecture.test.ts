@@ -28,12 +28,17 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(wheelRefreshSource).toContain("this.tacticalPresentationDisplayScaleDirty = true");
     expect(methodSource).toContain("if (this.tacticalPresentationDisplayScaleDirty)");
     expect(methodSource).toContain("if (this.tacticalPresentationDeferredFireUpdate)");
-    expect(methodSource.indexOf("if (this.tacticalPresentationDisplayScaleDirty)")).toBeLessThan(
-      methodSource.indexOf("if (this.tacticalPresentationDeferredFireUpdate)")
+    expect(methodSource.indexOf("if (this.tacticalPresentationDeferredFireUpdate)")).toBeLessThan(
+      methodSource.indexOf("if (this.tacticalPresentationDisplayScaleDirty)")
     );
     expect(methodSource.indexOf("if (this.tacticalPresentationDisplayScaleDirty)")).toBeLessThan(
       methodSource.indexOf("if (isCameraMotionActive")
     );
+    const deferredFireBranch = methodSource.slice(
+      methodSource.indexOf("if (this.tacticalPresentationDeferredFireUpdate)"),
+      methodSource.indexOf("if (this.tacticalPresentationDisplayScaleDirty)")
+    );
+    expect(deferredFireBranch).not.toContain("this.tacticalPresentationDisplayScaleDirty = false");
     const displayScaleDirtyBranch = methodSource.slice(
       methodSource.indexOf("if (this.tacticalPresentationDisplayScaleDirty)"),
       methodSource.indexOf("const isCameraMotionActive")
@@ -3809,6 +3814,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(firePreviewSource).toContain("targetColor,");
     expect(firePreviewSource).toContain("...timingPreview.timingDots");
     expect(firePreviewSource).toContain('link.name = "fire-target-prediction-track"');
+    expect(source).not.toContain("`IMPACT T-");
     expect(source).toContain("marker.position.copy(destination.center)");
     expect(firePreviewSource).toContain("end: futureTarget");
     expect(firePreviewSource).not.toContain("endClearanceWorld");
@@ -4638,7 +4644,8 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("const worldPadding = clamp(destination.ringRadius * 0.04");
     expect(source).not.toContain("const screenPadding = getWorldUnitsForScreenPixels");
     expect(source).toContain("`T+${order.etaTurns} -${order.burnCost} ΔV`");
-    expect(source).toContain("`ARRIVAL T+${hoverPlan.etaTurns} -${hoverPlan.burnCost} ΔV`");
+    expect(source).toContain("`T+${hoverPlan.etaTurns} -${hoverPlan.burnCost} ΔV`");
+    expect(source).not.toContain("`ARRIVAL T+");
     expect(source).toContain('return "weapons offline";');
     expect(source).toContain('return "shipyard";');
     expect(source).toContain('return "tritium";');
@@ -6362,7 +6369,7 @@ describe("Cinematic 3D architecture boundary", () => {
     );
     const styleSource = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
     const bindHoverStart = glossaryControllerSource.indexOf(
-      "  const bindHoverRoot = (root: HTMLElement): void => {"
+      "  const bindHoverRoot = (root: HTMLElement, options: GlossaryHoverRootOptions = {}): void => {"
     );
     const bindHoverEnd = glossaryControllerSource.indexOf(
       "  function handlePointerOver",
@@ -6370,7 +6377,9 @@ describe("Cinematic 3D architecture boundary", () => {
     );
     const bindHoverSource = glossaryControllerSource.slice(bindHoverStart, bindHoverEnd);
 
-    expect(uiSource).toContain("commandGlossaryController.bindHoverRoot(gameMenu);");
+    expect(uiSource).toContain("const gameMenuGlossaryHoverDwellMs = 360;");
+    expect(uiSource).toContain("commandGlossaryController.bindHoverRoot(gameMenu, {");
+    expect(uiSource).toContain("dwellMs: gameMenuGlossaryHoverDwellMs");
     expect(uiSource).toContain('applyGameMenuHoverCopy(title, "DELTAV", "ORBITAL STRATEGY");');
     expect(uiSource).toContain(
       'tooltip: "Begin the guided introduction to movement, production and combat."'
@@ -6391,6 +6400,29 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(styleSource).toContain(".game-menu__title:hover,\n.game-menu__title:focus-visible");
     expect(styleSource).toContain(
       "clamp(4px, 0.65vw, 14px) + min(clamp(310px, 22vw, 500px), calc(100vw - 24px)) +"
+    );
+  });
+
+  it("hands the tutorial menu hover into a temporarily expanded log hover area", () => {
+    const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
+    const glossaryControllerSource = readFileSync(
+      join(process.cwd(), "src/ui/gameGlossaryController.ts"),
+      "utf8"
+    );
+
+    expect(uiSource).toContain("const tutorialLogGlossaryHandoffActiveMs = 1_250;");
+    expect(uiSource).toContain("const tutorialLogGlossaryHandoffMinimumVisibleMs = 1_650;");
+    expect(uiSource).toContain("pendingTutorialGlossaryHandoffPoint =");
+    expect(uiSource).toContain("commandGlossaryController.beginHoverHandoff({");
+    expect(uiSource).toContain("root: commandConsole,");
+    expect(glossaryControllerSource).toContain(
+      'document.addEventListener("pointermove", handleDocumentPointerMove, true);'
+    );
+    expect(glossaryControllerSource).toContain(
+      "const token = findNearestGlossaryToken(options.root, options.clientX, options.clientY);"
+    );
+    expect(glossaryControllerSource).toContain(
+      "const minimumHoldMs = Math.max(0, hoverMinimumVisibleUntil - view.performance.now());"
     );
   });
 

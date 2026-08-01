@@ -14,6 +14,87 @@ export type TutorialTrackedBurn = Readonly<{
   mandatoryLaunchId?: string;
 }>;
 
+export type TutorialBurnDeparture = Readonly<{
+  turn: number;
+  type: string;
+  factionId?: string;
+  nodeId?: string;
+  destinationNodeId?: string;
+  etaTurns?: number;
+  burnArrivalTurn?: number;
+}>;
+
+export type TutorialFirstBurnTracking = Readonly<{
+  destinationNodeId: string;
+  arrivalTurn: number | null;
+}>;
+
+/**
+ * Recover the opening transfer from authoritative simulation state.
+ *
+ * The UI keeps both lesson-specific and generic BURN caches. A destination preview can make the
+ * lesson-specific cache stale, so a live order/transit or the departure event must win. The
+ * generic cache remains a useful fallback after the transit has already arrived and disappeared.
+ */
+export function findTrackedTutorialFirstBurn(options: {
+  burns: readonly TutorialTrackedBurn[];
+  departures: readonly TutorialBurnDeparture[];
+  openingOriginNodeId: string;
+  cachedTutorialDestinationNodeId: string | null;
+  cachedTutorialArrivalTurn: number | null;
+  cachedFirstDestinationNodeId: string | null;
+  cachedFirstArrivalTurn: number | null;
+}): TutorialFirstBurnTracking | null {
+  const liveBurn = options.burns.find((burn) => {
+    return burn.factionId === "player" && burn.originNodeId === options.openingOriginNodeId;
+  });
+
+  if (liveBurn !== undefined) {
+    return {
+      destinationNodeId: liveBurn.destinationNodeId,
+      arrivalTurn: liveBurn.arrivalTurn
+    };
+  }
+
+  for (let index = options.departures.length - 1; index >= 0; index -= 1) {
+    const departure = options.departures[index];
+
+    if (
+      departure === undefined ||
+      departure.type !== "BURN_DEPARTED" ||
+      departure.factionId !== "player" ||
+      departure.nodeId !== options.openingOriginNodeId ||
+      departure.destinationNodeId === undefined
+    ) {
+      continue;
+    }
+
+    return {
+      destinationNodeId: departure.destinationNodeId,
+      arrivalTurn:
+        departure.burnArrivalTurn ??
+        (departure.etaTurns === undefined
+          ? options.cachedTutorialArrivalTurn
+          : departure.turn - 1 + departure.etaTurns)
+    };
+  }
+
+  const cachedDestinationNodeId =
+    options.cachedTutorialDestinationNodeId ?? options.cachedFirstDestinationNodeId;
+
+  if (cachedDestinationNodeId === null) {
+    return null;
+  }
+
+  return {
+    destinationNodeId: cachedDestinationNodeId,
+    arrivalTurn:
+      options.cachedTutorialDestinationNodeId === null
+        ? options.cachedFirstArrivalTurn
+        : options.cachedTutorialArrivalTurn
+  };
+}
+
 export function findTrackedTutorialMandatoryLaunchBurn(options: {
   burns: readonly TutorialTrackedBurn[];
   activeMandatoryLaunchId: string | null;

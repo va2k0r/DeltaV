@@ -130,7 +130,7 @@ function createPlayerFacingResolutionRow(
       return {
         parts: [
           { text: numberPrefix },
-          { text: "IMPACT", className: factionClass },
+          { text: "impact", className: factionClass },
           { text: `  ${nodeName}` }
         ]
       };

@@ -56,13 +56,23 @@ const mechanicGlossaryEntries = [
     ]
   },
   {
+    id: "tritium-access",
+    label: "tritium access",
+    aliases: ["TRITIUM ACCESS"],
+    short: "The faction can still produce TRITIUM or realistically regain access to it soon.",
+    detail: [
+      "A faction retains tritium access while it controls an operating tritium plant or can credibly reach or contest one within the short operational window.",
+      "When only one faction retains tritium access, that faction wins."
+    ]
+  },
+  {
     id: "tritium-collapse",
-    label: "TRITIUM COLLAPSE",
+    label: "tritium collapse",
     aliases: ["TRITIUM COLLAPSE"],
-    short: "The victory state: only one faction retains a strategically viable path to tritium.",
+    short: "The victory state: only one faction retains tritium access.",
     detail: [
       "Victory is not awarded for score or abstract territory. A faction wins when every rival has lost a plausible short-term route to produce or contest TRITIUM.",
-      "The viability check considers current ships, ΔV, active transfers, nearby access and imminent SHIPYARD output."
+      "Tritium access considers current ships, ΔV, active transfers, nearby routes and imminent shipyard output."
     ]
   },
   {
@@ -168,7 +178,7 @@ const mechanicGlossaryEntries = [
   {
     id: "transfer",
     label: "TRANSFER",
-    aliases: ["TRANSFER", "TRANSFERS", "TRANSIT", "ARRIVAL", "ARRIVALS", "DEPARTURE", "DEPARTURES"],
+    aliases: ["TRANSFER", "TRANSFERS", "TRANSIT", "DEPARTURE", "DEPARTURES"],
     short: "The deterministic interval between BURN departure and arrival.",
     detail: [
       "A TRANSFER begins when BURN spends ΔV and removes the SHIP from its origin.",
@@ -338,7 +348,7 @@ const mechanicGlossaryEntries = [
       "Costs the route plus the origin gravity modifier. Paid from global faction ΔV at departure.",
       "Deterministic transfer shown as T+ETA. Normally T+2 to T+7.",
       "The burning ship cannot WORK or FIRE that TURN.",
-      "The ship follows its committed transfer until ARRIVAL.",
+      "The ship follows its committed transfer until it reaches the destination.",
       "Arrival can CONTEST immediately. It cannot WORK until the following turn.",
       "Departure breaks every FIRING SOLUTION targeting that ship.",
       "A CONTESTED ship may exit. It pays prior upkeep, then the normal transfer cost."
@@ -386,12 +396,12 @@ const mechanicGlossaryEntries = [
     short: "The productive resource that restores ΔV and ultimately determines victory.",
     detail: [
       "One eligible WORK result produces +2 ΔV during the economy phase.",
-      "Stored as global faction reserve; the simulation tracks no canister, convoy or local inventory.",
+      "Command accounting folds physical fuel, reaction mass and resupply into the global faction ΔV reserve.",
       "The physical output is certified D-T fusion fuel, reaction mass and tritium production margin compressed into one number.",
       "Natural tritium exists only in traces. Gas-giant skimmers harvest deuterium; lithium-6 blankets breed the tritium.",
       "Its 12.3-year half-life makes stockpiles perishable and bookkeeping strategic.",
       "CONTESTED state or BURN, FIRE and EVADE prevent income.",
-      "Losing every viable short-window route to tritium causes TRITIUM COLLAPSE."
+      "Losing every viable short-window route to tritium causes tritium collapse."
     ]
   },
   {
@@ -403,7 +413,7 @@ const mechanicGlossaryEntries = [
       "A SHIPYARD converts time into one new SHIP.",
       "Progress increases by 1/5 per eligible WORK turn.",
       "Progress belongs to the yard, not the faction. It can be captured and continued.",
-      "BURN, FIRE, EVADE, CONTESTED state or same-turn ARRIVAL prevents progress.",
+      "BURN, FIRE, EVADE, CONTESTED state or reaching the yard that turn prevents progress.",
       "Stored hull modules are mated around a docking spine; the incumbent supplies fuel and one reserve crew.",
       "At 5/5, the assembled ship remains at the yard and the incumbent performs MANDATORY LAUNCH.",
       "Production itself costs 0 ΔV."
@@ -509,8 +519,8 @@ const mechanicGlossaryEntries = [
       "A docking spine carries replaceable habitat, reactor, radiator and weapon modules.",
       "The weapon section mounts one rapid-fire turret and approximately ten to twelve nuclear missile-drones.",
       "Life support is provisioned for the active complement and the reserve crews expected to commission new hulls.",
-      "Ships physically carry canisters and reaction mass, but the game exposes no local inventory.",
-      "Every cost is paid from global faction ΔV."
+      "Ships physically carry canisters and reaction mass, while command accounting reports no separate reserve for each hull.",
+      "Every cost is paid from the global faction ΔV reserve."
     ]
   },
   {
@@ -523,7 +533,7 @@ const mechanicGlossaryEntries = [
       "All ships pay from one ΔV reserve, so they compete for the same future movement and survival budget.",
       "On Earth the corporation remains subject to law, tax, sanctions and arrest.",
       "In the outer system no government owns a comparable fleet already close enough to intervene.",
-      "Faction viability, rather than score or formal sovereignty, determines VICTORY."
+      "Tritium access, rather than score or formal sovereignty, determines VICTORY."
     ]
   },
   {
@@ -540,10 +550,10 @@ const mechanicGlossaryEntries = [
     id: "victory",
     label: "VICTORY",
     aliases: ["VICTORY", "WINS", "WIN"],
-    short: "Be the only faction with a strategically viable path to continuing tritium access.",
+    short: "Be the only faction that retains tritium access.",
     detail: [
-      "VICTORY occurs when only one faction remains tritium-viable within the short operational window.",
-      "The check includes production, movement, contesting and imminent shipyard output. It is not a score threshold or a requirement to occupy every orbit."
+      "VICTORY occurs when every rival has lost any realistic short-term route to TRITIUM.",
+      "Tritium access includes extraction, movement, contesting and imminent shipyard output. It is not a score threshold or a requirement to occupy every orbit."
     ]
   },
   {
@@ -831,7 +841,7 @@ function createDynamicGameGlossaryEntry(id: string): GameGlossaryEntry | undefin
       label: raw,
       aliases: [],
       short: isArrival
-        ? `${raw} places an ARRIVAL that many turns after the current command.`
+        ? `${raw} places the destination that many turns after the current command.`
         : `${raw} leaves that many turns before IMPACT.`,
       detail: [
         isArrival

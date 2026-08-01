@@ -58,6 +58,18 @@ describe("player-facing resolution rows", () => {
     ).toBe("01  MISSILE SOLUTION BROKEN — TARGET ESCAPED at Callisto");
   });
 
+  it("keeps impact lowercase in the command log", () => {
+    expect(
+      renderResolutionEvent({
+        turn: 4,
+        type: "MISSILE_IMPACT",
+        message: "Missile impact",
+        nodeId: "callisto_node",
+        factionId: "opponent"
+      })
+    ).toBe("01  impact  Callisto");
+  });
+
   it("reserves CREW LOST for actual ship destruction", () => {
     expect(
       renderResolutionEvent({

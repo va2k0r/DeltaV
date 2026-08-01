@@ -21489,23 +21489,25 @@ export class CinematicSolarSystemRenderer {
     const framesSinceLastUpdate =
       this.renderFrameSerial - this.tacticalPresentationLastUpdatedRenderFrameSerial;
 
-    // Wheel zoom changes the non-linear display-space layout used by BURN/FIRE endpoints. Camera
-    // rotation and pan can keep using the existing shader-facing ribbons, but stale display-scale
-    // geometry visibly trails the bodies. Refresh zoom-driven geometry on the very next rendered
-    // frame. BURN owns the selected transfer field and hover preview, so it must stay ahead of a
-    // deferred FIRE rebuild throughout a continuous zoom gesture instead of updating every other
-    // frame and visibly catching up. FIRE resumes on the first frame whose display scale is stable.
-    if (this.tacticalPresentationDisplayScaleDirty) {
-      this.tacticalPresentationDisplayScaleDirty = false;
-      return this.scheduleTacticalPresentationUpdate(elapsed);
-    }
-
+    // Reduced/minimal modes split BURN and FIRE across adjacent frames. Service an already queued
+    // FIRE rebuild before consuming a new zoom-dirty signal; otherwise every wheel frame schedules
+    // BURN again and FIRE remains frozen until the gesture settles. Leaving the dirty flag intact
+    // here guarantees that BURN catches up on the following frame at the latest.
     if (this.tacticalPresentationDeferredFireUpdate) {
       this.tacticalPresentationDeferredFireUpdate = false;
       this.tacticalPresentationUpdatePhase = "fire";
       this.tacticalPresentationLastUpdatedAt = elapsed;
       this.tacticalPresentationLastUpdatedRenderFrameSerial = this.renderFrameSerial;
       return true;
+    }
+
+    // Wheel zoom changes the non-linear display-space layout used by BURN/FIRE endpoints. Camera
+    // rotation and pan can keep using the existing shader-facing ribbons, but stale display-scale
+    // geometry visibly trails the bodies. Refresh zoom-driven geometry on the very next rendered
+    // frame; the deferred branch above alternates FIRE with BURN during a continuous gesture.
+    if (this.tacticalPresentationDisplayScaleDirty) {
+      this.tacticalPresentationDisplayScaleDirty = false;
+      return this.scheduleTacticalPresentationUpdate(elapsed);
     }
 
     const isCameraMotionActive = this.isTrajectoryLabelCameraMotionActive(performance.now());
@@ -21940,7 +21942,7 @@ export class CinematicSolarSystemRenderer {
         : dimColor(this.getBurnTrajectoryColor(hoverPlan), 0.58);
       this.showHoverTrajectoryLabel(
         this.getBurnDestinationBillboardAnchor(hoverPlan) ?? labelAnchor,
-        `ARRIVAL T+${hoverPlan.etaTurns} -${hoverPlan.burnCost} ΔV`,
+        `T+${hoverPlan.etaTurns} -${hoverPlan.burnCost} ΔV`,
         "burn-hover",
         isHoverPlanAffordable ? 1 : 0.72,
         hoverLabelTint
@@ -23095,7 +23097,7 @@ export class CinematicSolarSystemRenderer {
     if (labelAnchor !== null) {
       this.showHoverTrajectoryLabel(
         this.getFireImpactBillboardAnchor(hoverPlan) ?? labelAnchor,
-        `IMPACT T-${hoverPlan.missileEtaTurns}`,
+        `T-${hoverPlan.missileEtaTurns}`,
         "fire"
       );
     }

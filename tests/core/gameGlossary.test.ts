@@ -125,6 +125,101 @@ describe("game glossary", () => {
     expect(getGameGlossaryEntry("contested")?.detail.join(" ")).toContain("2 ΔV");
   });
 
+  it("names the victory dependency tritium access without viability jargon or added caps", () => {
+    const access = getGameGlossaryEntry("tritium-access");
+    const playerFacingCopy = gameGlossaryEntries
+      .flatMap((entry) => [entry.label, entry.short, ...entry.detail])
+      .join(" ");
+
+    expect(access?.label).toBe("tritium access");
+    expect(access?.short).toContain("produce TRITIUM");
+    expect(playerFacingCopy).not.toMatch(/\bTRITIUM (?:ACCESS|COLLAPSE)\b/u);
+    expect(playerFacingCopy).not.toMatch(/\b(?:faction viability|tritium-viable)\b/iu);
+  });
+
+  it("does not expose ARRIVAL as a billboard, log or detail label", () => {
+    const playerFacingCopy = gameGlossaryEntries
+      .flatMap((entry) => [entry.label, ...entry.aliases, entry.short, ...entry.detail])
+      .join(" ");
+    const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
+    const lessonSource = readFileSync(join(process.cwd(), "src/ui/tutorial/lessonRows.ts"), "utf8");
+    const rendererSource = readFileSync(
+      join(process.cwd(), "src/renderers/cinematic3d/index.ts"),
+      "utf8"
+    );
+
+    expect(playerFacingCopy).not.toMatch(/\bARRIVAL\b/u);
+    expect(uiSource).not.toContain('"ARRIVAL"');
+    expect(lessonSource).not.toMatch(/\bARRIVAL\b/u);
+    expect(rendererSource).not.toContain("`ARRIVAL T+");
+  });
+
+  it("tones down uppercase glossary terms inside the detail column", () => {
+    const controllerSource = readFileSync(
+      join(process.cwd(), "src/ui/gameGlossaryController.ts"),
+      "utf8"
+    );
+    const styles = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
+
+    expect(controllerSource).toContain("applyGlossaryDetailTokenTone(span, text);");
+    expect(controllerSource).toContain(
+      'span.classList.add("command-glossary-token--detail-uppercase");'
+    );
+    expect(styles).toContain(".command-glossary-detail .command-glossary-token--detail-uppercase");
+    expect(styles).toContain("color: rgba(142, 194, 207, 0.78);");
+  });
+
+  it("preserves the selected term's original casing in hover and detail labels", () => {
+    const controllerSource = readFileSync(
+      join(process.cwd(), "src/ui/gameGlossaryController.ts"),
+      "utf8"
+    );
+    const styles = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
+    const labelStylesStart = styles.indexOf(
+      ".command-glossary-hover__label,\n.command-glossary-detail__label {"
+    );
+    const labelStylesEnd = styles.indexOf("}", labelStylesStart);
+    const labelStyles = styles.slice(labelStylesStart, labelStylesEnd);
+
+    expect(controllerSource).toContain("getGlossaryTokenLabel(token, entry.label)");
+    expect(controllerSource).toContain(
+      "const label = getGlossaryTokenLabel(sourceToken, entry.label);"
+    );
+    expect(controllerSource).toContain('span.dataset["glossaryLabel"] = label;');
+    expect(controllerSource).toContain("detailLabel.textContent = label;");
+    expect(controllerSource).not.toContain("detailLabel.textContent = entry.label;");
+    expect(labelStylesStart).toBeGreaterThanOrEqual(0);
+    expect(labelStylesEnd).toBeGreaterThan(labelStylesStart);
+    expect(labelStyles).not.toContain("text-transform");
+  });
+
+  it("dismisses and protects the detail column with the agreed pointer grammar", () => {
+    const controllerSource = readFileSync(
+      join(process.cwd(), "src/ui/gameGlossaryController.ts"),
+      "utf8"
+    );
+    const styles = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
+
+    expect(controllerSource).toContain(
+      'document.addEventListener("pointerdown", handleDocumentPointerDown, true);'
+    );
+    expect(controllerSource).toContain(
+      'detailPanel.addEventListener("contextmenu", handleDetailPanelContextMenu, true);'
+    );
+    expect(controllerSource).toContain(
+      'detailPanel.addEventListener("selectstart", preventDetailPanelSelection, true);'
+    );
+    expect(controllerSource).toContain("event.button !== 0");
+    expect(controllerSource).toContain("event.button !== 2");
+    expect(controllerSource).toContain("isInsideInteractiveRoot(event.target)");
+    expect(controllerSource).toContain("detailHistory.pop();");
+    expect(controllerSource).toContain(
+      "renderDetail(previousEntry, previousHistoryEntry.label, false);"
+    );
+    expect(styles).toContain(".command-glossary-detail * {\n  user-select: none;");
+    expect(styles).toContain("-webkit-touch-callout: none;");
+  });
+
   it("keeps atomic commands mechanical while routing physical phrases into lore", () => {
     const burn = getGameGlossaryEntry("burn");
     const burnCopy = [burn?.short, ...(burn?.detail ?? [])].join(" ");
@@ -181,8 +276,16 @@ describe("game glossary", () => {
     const playerCopy = gameGlossaryEntries
       .flatMap((entry) => [entry.label, entry.short, ...entry.detail])
       .join(" ");
+    const inventoryCopy = [
+      ...(getGameGlossaryEntry("ship")?.detail ?? []),
+      ...(getGameGlossaryEntry("tritium")?.detail ?? [])
+    ].join(" ");
 
     expect(playerCopy).not.toMatch(/\b150[- ]days?\b/iu);
+    expect(inventoryCopy).not.toMatch(
+      /\b(?:the game exposes|simulation tracks|local inventory)\b/iu
+    );
+    expect(inventoryCopy).toContain("no separate reserve for each hull");
     expect(playerCopy).not.toContain(
       "Their law reaches every registered ship; their force does not."
     );

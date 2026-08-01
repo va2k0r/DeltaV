@@ -36,11 +36,7 @@ export function createTutorialFirstBurnTimeCostRows(
       key: "tutorial:first-burn-time-cost"
     },
     {
-      parts: [
-        { text: "The arrival marker shows where the destination will be at " },
-        { text: "ARRIVAL", className: playerClassName },
-        { text: ", not where it is now." }
-      ],
+      parts: [{ text: "The marker shows where the destination will be when the transfer ends." }],
       className: tutorialLineClassName,
       key: "tutorial:first-burn-arrival-marker"
     }
@@ -167,7 +163,7 @@ export function createTutorialShipyardFirePromptRows(): readonly TutorialCommand
     {
       parts: [
         { text: "The X marks the target's predicted position at " },
-        { text: "IMPACT", className: "command-console__event-contested" },
+        { text: "impact", className: "command-console__event-contested" },
         { text: ", not its current position." }
       ],
       className: tutorialLineClassName,

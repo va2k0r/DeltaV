@@ -1035,7 +1035,6 @@ select {
   font-size: 0.8em;
   letter-spacing: 0.08em;
   margin-bottom: 0.72em;
-  text-transform: uppercase;
 }
 
 .command-glossary-hover__text {
@@ -1067,6 +1066,28 @@ select {
   padding: 0 var(--command-console-line-right-gutter, clamp(24px, 3.2vw, 84px)) 10px 0;
   pointer-events: auto;
   line-height: 1.24;
+}
+
+.command-glossary-detail,
+.command-glossary-detail * {
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+}
+
+.command-glossary-detail::selection,
+.command-glossary-detail *::selection {
+  background: transparent;
+}
+
+.command-glossary-detail__label.can-go-back {
+  cursor: pointer;
+}
+
+.command-glossary-detail__label.can-go-back:hover,
+.command-glossary-detail__label.can-go-back:focus-visible {
+  color: rgba(213, 238, 244, 0.9);
+  outline: none;
 }
 
 .command-glossary-detail__body {
@@ -1129,6 +1150,21 @@ select {
   outline: none;
   text-shadow:
     0 0 8px rgba(159, 232, 255, 0.22),
+    0 1px 8px rgba(0, 0, 0, 0.48);
+}
+
+.command-glossary-detail .command-glossary-token--detail-uppercase {
+  color: rgba(142, 194, 207, 0.78);
+  text-shadow:
+    0 0 7px rgba(105, 190, 211, 0.08),
+    0 1px 7px rgba(0, 0, 0, 0.46);
+}
+
+.command-glossary-detail .command-glossary-token--detail-uppercase:hover,
+.command-glossary-detail .command-glossary-token--detail-uppercase:focus-visible {
+  color: rgba(213, 238, 244, 0.94);
+  text-shadow:
+    0 0 8px rgba(159, 232, 255, 0.18),
     0 1px 8px rgba(0, 0, 0, 0.48);
 }
 

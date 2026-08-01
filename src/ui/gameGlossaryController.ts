@@ -17,11 +17,29 @@ type GlossaryTypewriterTarget = Readonly<{
   text: string;
 }>;
 
+type GlossaryDetailHistoryEntry = Readonly<{
+  glossaryId: string;
+  label: string;
+}>;
+
+type GlossaryHoverRootOptions = Readonly<{
+  dwellMs?: number;
+}>;
+
+type GlossaryHoverHandoffOptions = Readonly<{
+  root: HTMLElement;
+  clientX: number;
+  clientY: number;
+  activeDurationMs: number;
+  minimumVisibleDurationMs: number;
+}>;
+
 export type GameGlossaryController = Readonly<{
   hoverPanel: HTMLElement;
   detailPanel: HTMLElement;
   bindRoot: (root: HTMLElement) => void;
-  bindHoverRoot: (root: HTMLElement) => void;
+  bindHoverRoot: (root: HTMLElement, options?: GlossaryHoverRootOptions) => void;
+  beginHoverHandoff: (options: GlossaryHoverHandoffOptions) => void;
   closeAll: () => void;
 }>;
 
@@ -39,7 +57,7 @@ export function createGameGlossaryTextSpans(
     }
 
     if (token.glossaryId !== undefined) {
-      applyGlossaryTokenSemantics(span, token.glossaryId);
+      applyGlossaryTokenSemantics(span, token.glossaryId, token.text);
     }
 
     return span;
@@ -76,19 +94,27 @@ export function createGameGlossaryController(
   detailBody.className = "command-glossary-detail__body";
   detailPanel.append(detailLabel, detailBody);
 
+  const interactiveRoots = new Set<HTMLElement>();
+  const hoverRootDwellMs = new Map<HTMLElement, number>();
   let hoverDwellTimer: number | null = null;
   let hoverReleaseTimer: number | null = null;
   let hoverAnimationFrame: number | null = null;
   let hoverGeneration = 0;
   let hoveredHoverKey: string | null = null;
   let hoveredHoverToken: HTMLElement | null = null;
+  let hoverMinimumVisibleUntil = 0;
+  let hoverHandoffRoot: HTMLElement | null = null;
+  let hoverHandoffUntil = 0;
+  let hoverHandoffTimer: number | null = null;
   let detailAnimationFrame: number | null = null;
   let detailGeneration = 0;
   let detailSourceToken: HTMLElement | null = null;
   let detailSourceLineKey: string | null = null;
+  let detailHistory: GlossaryDetailHistoryEntry[] = [];
   const handledActivationEvents = new WeakSet<Event>();
 
   const bindRoot = (root: HTMLElement): void => {
+    interactiveRoots.add(root);
     root.addEventListener("pointerover", handlePointerOver, true);
     root.addEventListener("pointerout", handlePointerOut, true);
     root.addEventListener("mouseover", handlePointerOver, true);
@@ -100,13 +126,39 @@ export function createGameGlossaryController(
     root.addEventListener("keydown", handleGlossaryKeydown, true);
   };
 
-  const bindHoverRoot = (root: HTMLElement): void => {
+  const bindHoverRoot = (root: HTMLElement, options: GlossaryHoverRootOptions = {}): void => {
+    hoverRootDwellMs.set(root, Math.max(0, options.dwellMs ?? gameGlossaryHoverDwellMs));
     root.addEventListener("pointerover", handleStaticPointerOver, true);
     root.addEventListener("pointerout", handleStaticPointerOut, true);
     root.addEventListener("mouseover", handleStaticPointerOver, true);
     root.addEventListener("mouseout", handleStaticPointerOut, true);
     root.addEventListener("focusin", handleStaticFocusIn, true);
     root.addEventListener("focusout", handleStaticFocusOut, true);
+  };
+
+  const beginHoverHandoff = (options: GlossaryHoverHandoffOptions): void => {
+    cancelHoverHandoff();
+    const token = findNearestGlossaryToken(options.root, options.clientX, options.clientY);
+
+    if (token === null) {
+      return;
+    }
+
+    const now = view.performance.now();
+    hoverHandoffRoot = options.root;
+    hoverHandoffUntil = now + Math.max(0, options.activeDurationMs);
+    hoverMinimumVisibleUntil = Math.max(
+      hoverMinimumVisibleUntil,
+      now + Math.max(0, options.minimumVisibleDurationMs)
+    );
+    revealGlossaryHoverImmediately(token);
+    hoverHandoffTimer = view.setTimeout(
+      () => {
+        hoverHandoffTimer = null;
+        finishHoverHandoff();
+      },
+      Math.max(0, options.activeDurationMs)
+    );
   };
 
   function handlePointerOver(event: MouseEvent): void {
@@ -194,6 +246,43 @@ export function createGameGlossaryController(
     event.stopImmediatePropagation();
   }
 
+  function handleDocumentPointerDown(event: PointerEvent): void {
+    if (
+      event.button !== 0 ||
+      !detailPanel.classList.contains("is-visible") ||
+      isInsideInteractiveRoot(event.target)
+    ) {
+      return;
+    }
+
+    closeAll();
+  }
+
+  function handleDetailPanelPointerDown(event: PointerEvent): void {
+    if (event.button !== 2) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    closeAll();
+  }
+
+  function handleDetailPanelContextMenu(event: MouseEvent): void {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    closeAll();
+  }
+
+  function preventDetailPanelSelection(event: Event): void {
+    event.preventDefault();
+  }
+
+  function isInsideInteractiveRoot(target: EventTarget | null): boolean {
+    const node = asNode(target);
+    return node !== null && [...interactiveRoots].some((root) => root.contains(node));
+  }
+
   function handleGlossaryClick(event: MouseEvent): void {
     const token = getGlossaryToken(event.target);
     const glossaryId = token?.dataset["glossaryId"];
@@ -260,7 +349,12 @@ export function createGameGlossaryController(
       return;
     }
 
-    scheduleHoverCopy(`glossary:${glossaryId}`, entry.label, entry.short, token);
+    scheduleHoverCopy(
+      `glossary:${glossaryId}`,
+      getGlossaryTokenLabel(token, entry.label),
+      entry.short,
+      token
+    );
   }
 
   function scheduleStaticHover(token: HTMLElement): void {
@@ -271,14 +365,31 @@ export function createGameGlossaryController(
       return;
     }
 
-    scheduleHoverCopy(`static:${label}\u0000${text}`, label, text, token);
+    scheduleHoverCopy(
+      `static:${label}\u0000${text}`,
+      label,
+      text,
+      token,
+      getHoverRootDwellMs(token)
+    );
+  }
+
+  function getHoverRootDwellMs(token: HTMLElement): number {
+    for (const [root, dwellMs] of hoverRootDwellMs) {
+      if (root.contains(token)) {
+        return dwellMs;
+      }
+    }
+
+    return gameGlossaryHoverDwellMs;
   }
 
   function scheduleHoverCopy(
     hoverKey: string,
     label: string,
     text: string,
-    token: HTMLElement
+    token: HTMLElement,
+    dwellMs = gameGlossaryHoverDwellMs
   ): void {
     clearHoverReleaseTimer();
 
@@ -307,23 +418,95 @@ export function createGameGlossaryController(
       }
 
       revealHover(label, text, token, generation);
-    }, gameGlossaryHoverDwellMs);
+    }, dwellMs);
   }
 
   function scheduleHoverClear(): void {
     clearHoverDwellTimer();
     clearHoverReleaseTimer();
-    const generation = hoverGeneration + 1;
-    hoverGeneration = generation;
-    hoveredHoverKey = null;
-    hoveredHoverToken = null;
-    hoverReleaseTimer = view.setTimeout(() => {
-      hoverReleaseTimer = null;
+    const generation = hoverGeneration;
+    const minimumHoldMs = Math.max(0, hoverMinimumVisibleUntil - view.performance.now());
+    hoverReleaseTimer = view.setTimeout(
+      () => {
+        hoverReleaseTimer = null;
 
-      if (generation === hoverGeneration) {
-        clearHoverImmediately();
-      }
-    }, gameGlossaryHoverReleaseMs);
+        if (generation === hoverGeneration) {
+          clearHoverImmediately();
+        }
+      },
+      Math.max(gameGlossaryHoverReleaseMs, minimumHoldMs)
+    );
+  }
+
+  function revealGlossaryHoverImmediately(token: HTMLElement): void {
+    const glossaryId = token.dataset["glossaryId"];
+    const entry = glossaryId === undefined ? undefined : getGameGlossaryEntry(glossaryId);
+
+    if (entry === undefined || glossaryId === undefined) {
+      return;
+    }
+
+    const hoverKey = `glossary:${glossaryId}`;
+    clearHoverDwellTimer();
+    clearHoverReleaseTimer();
+
+    if (
+      hoveredHoverKey === hoverKey &&
+      hoveredHoverToken === token &&
+      hoverPanel.classList.contains("is-visible")
+    ) {
+      return;
+    }
+
+    hoverGeneration += 1;
+    hoveredHoverKey = hoverKey;
+    hoveredHoverToken = token;
+    revealHover(getGlossaryTokenLabel(token, entry.label), entry.short, token, hoverGeneration);
+  }
+
+  function handleDocumentPointerMove(event: PointerEvent): void {
+    const root = hoverHandoffRoot;
+
+    if (root === null) {
+      return;
+    }
+
+    if (view.performance.now() >= hoverHandoffUntil) {
+      finishHoverHandoff();
+      return;
+    }
+
+    if (!isPointInsideElement(root, event.clientX, event.clientY)) {
+      scheduleHoverClear();
+      return;
+    }
+
+    const token = findNearestGlossaryToken(root, event.clientX, event.clientY);
+
+    if (token !== null) {
+      revealGlossaryHoverImmediately(token);
+    }
+  }
+
+  function finishHoverHandoff(): void {
+    if (hoverHandoffTimer !== null) {
+      view.clearTimeout(hoverHandoffTimer);
+      hoverHandoffTimer = null;
+    }
+
+    hoverHandoffRoot = null;
+    hoverHandoffUntil = 0;
+    scheduleHoverClear();
+  }
+
+  function cancelHoverHandoff(): void {
+    if (hoverHandoffTimer !== null) {
+      view.clearTimeout(hoverHandoffTimer);
+      hoverHandoffTimer = null;
+    }
+
+    hoverHandoffRoot = null;
+    hoverHandoffUntil = 0;
   }
 
   function revealHover(label: string, text: string, token: HTMLElement, generation: number): void {
@@ -406,8 +589,22 @@ export function createGameGlossaryController(
       return;
     }
 
-    detailSourceToken = sourceToken;
-    detailSourceLineKey = getGlossarySourceLineKey(sourceToken);
+    const isNestedDetail =
+      detailPanel.classList.contains("is-visible") && detailPanel.contains(sourceToken);
+    const label = getGlossaryTokenLabel(sourceToken, entry.label);
+
+    if (isNestedDetail) {
+      detailHistory.push({ glossaryId, label });
+    } else {
+      detailSourceToken = sourceToken;
+      detailSourceLineKey = getGlossarySourceLineKey(sourceToken);
+      detailHistory = [{ glossaryId, label }];
+    }
+
+    renderDetail(entry, label, true);
+  }
+
+  function renderDetail(entry: GameGlossaryEntry, label: string, shouldTypewrite: boolean): void {
     detailGeneration += 1;
     const generation = detailGeneration;
     cancelDetailAnimation();
@@ -417,11 +614,13 @@ export function createGameGlossaryController(
     } else {
       detailPanel.dataset["sourceLineKey"] = detailSourceLineKey;
     }
-    detailPanel.classList.remove("is-hidden");
-    detailPanel.classList.add("is-visible", "is-typewriting");
+    detailPanel.classList.remove("is-hidden", "is-typewriting");
+    detailPanel.classList.add("is-visible");
+    detailPanel.classList.toggle("is-typewriting", shouldTypewrite);
     detailPanel.dataset["density"] = getGlossaryDetailDensity(entry);
     detailPanel.setAttribute("aria-hidden", "false");
-    detailLabel.textContent = entry.label;
+    detailLabel.textContent = label;
+    syncDetailLabelBackSemantics();
     detailBody.innerHTML = "";
 
     const lines = entry.detail.map((paragraph) => {
@@ -430,7 +629,10 @@ export function createGameGlossaryController(
       const spans = createGameGlossaryTextSpans(document, paragraph);
       const targets = spans.map((span) => {
         const text = span.textContent ?? "";
-        span.textContent = "";
+        applyGlossaryDetailTokenTone(span, text);
+        if (shouldTypewrite) {
+          span.textContent = "";
+        }
         line.append(span);
         return { element: span, text };
       });
@@ -438,7 +640,64 @@ export function createGameGlossaryController(
       return { line, targets };
     });
 
-    void typeDetailLines(lines, generation);
+    if (shouldTypewrite) {
+      void typeDetailLines(lines, generation);
+    }
+  }
+
+  function handleDetailLabelClick(event: MouseEvent): void {
+    if (!restorePreviousDetail()) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+
+  function handleDetailLabelKeydown(event: KeyboardEvent): void {
+    if ((event.key !== "Enter" && event.key !== " ") || !restorePreviousDetail()) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+
+  function restorePreviousDetail(): boolean {
+    if (detailHistory.length <= 1) {
+      return false;
+    }
+
+    detailHistory.pop();
+    const previousHistoryEntry = detailHistory.at(-1);
+    const previousEntry =
+      previousHistoryEntry === undefined
+        ? undefined
+        : getGameGlossaryEntry(previousHistoryEntry.glossaryId);
+
+    if (previousEntry === undefined || previousHistoryEntry === undefined) {
+      closeAll();
+      return true;
+    }
+
+    renderDetail(previousEntry, previousHistoryEntry.label, false);
+    return true;
+  }
+
+  function syncDetailLabelBackSemantics(): void {
+    const canGoBack = detailHistory.length > 1;
+    detailLabel.classList.toggle("can-go-back", canGoBack);
+
+    if (canGoBack) {
+      detailLabel.tabIndex = 0;
+      detailLabel.setAttribute("role", "button");
+      detailLabel.setAttribute("aria-label", "Return to previous explanation");
+      return;
+    }
+
+    detailLabel.removeAttribute("tabindex");
+    detailLabel.removeAttribute("role");
+    detailLabel.removeAttribute("aria-label");
   }
 
   async function typeDetailLines(
@@ -516,6 +775,7 @@ export function createGameGlossaryController(
   function clearDetail(): void {
     detailSourceToken = null;
     detailSourceLineKey = null;
+    detailHistory = [];
     detailGeneration += 1;
     cancelDetailAnimation();
     detailPanel.removeAttribute("data-glossary-id");
@@ -525,6 +785,7 @@ export function createGameGlossaryController(
     detailPanel.classList.add("is-hidden");
     detailPanel.setAttribute("aria-hidden", "true");
     detailLabel.textContent = "";
+    syncDetailLabelBackSemantics();
     detailBody.innerHTML = "";
   }
 
@@ -535,6 +796,7 @@ export function createGameGlossaryController(
     cancelHoverAnimation();
     hoveredHoverKey = null;
     hoveredHoverToken = null;
+    hoverMinimumVisibleUntil = 0;
     hoverPanel.classList.remove("is-visible", "is-typewriting");
     hoverPanel.classList.add("is-hidden");
     hoverPanel.setAttribute("aria-hidden", "true");
@@ -543,6 +805,8 @@ export function createGameGlossaryController(
   }
 
   function closeAll(): void {
+    cancelHoverHandoff();
+    hoverMinimumVisibleUntil = 0;
     clearHoverImmediately();
     clearDetail();
   }
@@ -575,6 +839,14 @@ export function createGameGlossaryController(
     }
   }
 
+  detailPanel.addEventListener("pointerdown", handleDetailPanelPointerDown, true);
+  detailPanel.addEventListener("contextmenu", handleDetailPanelContextMenu, true);
+  detailPanel.addEventListener("selectstart", preventDetailPanelSelection, true);
+  detailPanel.addEventListener("dragstart", preventDetailPanelSelection, true);
+  detailLabel.addEventListener("click", handleDetailLabelClick);
+  detailLabel.addEventListener("keydown", handleDetailLabelKeydown);
+  document.addEventListener("pointermove", handleDocumentPointerMove, true);
+  document.addEventListener("pointerdown", handleDocumentPointerDown, true);
   bindRoot(detailPanel);
 
   return {
@@ -582,20 +854,88 @@ export function createGameGlossaryController(
     detailPanel,
     bindRoot,
     bindHoverRoot,
+    beginHoverHandoff,
     closeAll
   };
 }
 
-function applyGlossaryTokenSemantics(span: HTMLSpanElement, glossaryId: string): void {
+function findNearestGlossaryToken(
+  root: HTMLElement,
+  clientX: number,
+  clientY: number
+): HTMLElement | null {
+  let nearestToken: HTMLElement | null = null;
+  let nearestDistanceSquared = Number.POSITIVE_INFINITY;
+
+  for (const token of root.querySelectorAll<HTMLElement>(
+    ".command-glossary-token[data-glossary-id]"
+  )) {
+    const rect = token.getBoundingClientRect();
+
+    if (rect.width <= 0 || rect.height <= 0) {
+      continue;
+    }
+
+    const distanceX =
+      clientX < rect.left ? rect.left - clientX : clientX > rect.right ? clientX - rect.right : 0;
+    const distanceY =
+      clientY < rect.top ? rect.top - clientY : clientY > rect.bottom ? clientY - rect.bottom : 0;
+    const distanceSquared = distanceX * distanceX + distanceY * distanceY;
+
+    if (distanceSquared < nearestDistanceSquared) {
+      nearestToken = token;
+      nearestDistanceSquared = distanceSquared;
+    }
+  }
+
+  return nearestToken;
+}
+
+function isPointInsideElement(root: HTMLElement, clientX: number, clientY: number): boolean {
+  const rect = root.getBoundingClientRect();
+  return (
+    clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom
+  );
+}
+
+function applyGlossaryTokenSemantics(
+  span: HTMLSpanElement,
+  glossaryId: string,
+  label: string
+): void {
   const entry = getGameGlossaryEntry(glossaryId);
   span.classList.add("command-glossary-token");
   span.dataset["glossaryId"] = glossaryId;
+  span.dataset["glossaryLabel"] = label;
   span.tabIndex = 0;
   span.setAttribute("role", "button");
   span.setAttribute(
     "aria-label",
-    entry === undefined ? "Explain game term" : `Explain ${entry.label}`
+    `Explain ${getGlossaryTokenLabel(span, entry?.label ?? "game term")}`
   );
+}
+
+function getGlossaryTokenLabel(token: HTMLElement, fallback: string): string {
+  const label = token.dataset["glossaryLabel"]?.trim();
+  return label === undefined || label.length === 0 ? fallback : label;
+}
+
+function applyGlossaryDetailTokenTone(span: HTMLSpanElement, text: string): void {
+  const glossaryId = span.dataset["glossaryId"];
+
+  if (
+    glossaryId === undefined ||
+    glossaryId.startsWith("word:") ||
+    !isUppercaseGlossaryTerm(text)
+  ) {
+    return;
+  }
+
+  span.classList.add("command-glossary-token--detail-uppercase");
+}
+
+function isUppercaseGlossaryTerm(text: string): boolean {
+  return /\p{L}/u.test(text) && text === text.toLocaleUpperCase("en-US");
 }
 
 function getGlossaryToken(target: EventTarget | null): HTMLElement | null {

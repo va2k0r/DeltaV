@@ -102,18 +102,14 @@ describe("tutorial support production destinations", () => {
 describe("tutorial row modules", () => {
   it("explains that BURN and FIRE markers point to future positions", () => {
     expect(createTutorialFirstBurnTimeCostRows("player-highlight")).toContainEqual({
-      parts: [
-        { text: "The arrival marker shows where the destination will be at " },
-        { text: "ARRIVAL", className: "player-highlight" },
-        { text: ", not where it is now." }
-      ],
+      parts: [{ text: "The marker shows where the destination will be when the transfer ends." }],
       className: tutorialLineClassName,
       key: "tutorial:first-burn-arrival-marker"
     });
     expect(createTutorialShipyardFirePromptRows()).toContainEqual({
       parts: [
         { text: "The X marks the target's predicted position at " },
-        { text: "IMPACT", className: "command-console__event-contested" },
+        { text: "impact", className: "command-console__event-contested" },
         { text: ", not its current position." }
       ],
       className: tutorialLineClassName,

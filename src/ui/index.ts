@@ -193,6 +193,7 @@ import {
   createTutorialRuntimeDiagnosticDump,
   createTutorialRuntimeState,
   driveTutorialBurnToDestination,
+  findTrackedTutorialFirstBurn,
   findTrackedTutorialMandatoryLaunchBurn,
   findTutorialQueuedFireOrder,
   getTutorialMandatoryLaunchResumePhase,
@@ -659,6 +660,9 @@ const gameMenuCrtFlickerMinDelayMs = 1_200;
 const gameMenuCrtFlickerMaxDelayMs = 3_400;
 const gameMenuCrtFlickerMinDurationMs = 140;
 const gameMenuCrtFlickerMaxDurationMs = 300;
+const gameMenuGlossaryHoverDwellMs = 360;
+const tutorialLogGlossaryHandoffActiveMs = 1_250;
+const tutorialLogGlossaryHandoffMinimumVisibleMs = 1_650;
 const aiAutorunCommandTranscriptDomEntryLimit = 72;
 const commandTypewriterMsPerCharacter = 6;
 const commandTypewriterMinDurationMs = 80;
@@ -1011,7 +1015,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   const gameMenu = document.createElement("nav");
   gameMenu.className = "game-menu is-hidden";
   gameMenu.ariaLabel = "Game menu";
-  commandGlossaryController.bindHoverRoot(gameMenu);
+  commandGlossaryController.bindHoverRoot(gameMenu, {
+    dwellMs: gameMenuGlossaryHoverDwellMs
+  });
 
   const trailerScreenTitle = document.createElement("div");
   trailerScreenTitle.className = "trailer-screen-title is-hidden";
@@ -1185,6 +1191,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let gameMenuMainActions: HTMLElement | null = null;
   let gameMenuSubmenuActions: HTMLElement | null = null;
   let gameMenuTypingGeneration = 0;
+  let pendingTutorialGlossaryHandoffPoint: Readonly<{
+    clientX: number;
+    clientY: number;
+  }> | null = null;
   let planningTimerMode: PlanningTimerMode = "auto";
   let planningTimerDurationOverrideMs: number | null = null;
   let beatSyncMode: "on" | "off" = "on";
@@ -2935,7 +2945,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   function createGameMenuAction(
     label: string,
-    onClick: (action: HTMLButtonElement) => void,
+    onClick: (action: HTMLButtonElement, event: MouseEvent) => void,
     options: Readonly<{
       audioControl?: "music" | "sfx";
       selected?: boolean;
@@ -2969,8 +2979,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     action.addEventListener("pointerenter", () => {
       sfxEngine.play("ui.hoverCommand");
     });
-    action.addEventListener("click", () => {
-      onClick(action);
+    action.addEventListener("click", (event) => {
+      onClick(action, event);
     });
     return action;
   }
@@ -3076,7 +3086,15 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     });
   }
 
-  function startTutorialFromGameMenu(): void {
+  function startTutorialFromGameMenu(action: HTMLButtonElement, event: MouseEvent): void {
+    const actionRect = action.getBoundingClientRect();
+    pendingTutorialGlossaryHandoffPoint =
+      event.detail === 0
+        ? {
+            clientX: actionRect.left + actionRect.width / 2,
+            clientY: actionRect.top + actionRect.height / 2
+          }
+        : { clientX: event.clientX, clientY: event.clientY };
     stopGameMenuDemo();
 
     const waitForCurrentTurn = (): void => {
@@ -10817,7 +10835,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           return;
         }
 
-        const previousPendingOrderCount = state.pendingBurnOrders.length;
         const burnPlan = calculateBurnPlan(content, state, originNodeId, destinationNodeId);
         state = applyCommand(
           state,
@@ -10830,7 +10847,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         );
         snapshot = createSolarSystemSnapshot(content, state);
         markPlayerOrderConfirmedAfterSelection();
-        handleTutorialBurnOrderQueued(originNodeId, destinationNodeId, previousPendingOrderCount);
+        handleTutorialBurnOrderQueued(originNodeId, destinationNodeId);
         sfxEngine.play("planning.burnCommit", {
           intensity: burnPlan === null ? 0.5 : Math.min(1, burnPlan.burnCost / 6)
         });
@@ -11869,22 +11886,18 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     );
   }
 
-  function handleTutorialBurnOrderQueued(
-    originNodeId: string,
-    destinationNodeId: string,
-    previousPendingOrderCount: number
-  ): void {
+  function handleTutorialBurnOrderQueued(originNodeId: string, destinationNodeId: string): void {
     const tutorial = tutorialState;
+    const order = getPendingBurnOrder(originNodeId, "player");
 
-    if (tutorial === null || state.pendingBurnOrders.length <= previousPendingOrderCount) {
+    if (tutorial === null || order?.destinationNodeId !== destinationNodeId) {
       return;
     }
     snapCommandTranscriptToLiveTail();
     noteTutorialPlayerActivity();
 
-    const order = getPendingBurnOrder(originNodeId, "player");
-    tutorial.tutorialBurnDestinationNodeId = destinationNodeId;
-    tutorial.tutorialBurnArrivalTurn = order?.arrivalTurn ?? null;
+    tutorial.tutorialBurnDestinationNodeId = order.destinationNodeId;
+    tutorial.tutorialBurnArrivalTurn = order.arrivalTurn;
     const mandatoryLaunch = getNextPlayerMandatoryLaunch();
 
     if (
@@ -11897,8 +11910,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       tutorial.phase = "firstBurnQueued";
       tutorial.firstBurnReselectionStartedAt = null;
       tutorial.firstBurnPreviewDestinationNodeId = null;
-      tutorial.firstBurnDestinationNodeId = destinationNodeId;
-      tutorial.firstBurnArrivalTurn = order?.arrivalTurn ?? null;
+      tutorial.firstBurnDestinationNodeId = order.destinationNodeId;
+      tutorial.firstBurnArrivalTurn = order.arrivalTurn;
       updateInteractionLocks();
       updateCommandConsole();
       return;
@@ -12006,6 +12019,34 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     return state.pendingBurnOrders.find((order) => {
       return order.originNodeId === originNodeId && order.factionId === factionId;
     });
+  }
+
+  function recoverTutorialFirstBurnTracking(events: readonly TurnDebugEvent[] = []): string | null {
+    const tutorial = tutorialState;
+
+    if (tutorial === null) {
+      return null;
+    }
+
+    const tracking = findTrackedTutorialFirstBurn({
+      burns: [...state.pendingBurnOrders, ...state.activeBurnTransits],
+      departures: events,
+      openingOriginNodeId: tutorialOpeningOriginNodeId,
+      cachedTutorialDestinationNodeId: tutorial.tutorialBurnDestinationNodeId,
+      cachedTutorialArrivalTurn: tutorial.tutorialBurnArrivalTurn,
+      cachedFirstDestinationNodeId: tutorial.firstBurnDestinationNodeId,
+      cachedFirstArrivalTurn: tutorial.firstBurnArrivalTurn
+    });
+
+    if (tracking === null) {
+      return null;
+    }
+
+    tutorial.firstBurnDestinationNodeId = tracking.destinationNodeId;
+    tutorial.firstBurnArrivalTurn = tracking.arrivalTurn;
+    tutorial.tutorialBurnDestinationNodeId = tracking.destinationNodeId;
+    tutorial.tutorialBurnArrivalTurn = tracking.arrivalTurn;
+    return tracking.destinationNodeId;
   }
 
   function withBurnAffordability(
@@ -14124,6 +14165,23 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       resetRuntimeAfterGameReset({ preserveTutorial: true });
       updateCommandConsoleModeControls();
       revealCommandConsoleForActiveGame();
+      const handoffPoint = pendingTutorialGlossaryHandoffPoint;
+      pendingTutorialGlossaryHandoffPoint = null;
+      if (handoffPoint !== null) {
+        window.requestAnimationFrame(() => {
+          if (tutorialState === null || commandConsole.classList.contains("is-hidden")) {
+            return;
+          }
+
+          commandGlossaryController.beginHoverHandoff({
+            root: commandConsole,
+            clientX: handoffPoint.clientX,
+            clientY: handoffPoint.clientY,
+            activeDurationMs: tutorialLogGlossaryHandoffActiveMs,
+            minimumVisibleDurationMs: tutorialLogGlossaryHandoffMinimumVisibleMs
+          });
+        });
+      }
       frameTutorialOpeningCamera();
       lastTutorialCameraHintAt = null;
       lastTutorialCameraHintTurn = null;
@@ -14131,6 +14189,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       scheduleTutorialCameraPanOrbitHint();
     } catch (error) {
       tutorialState = null;
+      pendingTutorialGlossaryHandoffPoint = null;
       hideCommandConsoleForGameMenuLaunch();
       commandConsole.classList.remove("is-hidden");
       status.textContent = error instanceof Error ? error.message : "Tutorial failed to load.";
@@ -14829,18 +14888,24 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           event.nodeId === tutorialOpeningOriginNodeId
       )
     ) {
+      recoverTutorialFirstBurnTracking(events);
       tutorial.phase = "awaitingFirstArrival";
       updateInteractionLocks();
       void autoAdvanceTutorialToFirstArrival();
       return;
     }
 
+    const recoveredFirstBurnDestinationNodeId =
+      tutorial.phase === "awaitingFirstArrival"
+        ? recoverTutorialFirstBurnTracking(events)
+        : tutorial.firstBurnDestinationNodeId;
+
     if (
       tutorial.phase === "awaitingFirstArrival" &&
-      tutorial.firstBurnDestinationNodeId !== null &&
-      hasFactionShipAtNode(state, tutorial.firstBurnDestinationNodeId, "player")
+      recoveredFirstBurnDestinationNodeId !== null &&
+      hasFactionShipAtNode(state, recoveredFirstBurnDestinationNodeId, "player")
     ) {
-      resolveTutorialFirstArrival(tutorial.firstBurnDestinationNodeId);
+      resolveTutorialFirstArrival(recoveredFirstBurnDestinationNodeId);
       return;
     }
 
@@ -14998,15 +15063,15 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   async function autoAdvanceTutorialToFirstArrival(): Promise<void> {
     const tutorial = tutorialState;
 
-    if (
-      tutorial === null ||
-      tutorial.phase !== "awaitingFirstArrival" ||
-      tutorial.firstBurnDestinationNodeId === null
-    ) {
+    if (tutorial === null || tutorial.phase !== "awaitingFirstArrival") {
       return;
     }
 
-    const destinationNodeId = tutorial.firstBurnDestinationNodeId;
+    const destinationNodeId = recoverTutorialFirstBurnTracking();
+
+    if (destinationNodeId === null) {
+      return;
+    }
 
     if (hasFactionShipAtNode(state, destinationNodeId, "player")) {
       resolveTutorialFirstArrival(destinationNodeId);
@@ -18391,7 +18456,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     activeTutorial.phase = "contestedFireSetup";
     appendTutorialRows(
       [
-        "ARRIVAL",
         `Ship arrived at ${formatNodeName(content, arrivalNodeId)}.`,
         "",
         "An orbit occupied by ships from two different factions becomes CONTESTED.",
@@ -18503,7 +18567,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     activeTutorial.phase = "awaitingBurnOut";
     appendTutorialRows(
       [
-        "ARRIVAL",
         `Enemy ship arrived at ${formatNodeName(content, contestedNodeId)}.`,
         "",
         "CONTESTED",
