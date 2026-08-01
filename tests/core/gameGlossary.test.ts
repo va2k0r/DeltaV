@@ -11,7 +11,9 @@ import {
 } from "../../src/ui/gameGlossary";
 import {
   advanceTutorialLogbookIntroduction,
+  gameMenuGlossaryHoverDwellMs,
   tutorialLogbookExpandInstruction,
+  tutorialLogbookHoverDwellMs,
   tutorialLogbookHoverInstruction,
   tutorialLogbookLabel,
   tutorialLogbookReturnInstruction,
@@ -34,6 +36,8 @@ describe("game glossary", () => {
     }
 
     expect(sequence).toEqual(["hover-prompt", "expand-prompt", "return-prompt", "inactive"]);
+    expect(tutorialLogbookHoverDwellMs).toBe(gameMenuGlossaryHoverDwellMs);
+    expect(tutorialLogbookHoverDwellMs).toBe(240);
     expect([
       tutorialLogbookLabel,
       tutorialLogbookHoverInstruction,
@@ -55,13 +59,22 @@ describe("game glossary", () => {
 
     expect(controllerSource).toContain("handleTutorialLogbookTokenActivation(event, token)");
     expect(controllerSource).toContain("renderTutorialLogbookDetailPrompt();");
+    expect(controllerSource).toContain("token,\n          tutorialLogbookHoverDwellMs");
+    expect(controllerSource).toContain("hoverText.classList.toggle(");
+    expect(controllerSource).toContain("options.onTutorialLogbookIntroductionComplete?.();");
     expect(controllerSource).toContain("detailLabel.textContent = tutorialLogbookLabel;");
     expect(controllerSource).toContain(
       'detailLabel.classList.add("can-go-back", "is-tutorial-logbook-attention");'
     );
     expect(uiSource).toContain("commandGlossaryController.beginTutorialLogbookIntroduction();");
+    expect(uiSource).toContain(
+      "commandGlossaryController.beginTutorialLogbookIntroduction();\n      updateCommandConsole();"
+    );
     expect(uiSource).toContain("commandGlossaryController.endTutorialLogbookIntroduction();");
-    expect(styles).toContain(".command-glossary-hover.is-tutorial-logbook-attention,");
+    expect(uiSource).toContain("isTutorialLogbookIntroductionBlockingOpening()");
+    expect(uiSource).toContain("commandGlossaryController.isTutorialLogbookIntroductionActive()");
+    expect(styles).toContain(".command-glossary-hover__text.is-tutorial-logbook-attention,");
+    expect(styles).not.toContain(".command-glossary-hover.is-tutorial-logbook-attention,");
     expect(styles).toContain(".command-glossary-detail__line.is-tutorial-logbook-attention,");
     expect(styles).toContain(".command-glossary-detail__label.is-tutorial-logbook-attention {");
   });

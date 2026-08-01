@@ -6403,7 +6403,7 @@ describe("Cinematic 3D architecture boundary", () => {
     );
     const bindHoverSource = glossaryControllerSource.slice(bindHoverStart, bindHoverEnd);
 
-    expect(uiSource).toContain("const gameMenuGlossaryHoverDwellMs = 240;");
+    expect(glossaryControllerSource).toContain("export const gameMenuGlossaryHoverDwellMs = 240;");
     expect(uiSource).toContain("commandGlossaryController.bindHoverRoot(gameMenu, {");
     expect(uiSource).toContain("dwellMs: gameMenuGlossaryHoverDwellMs");
     expect(uiSource).toContain('applyGameMenuHoverCopy(title, "DELTAV", "ORBITAL STRATEGY");');

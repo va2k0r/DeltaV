@@ -47,7 +47,13 @@ type GlossaryHoverHandoffOptions = Readonly<{
   minimumVisibleDurationMs: number;
 }>;
 
+type GameGlossaryControllerOptions = Readonly<{
+  onTutorialLogbookIntroductionComplete?: () => void;
+}>;
+
 export const tutorialLogbookLabel = "Logbook";
+export const gameMenuGlossaryHoverDwellMs = 240;
+export const tutorialLogbookHoverDwellMs = gameMenuGlossaryHoverDwellMs;
 export const tutorialLogbookHoverInstruction =
   "Left-click any word in the logbook to open its explanation.";
 export const tutorialLogbookExpandInstruction = "Left-click the selected term to expand it.";
@@ -84,6 +90,7 @@ export type GameGlossaryController = Readonly<{
   beginTutorialLogbookIntroduction: () => void;
   restoreTutorialLogbookIntroduction: () => void;
   endTutorialLogbookIntroduction: () => void;
+  isTutorialLogbookIntroductionActive: () => boolean;
   closeAll: () => void;
 }>;
 
@@ -110,7 +117,8 @@ export function createGameGlossaryTextSpans(
 
 export function createGameGlossaryController(
   document: Document,
-  view: Window
+  view: Window,
+  options: GameGlossaryControllerOptions = {}
 ): GameGlossaryController {
   const hoverPanel = document.createElement("aside");
   hoverPanel.className = "command-glossary-hover is-hidden";
@@ -227,6 +235,9 @@ export function createGameGlossaryController(
     tutorialLogbookIntroductionStep = "inactive";
     closeAll();
   };
+
+  const isTutorialLogbookIntroductionActive = (): boolean =>
+    tutorialLogbookIntroductionStep !== "inactive";
 
   function handlePointerOver(event: MouseEvent): void {
     const token = getGlossaryToken(event.target);
@@ -425,7 +436,8 @@ export function createGameGlossaryController(
           "tutorial:logbook-introduction",
           tutorialLogbookLabel,
           tutorialLogbookHoverInstruction,
-          token
+          token,
+          tutorialLogbookHoverDwellMs
         );
       }
       return;
@@ -532,12 +544,13 @@ export function createGameGlossaryController(
         return;
       }
 
-      clearHoverDwellTimer();
-      clearHoverReleaseTimer();
-      hoverGeneration += 1;
-      hoveredHoverKey = "tutorial:logbook-introduction";
-      hoveredHoverToken = token;
-      revealHover(tutorialLogbookLabel, tutorialLogbookHoverInstruction, token, hoverGeneration);
+      scheduleHoverCopy(
+        "tutorial:logbook-introduction",
+        tutorialLogbookLabel,
+        tutorialLogbookHoverInstruction,
+        token,
+        tutorialLogbookHoverDwellMs
+      );
       return;
     }
 
@@ -618,7 +631,7 @@ export function createGameGlossaryController(
     hoverText.textContent = "";
     hoverPanel.classList.remove("is-hidden");
     hoverPanel.classList.add("is-visible", "is-typewriting");
-    hoverPanel.classList.toggle(
+    hoverText.classList.toggle(
       "is-tutorial-logbook-attention",
       tutorialLogbookIntroductionStep === "hover-prompt"
     );
@@ -862,10 +875,7 @@ export function createGameGlossaryController(
     if (tutorialLogbookIntroductionStep === "return-prompt") {
       event.preventDefault();
       event.stopImmediatePropagation();
-      tutorialLogbookIntroductionStep = advanceTutorialLogbookIntroduction(
-        tutorialLogbookIntroductionStep
-      );
-      closeAll();
+      completeTutorialLogbookIntroduction();
       return;
     }
 
@@ -884,10 +894,7 @@ export function createGameGlossaryController(
     ) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      tutorialLogbookIntroductionStep = advanceTutorialLogbookIntroduction(
-        tutorialLogbookIntroductionStep
-      );
-      closeAll();
+      completeTutorialLogbookIntroduction();
       return;
     }
 
@@ -922,6 +929,14 @@ export function createGameGlossaryController(
         : previousEntry;
     renderDetail(restoredEntry, previousHistoryEntry.label, false);
     return true;
+  }
+
+  function completeTutorialLogbookIntroduction(): void {
+    tutorialLogbookIntroductionStep = advanceTutorialLogbookIntroduction(
+      tutorialLogbookIntroductionStep
+    );
+    closeAll();
+    options.onTutorialLogbookIntroductionComplete?.();
   }
 
   function syncDetailLabelBackSemantics(): void {
@@ -1040,7 +1055,7 @@ export function createGameGlossaryController(
     hoveredHoverToken = null;
     hoverMinimumVisibleUntil = 0;
     hoverPanel.classList.remove("is-visible", "is-typewriting");
-    hoverPanel.classList.remove("is-tutorial-logbook-attention");
+    hoverText.classList.remove("is-tutorial-logbook-attention");
     hoverPanel.classList.add("is-hidden");
     hoverPanel.setAttribute("aria-hidden", "true");
     hoverLabel.textContent = "";
@@ -1103,6 +1118,7 @@ export function createGameGlossaryController(
     beginTutorialLogbookIntroduction,
     restoreTutorialLogbookIntroduction,
     endTutorialLogbookIntroduction,
+    isTutorialLogbookIntroductionActive,
     closeAll
   };
 }
