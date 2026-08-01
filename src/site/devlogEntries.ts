@@ -22,59 +22,6 @@ export type DevlogEntry = Readonly<{
   figures?: readonly DevlogFigure[];
 }>;
 
-const turn36ScreenshotUrl = new URL(
-  "../../diagnostics/tutorial-deep-pass-deployed-2026-07-30/screens/58-turn36-clean.png",
-  import.meta.url
-).href;
-
-const burnPretzelScreenshotUrl = new URL(
-  "../../diagnostics/tutorial-deep-pass-deployed-2026-07-30/screens/28-burn-pretzel-zoomed.png",
-  import.meta.url
-).href;
-
-const replayRewoundScreenshotUrl = new URL(
-  "../../diagnostics/tutorial-deep-pass-deployed-2026-07-30/screens/53-replay-rewound.png",
-  import.meta.url
-).href;
-
-const campaignScreenshotUrl = new URL(
-  "../../diagnostics/tutorial-deep-pass-deployed-2026-07-30/screens/31-t14-system-view.png",
-  import.meta.url
-).href;
-
-const mandatoryLaunchScreenshotUrl = new URL(
-  "../../diagnostics/tutorial-deep-pass-deployed-2026-07-30/screens/38-mandatory-launch-preview.png",
-  import.meta.url
-).href;
-
-const openInformationScreenshotUrl = new URL(
-  "../../diagnostics/tutorial-deep-pass-deployed-2026-07-30/screens/32-t14-fit-system.png",
-  import.meta.url
-).href;
-
-const firePreviewScreenshotUrl = new URL(
-  "../../diagnostics/tutorial-deep-pass-deployed-2026-07-30/screens/17-fire-preview-phobos.png",
-  import.meta.url
-).href;
-
-const burnAnimationUrl = new URL("./assets/devlog/orbital-burn.gif", import.meta.url).href;
-const burnAnimationPosterUrl = new URL(
-  "../../diagnostics/tutorial-deep-pass-deployed-2026-07-30/screens/11-burn-long-resolution-650ms.png",
-  import.meta.url
-).href;
-
-const fireAnimationUrl = new URL("./assets/devlog/fire-resolution.gif", import.meta.url).href;
-const fireAnimationPosterUrl = new URL(
-  "../../diagnostics/tutorial-deep-pass-deployed-2026-07-30/screens/22-fire-after-resolution.png",
-  import.meta.url
-).href;
-
-const contestedAnimationUrl = new URL("./assets/devlog/contested-orbit.gif", import.meta.url).href;
-const contestedAnimationPosterUrl = new URL(
-  "../../diagnostics/tutorial-deep-pass-deployed-2026-07-30/screens/24-contested-frame-2.png",
-  import.meta.url
-).href;
-
 /**
  * A public, extradiegetic devlog. Claims must remain traceable to the project archive, canon,
  * diagnostics or simulation output. Publication dates follow the development record at day-level
@@ -99,15 +46,6 @@ const devlogArchive = [
       "Orders resolve at the same time, so a faction cannot react to an enemy choice made earlier in the turn. Everyone sees the same map, but not the orders being prepared. A ship able to reach three destinations forces the opponent to prepare for all three even though it will choose only one. The uncertainty comes from intent and cost, not hidden units.",
       "Campaign planning begins by counting each side's workable routes to tritium. The next step is to find which routes can be made too expensive. Denying a WORK turn is worthwhile when it costs less than the income prevented. Missiles should arrive after a target has committed to work or movement, and shipyards are most vulnerable near completion. A battle has little value when it changes none of the routes, production, support or recovery options that follow it.",
       "DeltaV does not calculate every detail of real spaceflight. Geometry sets the available routes, delta-v sets which routes can be afforded, and timing sets when a choice can no longer be changed. The cheapest transfer, the earliest arrival and the move that keeps a faction supplied are often three different orders."
-    ],
-    figures: [
-      {
-        afterParagraph: 2,
-        src: campaignScreenshotUrl,
-        alt: "A DeltaV system view showing several planetary systems, ships and future routes",
-        caption:
-          "The campaign view is read as a set of routes and arrival times. Empty space has no value by itself."
-      }
     ]
   },
   {
@@ -125,15 +63,6 @@ const devlogArchive = [
       "The stored hull is one plausible answer, not the only engineering answer. What matters is that industry can stay under armour and spread across several facilities, while military power appears only after the parts and crew become a mobile ship. Shipyard progress can be captured because the finished parts and completed tests remain at the site.",
       "DeltaV makes other compromises of the same kind. Astronomical distances are compressed unevenly so that moons remain visible without making interplanetary travel feel local. Transfers are expressed as discrete orders rather than continuously replanned burns. Terminal combat becomes missile pressure, evasion and orbital contests instead of a second-by-second guidance simulation. Tritium reserves are public even though no telescope could read the gauge, because the uncertainty belongs in simultaneous intent rather than private accounting.",
       "The standard is not whether every displayed curve could serve as a real flight plan. Each rule must preserve the strategic pressure created by physics, and each simplification needs a clear purpose. The setting remains believable when players can predict the broad result from the situation and the game states its exceptions clearly."
-    ],
-    figures: [
-      {
-        afterParagraph: 4,
-        src: mandatoryLaunchScreenshotUrl,
-        alt: "A mandatory launch preview from Saturn toward a completed shipyard at Mars",
-        caption:
-          "A completed hull forces the working ship to reserve and execute a departure. The logistics appear on the map as a route, a cost and a deadline."
-      }
     ]
   },
   {
@@ -156,15 +85,6 @@ const devlogArchive = [
       "The distinction between detection and identification also survives. The game exposes mechanically relevant state because hiding it would add bookkeeping, yet the strategic meaning of that state is not labelled. A missile with a visible arrival time may be intended to drain one point of delta-v, cancel a productive turn, drive a ship out of a contested orbit or distract support from a shipyard. The projectile supplies position and timing but not the strategic purpose of the order.",
       "Removing fog of war changes the interface as much as the balance. The planetarium must show distant threats without filling the screen with warnings, and the log must show how a reserve was spent. Dotted trajectories, arrival labels and public reserves are part of the shared game state, not optional hints.",
       "Plausible concealment remains possible for dormant hardware on or beneath a moon, civilian traffic whose purpose is misrepresented, or vehicles accepting severe limits on power and travel time. The current rules instead model mobile forces after propulsion and combat systems are active. At that operational stage, hidden reserves would primarily add accounting uncertainty while visible orders and simultaneous intent already provide strategic uncertainty."
-    ],
-    figures: [
-      {
-        afterParagraph: 2,
-        src: openInformationScreenshotUrl,
-        alt: "A wide DeltaV system view with visible ships, reserves and movement markers",
-        caption:
-          "Ships and reserves are public. The unknown is which of the visible options each faction will choose."
-      }
     ]
   },
   {
@@ -200,16 +120,6 @@ const devlogArchive = [
       "The turn also suits command across several planetary systems. Communication delay makes continuous remote control less plausible, while local crews and software can carry out orders already received. DeltaV does not track message delay as another resource. Simultaneous planning keeps the relevant result: commanders commit a group of orders that cannot be revised halfway through resolution.",
       "Physical scale is compressed in layers. Interplanetary distance is compressed more than travel inside a moon system; otherwise most of a campaign would be spent waiting. The important relationships remain intact: local action is faster than distant reinforcement, missiles provide warning, production can be interrupted, and poor alignment costs time or delta-v.",
       "The interface uses whole turns to coordinate orders and approximate days only to communicate scale. The conversion does not alter the rules or claim the precision of a real flight plan."
-    ],
-    figures: [
-      {
-        afterParagraph: 2,
-        src: burnAnimationUrl,
-        reducedMotionSrc: burnAnimationPosterUrl,
-        alt: "A ship moving along a long transfer preview over three captured stages",
-        caption:
-          "A long transfer resolves across one planning interval. The loop pauses before departure and after arrival so the change in position remains readable."
-      }
     ]
   },
   {
@@ -226,15 +136,6 @@ const devlogArchive = [
       "Missiles permit a cleaner abstraction because the defender's response is itself an orbital maneuver. An uncontested target with enough delta-v automatically evades each impacting missile at a cost of one. The rule collects guidance, terminal defense and a great deal of detailed engineering into a result that remains strategically useful: the attack forces movement expenditure and interrupts WORK. If the target is already contested or cannot pay, the impact destroys it. There are no hit points to erode because hull damage is not the scale at which the player is commanding.",
       "FIRE costs no delta-v at launch, although the firing ship forfeits its action and therefore cannot WORK during that turn. This prevents ammunition accounting from becoming a second economy while preserving a substantial cost for casual attacks. A ship beside a tritium plant gives up immediate income to create future pressure; whether the exchange is favourable depends on the target's reserve, work schedule and available escape routes.",
       "Choosing missiles first does not remove lasers or guns from the setting. It sets a design rule: a weapon belongs in DeltaV when it creates a distinct command problem that can be shown on the map. Missiles do that through travel time, reserve cost and interrupted work. A laser or railgun will need its own clear decision, not just a different effect for the same result."
-    ],
-    figures: [
-      {
-        afterParagraph: 1,
-        src: firePreviewScreenshotUrl,
-        alt: "A FIRE preview aimed at a ship approaching Phobos",
-        caption:
-          "The firing solution shows target, arrival and warning time before the order is committed."
-      }
     ]
   },
   {
@@ -251,16 +152,6 @@ const devlogArchive = [
       "Two coordinated missiles illustrate the difference. If they arrive against an uncontested ship with sufficient reserve, the ship can survive both by paying twice and losing the turn's work. If another ship has already made the orbit contested, evasion is unavailable and the same impacts become lethal. If the target burns away before impact, the firing solutions are broken. Every outcome depends on preparation visible several turns earlier.",
       "A useful firing doctrine follows from the opportunity cost. Prefer productive targets, ships already constrained by another commitment, and arrivals that coincide with a transfer window the defender wants to use. Avoid firing merely because the command is legal. Pressure several parts of the reserve when possible, because a missile that forces an expensive burn may matter more than one that finally hits an immobile ship.",
       "The test kept FIRE because it changed strategy in a way ordinary movement did not. It also set a balance requirement: missiles need costs that prevent players from selecting FIRE every turn. Those costs are the lost WORK turn, visible travel time and automatic evasion. Further tuning should adjust that exchange rather than introduce hit points unrelated to the rest of the game."
-    ],
-    figures: [
-      {
-        afterParagraph: 2,
-        src: fireAnimationUrl,
-        reducedMotionSrc: fireAnimationPosterUrl,
-        alt: "A missile strike shown from firing preview through impact and aftermath",
-        caption:
-          "The loop holds on the firing solution, advances through impact and stops on the resulting state."
-      }
     ]
   },
   {
@@ -276,16 +167,6 @@ const devlogArchive = [
       "Productive sites make the timing sharper. Contested tritium produces nothing, so an attacker may accept the same upkeep cost as the defender merely to stop income. At a shipyard, existing progress is frozen but remains attached to the facility. Arriving shortly before completion can therefore capture work already performed, provided the attacker can survive the local response and eventually clear the contest.",
       "Remaining is rational when denied production exceeds upkeep, support is approaching, or departure would give the opponent an immediate strategic route. Departure is rational when continued upkeep consumes the reserve required for a higher-value burn. Public reserves allow both factions to estimate the turn on which maintaining the contest ceases to be viable.",
       "The rule leaves close combat unresolved and keeps only the consequences needed at campaign scale. A detailed combat layer would be useful only if it added decisions not already covered by contest, outside support, upkeep and escape routes."
-    ],
-    figures: [
-      {
-        afterParagraph: 1,
-        src: contestedAnimationUrl,
-        reducedMotionSrc: contestedAnimationPosterUrl,
-        alt: "Two opposing ships entering the same orbit and creating a contested state",
-        caption:
-          "Two ships enter the same useful orbit. Production stops, evasion closes and both factions begin paying upkeep."
-      }
     ]
   },
   {
@@ -316,15 +197,6 @@ const devlogArchive = [
       "The camera is part of the interface. Left drag pans, right drag orbits, the wheel changes scale and a double click selects a new focus. Pitch limits prevent an unreadable edge-on view while keeping enough perspective to separate high transfers from local orbits. Stable controls let the player compare the same position across several turns.",
       "Long shadows, enlarged bodies and luminous orbital rings are explicit visual distortions. Shadows separate small bodies from a dark background and establish the direction of the central light source. Enlarged bodies maintain visibility across compressed distance scales. Orbit rings expose trajectory and future position. Each distortion is retained only when it communicates a relationship used by the rules.",
       "The same rule applies around the map. Command history must be wide enough to explain a complicated turn without covering the emptiness that communicates system scale. Tooltips, dotted paths and labels are reserved for information needed to plan or understand an outcome. Repeated and decorative information is removed."
-    ],
-    figures: [
-      {
-        afterParagraph: 2,
-        src: burnPretzelScreenshotUrl,
-        alt: "A malformed DeltaV burn preview looping around Mars and Deimos",
-        caption:
-          "The curve folded back through the local system despite valid endpoints and cost, so it did not represent the transfer order."
-      }
     ]
   },
   {
@@ -340,22 +212,6 @@ const devlogArchive = [
       "Saved states allow the exact turn and camera context to be reopened after a correction. Replay verification checks both deterministic state and the explanation associated with it. A correction is incomplete when the current turn renders properly but rewinding restores the misleading presentation.",
       "The command history serves the same requirement. Hovering or selecting an event can return the planetarium to the ships, missiles and orbits involved, while the Logbook explains the relevant rule without covering the map permanently. Instruction is attached to the record of the match because a specific failure is more useful than generic advice once several causes overlap.",
       "Readability is part of correctness when orders are committed several turns ahead. A failed order should be explained by orbital geometry, insufficient delta-v or an enemy choice. The presentation must not hide those causes or suggest rules that do not exist."
-    ],
-    figures: [
-      {
-        afterParagraph: 0,
-        src: turn36ScreenshotUrl,
-        alt: "A wide DeltaV match with planets, ships, transfers and the command history visible",
-        caption:
-          "The extended match contained enough simultaneous movement and fire to expose failures hidden by isolated test scenes."
-      },
-      {
-        afterParagraph: 3,
-        src: replayRewoundScreenshotUrl,
-        alt: "The DeltaV planetarium rewound with the matching command history visible",
-        caption:
-          "Replay restores the state, the camera and the explanation attached to the same event."
-      }
     ]
   },
   {

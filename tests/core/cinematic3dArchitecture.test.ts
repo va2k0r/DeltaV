@@ -2227,6 +2227,11 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(mainActionsSource).not.toContain('"2VS"');
     expect(mainActionsSource).not.toContain('"3VS"');
     expect(mainActionsSource).not.toContain("PLAYER VS PLAYER VS PLAYER");
+    expect(uiSource).toContain("cinematicRenderer?.setProductiveMarkersVisible(false);");
+    expect(uiSource).toContain("cinematicRenderer?.setProductiveMarkersVisible(true);");
+    expect(uiSource).toContain(
+      "cinematicRenderer.setProductiveMarkersVisible(!isGameMenuDemoActive);"
+    );
   });
 
   it("uses the canonical planets-crossing-space composition for the opening menu", () => {
@@ -2846,8 +2851,13 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("setLowBloomProfileEnabled(enabled: boolean): void");
     expect(source).toContain("if (!this.solarHazeEnabled || !this.tuning.solarDustEnabled)");
     expect(source).toContain("const productiveNodeMarkersEnabled = true");
+    expect(source).toContain("private productiveMarkersVisible = true;");
+    expect(source).toContain("setProductiveMarkersVisible(visible: boolean): void");
     expect(source).toContain("setVisualTuning(overrides: Partial<Cinematic3dVisualTuning> = {})");
     expect(source).toContain("private shouldShowProductiveMarkerForNode(node: NodeSnapshot)");
+    expect(source).toContain(
+      "if (!productiveNodeMarkersEnabled || !this.productiveMarkersVisible)"
+    );
     expect(source).toContain('return node.type === "shipyard";');
     expect(source).toContain("private getShipyardSurfaceGridDetailOpacity(detailProgress: number)");
     expect(source).not.toContain("CinematicProductionMarkerMode");
@@ -6400,6 +6410,9 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(startDemoSource).not.toContain("setDebugAiLevel(1);");
     expect(startDemoSource).toContain("scheduleGameMenuDemoTurn(0);");
     expect(uiSource).toContain(
+      "const shouldUseAiTurnWorker = isZeroTimerAiAutorunMode() || isGameMenuDemoActive;"
+    );
+    expect(uiSource).toContain(
       "cinematicRenderer.setTrajectoryReflectionMode(trajectoryReflectionMode);"
     );
     expect(clearEffectsSource).not.toContain("burnPreviewGroup");
@@ -6457,13 +6470,12 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(modeResolverEnd).toBeGreaterThan(modeResolverStart);
     expect(resolverStart).toBeGreaterThanOrEqual(0);
     expect(resolverEnd).toBeGreaterThan(resolverStart);
-    expect(modeResolverSource).toContain('return isGameMenuOpen() ? "minimal" : "auto";');
+    expect(modeResolverSource).toContain('return "auto";');
     expect(modeResolverSource).not.toContain("isTrailerModeActive");
     expect(modeResolverSource).not.toContain("localStorage");
     expect(resolverSource).toContain("return getCinematicPerformanceMode();");
     expect(resolverSource).not.toContain('"auto"');
     expect(uiSource).toContain("return getCinematicRendererPerformanceMode();");
-    expect(uiSource).toContain("const gameMenuBackgroundAiTurnsEnabled = false;");
   });
 
   it("offers AI showcase matches as alternatives in the New Game mode selector", () => {
