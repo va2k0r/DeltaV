@@ -664,9 +664,6 @@ const zeroTimerMinimumTurnPresentationMs = 2_000;
 const postMatchAutoReturnDelayMs = 10_000;
 const gameMenuDemoTurnDelayMs = 2_000;
 const gameMenuDemoRestartDelayMs = 360;
-// The menu is a visual backdrop, not a match. Advancing a full three-faction AI turn every two
-// seconds creates regular main-thread stalls while adding little to the opening composition.
-const gameMenuBackgroundAiTurnsEnabled = false;
 const gameMenuCrtFlickerMinDelayMs = 1_200;
 const gameMenuCrtFlickerMaxDelayMs = 3_400;
 const gameMenuCrtFlickerMinDurationMs = 140;
@@ -2175,6 +2172,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     dragStart = null;
     cinematicRenderer?.setCameraInputEnabled(false);
     cinematicRenderer?.setBillboardsVisible(false);
+    cinematicRenderer?.setProductiveMarkersVisible(false);
 
     gameMenuBaseContent ??= content;
     const gameMenuPreset = getMapPreset(DEFAULT_MAP_PRESET_ID);
@@ -2251,6 +2249,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     hideCommandConsoleForGameMenuLaunch();
     cinematicRenderer?.setForcedCameraFocusTarget(null);
     cinematicRenderer?.setCameraInputEnabled(true);
+    cinematicRenderer?.setProductiveMarkersVisible(true);
   }
 
   function isGameMenuOpen(): boolean {
@@ -2459,7 +2458,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   function scheduleGameMenuDemoTurn(delayMs = gameMenuDemoTurnDelayMs): void {
     if (
-      !gameMenuBackgroundAiTurnsEnabled ||
       !isGameMenuDemoActive ||
       gameMenuDemoTurnTimer !== null ||
       gameMenuDemoRestartTimer !== null ||
@@ -10852,7 +10850,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function getCinematicPerformanceMode(): CinematicPerformanceMode {
-    return isGameMenuOpen() ? "minimal" : "auto";
+    return "auto";
   }
 
   function getStoredTrajectoryReflectionMode(): CinematicTrajectoryReflectionMode {
@@ -11151,6 +11149,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     cinematicRenderer.setBeautyModeEnabled(isBeautyModeActive);
     cinematicRenderer.setCameraInputEnabled(!isGameMenuOpen());
     cinematicRenderer.setBillboardsVisible(!isGameMenuDemoActive);
+    cinematicRenderer.setProductiveMarkersVisible(!isGameMenuDemoActive);
     resizeActiveView();
   }
 
@@ -19162,7 +19161,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     automaticMandatoryLaunchFactionIds: readonly FactionId[] | undefined,
     planningOptions: AiPlanningOptions
   ): Promise<GameState> {
-    if (!isZeroTimerAiAutorunMode() || typeof Worker === "undefined") {
+    const shouldUseAiTurnWorker = isZeroTimerAiAutorunMode() || isGameMenuDemoActive;
+
+    if (!shouldUseAiTurnWorker || typeof Worker === "undefined") {
       aiWorkerPostMatchEvaluation = null;
       return advanceSimulationTurn(
         state,

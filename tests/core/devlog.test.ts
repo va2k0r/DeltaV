@@ -103,13 +103,8 @@ describe("public devlog", () => {
     expect(copy).toContain("A telescope would not read a propellant gauge");
   });
 
-  it("uses documented playtest media and provides still fallbacks for animated figures", () => {
-    const figures = devlogEntries.flatMap((entry) => entry.figures ?? []);
-    const animations = figures.filter((figure) => figure.src.endsWith(".gif"));
-
-    expect(figures.length).toBeGreaterThanOrEqual(9);
-    expect(animations).toHaveLength(3);
-    expect(animations.every((figure) => figure.reducedMotionSrc !== undefined)).toBe(true);
+  it("keeps every devlog article free of photos and animation", () => {
+    expect(devlogEntries.every((entry) => entry.figures === undefined)).toBe(true);
   });
 
   it("starts with the articles and keeps product destinations after the archive", () => {
@@ -147,15 +142,18 @@ describe("public devlog", () => {
     );
 
     expect(cssSource).toContain("--site-map-overlap: clamp(250px, 29vh, 340px);");
-    expect(cssSource).toContain("--site-map-continuation: clamp(1100px, 140vh, 1600px);");
-    expect(cssSource).toContain("height: calc(100vh + var(--site-map-continuation));");
-    expect(cssSource).toContain("min-height: calc(100svh + var(--site-map-continuation));");
-    expect(cssSource).toContain("position: sticky;");
-    expect(cssSource).toContain("height: 100vh;");
+    expect(cssSource).toContain("--site-map-extension: 0px;");
+    expect(cssSource).toContain("height: calc(100vh + var(--site-map-extension));");
+    expect(cssSource).toContain("min-height: calc(100svh + var(--site-map-extension));");
     expect(cssSource).toContain(".deltav-runtime-host.is-site-background .canvas-frame");
     expect(cssSource).toContain(
-      "margin-top: calc(-1 * (var(--site-map-continuation) + var(--site-map-overlap)));"
+      "margin-top: calc(-1 * (var(--site-map-extension) + var(--site-map-overlap)));"
     );
+    expect(cssSource).toContain(
+      ".deltav-runtime-host.is-site-background .game-menu {\n  position: absolute;"
+    );
+    expect(cssSource).not.toContain("--site-map-continuation");
+    expect(cssSource).not.toContain("position: sticky;");
     expect(cssSource).not.toContain(".delta-site::before");
     expect(cssSource).toContain(
       ".delta-site__brief {\n  padding-top: 0;\n  padding-bottom: clamp(110px, 15vw, 230px);\n  border-top: 0;"
@@ -165,10 +163,14 @@ describe("public devlog", () => {
     );
     expect(siteSource).not.toContain("syncOpeningSpan");
     expect(siteSource).not.toContain("openingResizeObserver");
-    expect(mainSource.indexOf("await createDeltaVApp(gameHost)")).toBeLessThan(
-      mainSource.indexOf('gameHost.classList.add("is-site-background")')
+    expect(mainSource.indexOf('"deltav-runtime-host is-site-background"')).toBeLessThan(
+      mainSource.indexOf("await createDeltaVApp(gameHost)")
     );
-    expect(rendererSource).toContain("private updateViewportProjection(");
+    expect(rendererSource).toContain("private syncSitePlanetariumExtent()");
+    expect(rendererSource).toContain("private getSitePlanetariumProjectedBottom(");
+    expect(rendererSource).toContain(
+      'document.documentElement.style.setProperty("--site-map-extension"'
+    );
     expect(rendererSource).toContain("this.camera.setViewOffset(");
     expect(rendererSource).toContain("if (this.isRootInViewport)");
   });

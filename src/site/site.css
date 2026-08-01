@@ -5,6 +5,7 @@
   --site-line: rgba(164, 186, 198, 0.22);
   --site-cyan: #9fe8ff;
   --site-ivory: #e5e9c9;
+  --site-map-extension: 0px;
 }
 
 body.is-deltav-site,
@@ -15,7 +16,6 @@ body.is-deltav-site #app {
 
 body.is-deltav-site {
   --site-map-overlap: clamp(250px, 29vh, 340px);
-  --site-map-continuation: clamp(1100px, 140vh, 1600px);
   overflow-x: hidden;
   overflow-y: auto;
   background: #07111a;
@@ -42,19 +42,17 @@ body.is-deltav-site::-webkit-scrollbar {
 .deltav-runtime-host.is-site-background {
   position: relative;
   z-index: 0;
-  height: calc(100vh + var(--site-map-continuation));
-  min-height: calc(100svh + var(--site-map-continuation));
+  height: calc(100vh + var(--site-map-extension));
+  min-height: calc(100svh + var(--site-map-extension));
 }
 
-.deltav-runtime-host.is-site-background .app-shell {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  min-height: 100svh;
-}
-
+.deltav-runtime-host.is-site-background .app-shell,
 .deltav-runtime-host.is-site-background .canvas-frame {
   height: 100%;
+}
+
+.deltav-runtime-host.is-site-background .game-menu {
+  position: absolute;
 }
 
 .deltav-runtime-host.is-site-background .game-menu__main-column {
@@ -70,7 +68,7 @@ body.is-deltav-site::-webkit-scrollbar {
   position: relative;
   z-index: 0;
   min-height: 100vh;
-  margin-top: calc(-1 * (var(--site-map-continuation) + var(--site-map-overlap)));
+  margin-top: calc(-1 * (var(--site-map-extension) + var(--site-map-overlap)));
   background: transparent;
   color: var(--site-ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;

@@ -1802,6 +1802,11 @@ const openingCameraYawSearchStep = Math.PI / 72;
 const openingCameraYawSearchSpan = Math.PI / 5.5;
 const openingCameraFramePaddingPixels = 34;
 const openingCameraDistancePadding = 1.018;
+const sitePlanetariumExtentMarginMinPixels = 72;
+const sitePlanetariumExtentMarginMaxPixels = 120;
+const sitePlanetariumExtentMarginViewportRatio = 0.06;
+const sitePlanetariumOrbitExtentSamples = 256;
+const sitePlanetariumBodyExtentSamples = 32;
 const openingMercurySolarGapPixels = 8;
 const openingMercurySolarGapRadiusRatio = 0.06;
 const openingMercurySolarMaxCenterRatio = 1.7;
@@ -2433,6 +2438,9 @@ export class CinematicSolarSystemRenderer {
   private framePerformanceMode: Exclude<CinematicPerformanceMode, "auto"> | null = null;
   private rendererCssWidth = 1;
   private rendererCssHeight = 1;
+  private sitePlanetariumExtensionPixels: number | null = null;
+  private sitePlanetariumExtentLayoutSignature = "";
+  private sitePlanetariumExtentFrame: number | null = null;
   private currentRendererPixelRatio = 0;
   private cinematicUiBloomCacheValid = false;
   private cinematicUiBloomCacheSignature = "";
@@ -2520,6 +2528,7 @@ export class CinematicSolarSystemRenderer {
   private readonly tritiumStreamSuppressedArrivalTurns = new Map<string, number>();
   private workEffectsLastUpdatedAt = Number.NEGATIVE_INFINITY;
   private productiveMarkerZoomOutFlashStartedAt = Number.NEGATIVE_INFINITY;
+  private productiveMarkersVisible = true;
   private hasAppliedOpeningSystemCamera = false;
   private hasLoggedTurnZeroScaleAudit = false;
   private driveWakeCameraDazzleStrength = 0;
@@ -2846,6 +2855,31 @@ export class CinematicSolarSystemRenderer {
     this.labelLayer.classList.toggle("is-hidden", !visible);
   }
 
+  setProductiveMarkersVisible(visible: boolean): void {
+    if (this.productiveMarkersVisible === visible) {
+      return;
+    }
+
+    this.productiveMarkersVisible = visible;
+    this.nodePresentationLastStateSignature = "";
+    this.nodePresentationLastSignature = "";
+    this.invalidateCinematicUiBloomCache();
+
+    if (this.snapshot === null) {
+      return;
+    }
+
+    for (const node of this.snapshot.nodes) {
+      const nodeObject = this.nodeObjects.get(node.id);
+
+      if (nodeObject !== undefined) {
+        this.syncProductiveMarkerPresentation(nodeObject, node);
+      }
+    }
+
+    this.renderFrame();
+  }
+
   setSnapshot(
     snapshot: SolarSystemSnapshot,
     options: Readonly<{ deferRender?: boolean }> = {}
@@ -2899,6 +2933,8 @@ export class CinematicSolarSystemRenderer {
     if (this.shouldRecenterTrackedFocusTarget()) {
       this.recenterTrackedFocusTarget();
     }
+
+    this.scheduleSitePlanetariumExtentSync();
 
     if (options.deferRender !== true) {
       this.renderFrame();
@@ -3835,6 +3871,7 @@ export class CinematicSolarSystemRenderer {
     this.rebaseSunRelativeCameraReference();
     this.refreshDisplayScale();
     this.updateCamera();
+    this.scheduleSitePlanetariumExtentSync();
     if (options.deferRender !== true) {
       this.renderFrame();
     }
@@ -4193,6 +4230,7 @@ export class CinematicSolarSystemRenderer {
     if (!this.hasAppliedOpeningSystemCamera && this.applyOpeningSystemCamera()) {
       return;
     }
+    this.scheduleSitePlanetariumExtentSync();
     this.renderFrame();
   }
 
@@ -4205,14 +4243,240 @@ export class CinematicSolarSystemRenderer {
     this.camera.aspect = width / compositionHeight;
 
     if (height > compositionHeight + 0.5) {
-      // Render more of the same camera frustum below the website's opening viewport. The top
-      // composition remains pixel-identical to the main menu while the planetarium continues
-      // behind the first devlog entry instead of ending at a horizontal canvas boundary.
+      // The website canvas grows only below the canonical menu viewport. An off-axis projection
+      // exposes that extra world space without moving or rescaling the opening composition.
       this.camera.setViewOffset(width, compositionHeight, 0, 0, width, height);
       return;
     }
 
     this.camera.updateProjectionMatrix();
+  }
+
+  private scheduleSitePlanetariumExtentSync(): void {
+    if (
+      this.sitePlanetariumExtentFrame !== null ||
+      this.root.closest(".deltav-runtime-host.is-site-background") === null
+    ) {
+      return;
+    }
+
+    this.sitePlanetariumExtentFrame = requestAnimationFrame(() => {
+      this.sitePlanetariumExtentFrame = null;
+      this.syncSitePlanetariumExtent();
+    });
+  }
+
+  private syncSitePlanetariumExtent(): void {
+    if (
+      this.snapshot === null ||
+      this.displayState === null ||
+      this.root.closest(".deltav-runtime-host.is-site-background") === null
+    ) {
+      return;
+    }
+
+    const width = Math.max(1, this.rendererCssWidth);
+    const compositionHeight = Math.max(1, window.innerHeight);
+    const compositionCamera = this.camera.clone();
+    compositionCamera.clearViewOffset();
+    compositionCamera.aspect = width / compositionHeight;
+    compositionCamera.updateProjectionMatrix();
+    const layoutSignature = this.getSitePlanetariumExtentLayoutSignature(
+      compositionCamera,
+      width,
+      compositionHeight
+    );
+
+    if (layoutSignature === this.sitePlanetariumExtentLayoutSignature) {
+      return;
+    }
+
+    const margin = clamp(
+      compositionHeight * sitePlanetariumExtentMarginViewportRatio,
+      sitePlanetariumExtentMarginMinPixels,
+      sitePlanetariumExtentMarginMaxPixels
+    );
+    const projectedBottom = this.getSitePlanetariumProjectedBottom(
+      compositionCamera,
+      width,
+      compositionHeight,
+      margin
+    );
+    const extension = Math.max(0, Math.ceil(projectedBottom + margin - compositionHeight));
+
+    this.sitePlanetariumExtentLayoutSignature = layoutSignature;
+
+    if (
+      this.sitePlanetariumExtensionPixels !== null &&
+      Math.abs(this.sitePlanetariumExtensionPixels - extension) < 1
+    ) {
+      return;
+    }
+
+    this.sitePlanetariumExtensionPixels = extension;
+    document.documentElement.style.setProperty("--site-map-extension", `${extension}px`);
+  }
+
+  private getSitePlanetariumExtentLayoutSignature(
+    camera: THREE.PerspectiveCamera,
+    width: number,
+    height: number
+  ): string {
+    const cameraValues = [
+      camera.position.x,
+      camera.position.y,
+      camera.position.z,
+      camera.quaternion.x,
+      camera.quaternion.y,
+      camera.quaternion.z,
+      camera.quaternion.w
+    ].map((value) => value.toFixed(4));
+    const bodyLayout =
+      this.snapshot?.bodies
+        .map((body) => `${body.id}:${body.parentId ?? "root"}:${body.orbitRadius}`)
+        .join("|") ?? "";
+    const nodeLayout =
+      this.snapshot?.nodes
+        .map((node) => `${node.id}:${node.bodyId}:${node.nodeOrbitRadius}`)
+        .join("|") ?? "";
+
+    return [width, height, ...cameraValues, bodyLayout, nodeLayout].join(";");
+  }
+
+  private getSitePlanetariumProjectedBottom(
+    camera: THREE.PerspectiveCamera,
+    width: number,
+    height: number,
+    horizontalMargin: number
+  ): number {
+    if (this.snapshot === null) {
+      return 0;
+    }
+
+    let bottom = 0;
+    const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+    const samplePoint = new THREE.Vector3();
+    const updateBottom = (worldPoint: THREE.Vector3): void => {
+      const projected = worldPoint.clone().project(camera);
+
+      if (
+        !Number.isFinite(projected.x) ||
+        !Number.isFinite(projected.y) ||
+        !Number.isFinite(projected.z) ||
+        projected.z < -1 ||
+        projected.z > 1
+      ) {
+        return;
+      }
+
+      const x = (projected.x * 0.5 + 0.5) * width;
+
+      if (x < -horizontalMargin || x > width + horizontalMargin) {
+        return;
+      }
+
+      bottom = Math.max(bottom, (-projected.y * 0.5 + 0.5) * height);
+    };
+    const sampleScreenFacingCircle = (center: THREE.Vector3, radius: number): void => {
+      for (let index = 0; index < sitePlanetariumBodyExtentSamples; index += 1) {
+        const angle = (index / sitePlanetariumBodyExtentSamples) * Math.PI * 2;
+        samplePoint
+          .copy(center)
+          .addScaledVector(cameraRight, Math.cos(angle) * radius)
+          .addScaledVector(cameraUp, Math.sin(angle) * radius);
+        updateBottom(samplePoint);
+      }
+    };
+    const sampleOrbitalCircle = (center: THREE.Vector3, radius: number): void => {
+      for (let index = 0; index < sitePlanetariumOrbitExtentSamples; index += 1) {
+        const angle = (index / sitePlanetariumOrbitExtentSamples) * Math.PI * 2;
+        samplePoint.set(
+          center.x + Math.cos(angle) * radius,
+          center.y,
+          center.z + Math.sin(angle) * radius
+        );
+        updateBottom(samplePoint);
+      }
+    };
+    const bodyLocalExtents = new Map<string, number>();
+    const childrenByParentId = new Map<string, BodySnapshot[]>();
+
+    for (const body of this.snapshot.bodies) {
+      const baseRadius = this.getDisplayBodyRadius(body);
+      const visualRadius =
+        body.id === "saturn"
+          ? baseRadius * saturnRingSystemBaseOuterRadius
+          : body.id === "uranus"
+            ? baseRadius * uranusRingSystemBaseOuterRadius
+            : body.id === "neptune"
+              ? baseRadius * neptuneRingSystemBaseOuterRadius
+              : baseRadius;
+      bodyLocalExtents.set(body.id, visualRadius);
+
+      if (body.parentId !== null) {
+        const siblings = childrenByParentId.get(body.parentId) ?? [];
+        siblings.push(body);
+        childrenByParentId.set(body.parentId, siblings);
+      }
+    }
+
+    for (const node of this.snapshot.nodes) {
+      const nodeRadius = node.nodeOrbitRadius * this.getDisplayNodeRingScale(node);
+      bodyLocalExtents.set(
+        node.bodyId,
+        Math.max(bodyLocalExtents.get(node.bodyId) ?? 0, nodeRadius)
+      );
+    }
+
+    const bodyFamilyExtents = new Map<string, number>();
+    const getBodyFamilyExtent = (body: BodySnapshot): number => {
+      const cached = bodyFamilyExtents.get(body.id);
+
+      if (cached !== undefined) {
+        return cached;
+      }
+
+      let extent = bodyLocalExtents.get(body.id) ?? 0;
+
+      for (const child of childrenByParentId.get(body.id) ?? []) {
+        extent = Math.max(
+          extent,
+          child.orbitRadius * this.getDisplayOrbitScale(child) + getBodyFamilyExtent(child)
+        );
+      }
+
+      bodyFamilyExtents.set(body.id, extent);
+      return extent;
+    };
+
+    for (const body of this.snapshot.bodies) {
+      const center = this.getDisplayBodyPosition(body);
+      const extentRadius = bodyLocalExtents.get(body.id) ?? this.getDisplayBodyRadius(body);
+      sampleScreenFacingCircle(center, extentRadius);
+
+      if (body.parentId === null || body.orbitRadius <= 0) {
+        continue;
+      }
+
+      const parent = this.snapshotBodiesById.get(body.parentId);
+
+      if (parent !== undefined) {
+        sampleOrbitalCircle(
+          this.getDisplayBodyPosition(parent),
+          body.orbitRadius * this.getDisplayOrbitScale(body) + getBodyFamilyExtent(body)
+        );
+      }
+    }
+
+    for (const node of this.snapshot.nodes) {
+      sampleOrbitalCircle(
+        this.getDisplayNodePosition(node),
+        node.nodeOrbitRadius * this.getDisplayNodeRingScale(node)
+      );
+    }
+
+    return bottom;
   }
 
   getSolarScreenProjection(): CinematicSolarScreenProjection | null {
@@ -5780,6 +6044,10 @@ export class CinematicSolarSystemRenderer {
     this.clearTrajectoryLabels();
     this.clearMissileThreatIndicators();
     cancelAnimationFrame(this.animationFrame);
+    if (this.sitePlanetariumExtentFrame !== null) {
+      cancelAnimationFrame(this.sitePlanetariumExtentFrame);
+      this.sitePlanetariumExtentFrame = null;
+    }
     this.viewportObserver?.disconnect();
     this.viewportObserver = null;
     if (this.cinematicShaderWarmupTimer !== null) {
@@ -6932,7 +7200,7 @@ export class CinematicSolarSystemRenderer {
   }
 
   private shouldShowProductiveMarkerForNode(node: NodeSnapshot): boolean {
-    if (!productiveNodeMarkersEnabled) {
+    if (!productiveNodeMarkersEnabled || !this.productiveMarkersVisible) {
       return false;
     }
 
@@ -7584,6 +7852,7 @@ export class CinematicSolarSystemRenderer {
     this.hasAppliedOpeningSystemCamera = true;
     this.syncScene(this.snapshot);
     this.updateCamera();
+    this.scheduleSitePlanetariumExtentSync();
     return true;
   }
 

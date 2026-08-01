@@ -55,7 +55,9 @@ async function startDeltaV(): Promise<void> {
   const searchParams = new URLSearchParams(window.location.search);
   const directGameMode = shouldOpenDirectlyInGame(searchParams);
   const gameHost = document.createElement("div");
-  gameHost.className = "deltav-runtime-host";
+  gameHost.className = directGameMode
+    ? "deltav-runtime-host"
+    : "deltav-runtime-host is-site-background";
   appRoot.replaceChildren(gameHost);
 
   await createDeltaVApp(gameHost);
@@ -63,7 +65,6 @@ async function startDeltaV(): Promise<void> {
     return;
   }
 
-  gameHost.classList.add("is-site-background");
   createDeltaVSite(appRoot, gameHost);
 }
 

@@ -334,7 +334,7 @@ The canonical main-menu banner is the detached top-down “planets crossing spac
 
 ```text
 Reference viewport: 2560 × 1440
-Procedural reference seed: proc-ms3v4bl9-10thvw5
+Procedural reference seed: proc-ms4v3wlj-0puste0
 Opening orbital phase: turn 76
 Camera does not track a body
 Sun is offset left; the menu occupies negative space on the right
