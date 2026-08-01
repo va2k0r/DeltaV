@@ -418,9 +418,9 @@ describe("Cinematic 3D architecture boundary", () => {
 
     expect(uiSource).toContain("new DeltaVMusicEngine()");
     expect(uiSource).toContain("musicButton");
-    expect(uiSource).toContain("let isMusicEnabled = false;");
-    expect(uiSource).toContain('musicButton.textContent = "Music Off"');
-    expect(uiSource).toContain('musicButton.setAttribute("aria-pressed", "false")');
+    expect(uiSource).toContain("let isMusicEnabled = true;");
+    expect(uiSource).toContain('musicButton.textContent = "Music On"');
+    expect(uiSource).toContain('musicButton.setAttribute("aria-pressed", "true")');
     expect(uiSource).toContain('"Music On"');
     expect(uiSource).toContain('"Music Off"');
     expect(uiSource).toContain('"Music Pending"');
