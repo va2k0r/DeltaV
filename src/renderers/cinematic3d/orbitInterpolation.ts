@@ -46,7 +46,7 @@ export function alignMissileFlightProgressToImpactPresentation(
   return startProgress + (1 - startProgress) * impactProgress;
 }
 
-export function getMissileDefenseInterceptionFlightProgress(
+export function getMissileDefenseNeutralizationFlightProgress(
   missile: Pick<ActiveMissile, "issuedTurn" | "missileEtaTurns">,
   fromTurn: number,
   toTurn: number

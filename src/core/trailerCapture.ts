@@ -339,7 +339,7 @@ export function createTrailerCaptureTimeline(content: SimulationContent): Traile
   );
   addScene(
     "evade-point-defense",
-    "Successful EVADE / Point Defense intercept",
+    "Successful EVADE / Point Defense kill",
     {
       targetNodeIds: ["venus_node"],
       focusTargetKey: "node:venus_node",

@@ -110,8 +110,8 @@ Canonical order:
 ```text
 1. Contested upkeep
 2. Missile impact + automatic/preventive Evade
-3. Ship arrivals / Intercept resolution
-4. Actions: Fire, Burn, Intercept declarations resolve under action rules
+3. Ship arrivals
+4. Actions: Fire and Burn declarations resolve under action rules
 5. Economy:
    a. Tritium income
    b. Shipyard progress/completion
@@ -134,7 +134,6 @@ Each ship may perform one active action per turn:
 BURN
 FIRE
 EVADE
-INTERCEPT
 ```
 
 WORK is not manually selected. It is automatically resolved for available ships on productive nodes.
@@ -151,8 +150,7 @@ Burn is used to:
 
 - start a transfer;
 - change direction while drifting;
-- leave contested;
-- perform Intercept.
+- leave contested.
 
 ```text
 Burn cost = route cost + origin gravity well modifier
@@ -176,12 +174,9 @@ A drifting ship may:
 
 - Fire;
 - Evade;
-- Burn again to change direction;
-- be Intercepted.
+- Burn again to change direction.
 
 If a drifting ship Evades, it continues its current trajectory unless a future balance patch adds delay.
-
-If a drifting ship is Intercepted, its transfer is cancelled and it enters a temporary contested intercept node.
 
 ## 9. Fire and missiles
 
@@ -264,7 +259,6 @@ A contested ship cannot:
 - Fire;
 - Evade;
 - Work;
-- Intercept;
 - perform any action other than Stay or Burn out.
 
 A contested ship may:
@@ -281,20 +275,7 @@ A contested ship holds the target in place.
 External support decides whether staying is safe.
 ```
 
-## 12. Intercept
-
-Intercept is a Burn action against a ship in transfer/drift.
-
-On successful Intercept:
-
-- the target transfer is cancelled;
-- interceptor and target enter a temporary contested intercept node;
-- no Work is possible there;
-- the temporary node persists until one ship Burns out or is destroyed.
-
-Intercept does not deal damage by itself.
-
-## 13. Work
+## 12. Work
 
 WORK resolves automatically in Economy Phase.
 
@@ -314,7 +295,7 @@ A ship on Protected cannot Work.
 
 A contested ship cannot Work.
 
-## 14. Tritium production
+## 13. Tritium production
 
 Baseline:
 
@@ -339,7 +320,7 @@ Maximum global tritium production if all are worked:
 4 nodes × 2 dV = 8 dV per turn across the map
 ```
 
-## 15. Shipyard production
+## 14. Shipyard production
 
 Shipyard production has no dV cost.
 
@@ -363,7 +344,7 @@ When a ship is completed, the produced ship must Burn out of the shipyard during
 
 If it cannot pay or execute a legal Burn, the produced ship is destroyed.
 
-## 16. Gravity well
+## 15. Gravity well
 
 Gravity well applies only to Burn from the origin node.
 
@@ -381,7 +362,7 @@ Barren moons: 0 unless specified
 Triton: +1
 ```
 
-## 17. Victory and elimination
+## 16. Victory and elimination
 
 Win condition:
 

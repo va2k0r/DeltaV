@@ -38,6 +38,9 @@ select {
 }
 
 .app-shell {
+  --command-rail-right: clamp(16px, 1.8vw, 40px);
+  --command-rail-width: min(clamp(330px, 25vw, 540px), calc(100vw - 32px));
+  --command-rail-gap: clamp(16px, 1.6vw, 32px);
   position: relative;
   display: block;
   height: 100vh;
@@ -279,7 +282,7 @@ select {
 .replay-indicator {
   position: absolute;
   top: 26px;
-  right: 28px;
+  right: var(--command-rail-right);
   z-index: 6;
   border: 1px solid rgba(169, 204, 232, 0.72);
   border-radius: 4px;
@@ -299,7 +302,7 @@ select {
 
 .post-match-report {
   position: absolute;
-  right: 24px;
+  right: var(--command-rail-right);
   bottom: 24px;
   z-index: 6;
   width: min(620px, calc(100% - 48px));
@@ -834,15 +837,15 @@ select {
 }
 
 .command-console {
-  --command-console-line-right-gutter: clamp(24px, 3.2vw, 84px);
+  --command-console-line-right-gutter: clamp(22px, 2.4vw, 56px);
   --command-console-tail-snap-padding: 0px;
   --command-console-transcript-headroom: clamp(112px, 15vh, 220px);
   position: fixed;
   top: clamp(16px, 2vh, 32px);
-  right: clamp(4px, 0.65vw, 14px);
+  right: var(--command-rail-right);
   z-index: 7;
   display: flex;
-  width: min(clamp(310px, 22vw, 500px), calc(100vw - 24px));
+  width: var(--command-rail-width);
   height: clamp(250px, 34vh, 460px);
   max-height: clamp(250px, 34vh, 460px);
   flex-direction: column;
@@ -996,7 +999,7 @@ select {
   position: fixed;
   z-index: 8;
   box-sizing: border-box;
-  width: min(clamp(310px, 22vw, 500px), calc(100vw - 24px));
+  width: var(--command-rail-width);
   border: 0;
   background: none;
   box-shadow: none;
@@ -1022,10 +1025,7 @@ select {
 
 .command-glossary-hover {
   top: clamp(16px, 2vh, 32px);
-  right: calc(
-    clamp(4px, 0.65vw, 14px) + min(clamp(310px, 22vw, 500px), calc(100vw - 24px)) +
-      clamp(18px, 2vw, 38px)
-  );
+  right: calc(var(--command-rail-right) + var(--command-rail-width) + var(--command-rail-gap));
   min-height: 4.5em;
   opacity: 0;
   padding: 0;
@@ -1037,7 +1037,6 @@ select {
   opacity: 1;
 }
 
-.command-glossary-hover__text.is-tutorial-logbook-attention,
 .command-glossary-detail__line.is-tutorial-logbook-attention,
 .command-glossary-detail__label.is-tutorial-logbook-attention {
   animation: tutorial-live-hint-blink var(--beat-tutorial-hint-duration, 1050ms) steps(2, end)
@@ -1077,13 +1076,13 @@ select {
 
 .command-glossary-detail {
   top: calc(clamp(16px, 2vh, 32px) + clamp(250px, 34vh, 460px) + clamp(18px, 2.5vh, 34px));
-  right: clamp(4px, 0.65vw, 14px);
+  right: var(--command-rail-right);
   max-height: calc(
     100vh - (clamp(16px, 2vh, 32px) + clamp(250px, 34vh, 460px) + clamp(18px, 2.5vh, 34px)) - 18px
   );
   overflow-x: hidden;
   overflow-y: hidden;
-  padding: 0 var(--command-console-line-right-gutter, clamp(24px, 3.2vw, 84px)) 10px 0;
+  padding: 0 var(--command-console-line-right-gutter, clamp(22px, 2.4vw, 56px)) 10px 0;
   pointer-events: auto;
   line-height: 1.24;
 }
@@ -1208,13 +1207,13 @@ select {
 }
 
 .game-menu {
-  --command-console-line-right-gutter: clamp(24px, 3.2vw, 84px);
-  --game-menu-column-gap: clamp(12px, 1.4vw, 24px);
+  --command-console-line-right-gutter: clamp(22px, 2.4vw, 56px);
+  --game-menu-column-gap: var(--command-rail-gap);
   --game-menu-column-width: min(
-    clamp(310px, 22vw, 500px),
+    var(--command-rail-width),
     calc(
       (
-          100vw - var(--game-menu-column-gap) - var(--game-menu-column-gap) -
+          100vw - var(--command-rail-right) - var(--game-menu-column-gap) -
             var(--game-menu-column-gap)
         ) /
         2
@@ -1240,13 +1239,13 @@ select {
         4
     )
   );
-  --game-menu-tone-bright: #d7dfb9;
-  --game-menu-tone-regular: #bac79c;
-  --game-menu-tone-soft: #9eac83;
-  --game-menu-tone-dim: #778366;
+  --game-menu-tone-bright: #eef1e3;
+  --game-menu-tone-regular: #e1e6d5;
+  --game-menu-tone-soft: #d1dac3;
+  --game-menu-tone-dim: #bbc7ad;
   position: fixed;
   top: clamp(16px, 2vh, 32px);
-  right: var(--game-menu-column-gap);
+  right: var(--command-rail-right);
   transform: translateY(-2.72em);
   z-index: 7;
   display: flex;
@@ -1282,13 +1281,14 @@ select {
   width: 100%;
   min-height: 1em;
   margin: 0 0 1.36em;
-  color: #eff2d9;
+  color: #f7f8f2;
   cursor: help;
   font: inherit;
   line-height: 1;
   padding-right: var(--command-console-line-right-gutter);
   text-align: left;
   pointer-events: auto;
+  white-space: nowrap;
 }
 
 .game-menu__title:hover,
@@ -1304,7 +1304,8 @@ select {
 .trailer-cta-screen {
   position: fixed;
   top: 28%;
-  left: 74.25vw;
+  right: var(--command-rail-right);
+  width: var(--command-rail-width);
   z-index: 7;
   display: flex;
   flex-direction: column;
@@ -1411,6 +1412,7 @@ select {
   padding: 0 var(--command-console-line-right-gutter) 0 0;
   text-align: left;
   text-shadow: inherit;
+  white-space: nowrap;
   transition:
     color 120ms ease,
     opacity 120ms ease,
@@ -1435,6 +1437,12 @@ select {
 
 .game-menu__action--dim {
   color: var(--game-menu-tone-dim);
+}
+
+.game-menu__spacer {
+  flex: 0 0 1.36em;
+  min-height: 1.36em;
+  pointer-events: none;
 }
 
 .game-menu__brightness-control {
@@ -1484,7 +1492,7 @@ select {
   appearance: none;
   border: 1px solid currentColor;
   border-radius: 0;
-  background: #d9dfb8;
+  background: #eef1e3;
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.78),
     0 0 7px rgba(190, 211, 145, 0.24);
@@ -1503,7 +1511,7 @@ select {
   height: 1.05em;
   border: 1px solid currentColor;
   border-radius: 0;
-  background: #d9dfb8;
+  background: #eef1e3;
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.78),
     0 0 7px rgba(190, 211, 145, 0.24);
@@ -1515,25 +1523,25 @@ select {
 }
 
 .game-menu__submenu-actions[data-screen="new-game"] {
-  --game-menu-tone-bright: #dce4be;
-  --game-menu-tone-regular: #c2cea3;
-  --game-menu-tone-soft: #a3b087;
-  --game-menu-tone-dim: #7d896a;
+  --game-menu-tone-bright: #f0f3e5;
+  --game-menu-tone-regular: #e4e9d7;
+  --game-menu-tone-soft: #d3ddc5;
+  --game-menu-tone-dim: #bdcaae;
 }
 
 .game-menu__submenu-actions[data-screen="options"] {
-  --game-menu-tone-bright: #d9dfb8;
-  --game-menu-tone-regular: #bec89c;
-  --game-menu-tone-soft: #a0aa80;
-  --game-menu-tone-dim: #798263;
+  --game-menu-tone-bright: #eef1e3;
+  --game-menu-tone-regular: #e2e6d4;
+  --game-menu-tone-soft: #d1d8c1;
+  --game-menu-tone-dim: #bbc4ac;
   top: calc(100% - 4px - 2.72em);
 }
 
 .game-menu__submenu-actions[data-screen="quit"] {
-  --game-menu-tone-bright: #d8d7b0;
-  --game-menu-tone-regular: #c1bf98;
-  --game-menu-tone-soft: #a5a37f;
-  --game-menu-tone-dim: #7f7d62;
+  --game-menu-tone-bright: #efefe2;
+  --game-menu-tone-regular: #e3e2d2;
+  --game-menu-tone-soft: #d2d1c0;
+  --game-menu-tone-dim: #bdbdab;
   top: calc(100% - 4px - 1.36em);
 }
 
@@ -1622,29 +1630,28 @@ select {
 }
 
 @media (max-aspect-ratio: 1/1) and (min-height: 640px) {
+  .app-shell {
+    --command-rail-right: clamp(6px, 1vw, 10px);
+    --command-rail-width: min(clamp(255px, 38vw, 315px), calc(100vw - 16px));
+    --command-rail-gap: clamp(8px, 1.5vw, 16px);
+  }
+
   .command-console {
     --command-console-line-right-gutter: clamp(14px, 4vw, 30px);
     --command-console-transcript-headroom: 0px;
     top: clamp(8px, 1vh, 12px);
-    right: clamp(6px, 1vw, 10px);
-    width: min(clamp(255px, 38vw, 315px), calc(100vw - 16px));
     height: auto;
     max-height: min(32vh, 260px);
   }
 
   .command-glossary-hover {
     top: clamp(8px, 1vh, 12px);
-    right: calc(
-      clamp(6px, 1vw, 10px) + min(clamp(255px, 38vw, 315px), calc(100vw - 16px)) +
-        clamp(8px, 1.5vw, 16px)
-    );
+    right: calc(var(--command-rail-right) + var(--command-rail-width) + var(--command-rail-gap));
     width: min(clamp(210px, 34vw, 280px), calc(62vw - 30px));
   }
 
   .command-glossary-detail {
     top: calc(clamp(8px, 1vh, 12px) + min(32vh, 260px) + clamp(14px, 2vh, 22px));
-    right: clamp(6px, 1vw, 10px);
-    width: min(clamp(255px, 38vw, 315px), calc(100vw - 16px));
     max-height: calc(
       100vh - (clamp(8px, 1vh, 12px) + min(32vh, 260px) + clamp(14px, 2vh, 22px)) - 14px
     );
@@ -1674,17 +1681,6 @@ select {
 
   .game-menu {
     --command-console-line-right-gutter: clamp(14px, 4vw, 30px);
-    --game-menu-column-gap: clamp(6px, 1vw, 10px);
-    --game-menu-column-width: min(
-      clamp(255px, 38vw, 315px),
-      calc(
-        (
-            100vw - var(--game-menu-column-gap) - var(--game-menu-column-gap) -
-              var(--game-menu-column-gap)
-          ) /
-          2
-      )
-    );
     top: clamp(8px, 1vh, 12px);
     height: min(32vh, 260px);
     max-height: min(32vh, 260px);
@@ -2191,7 +2187,7 @@ select {
 
 .ai-report {
   position: absolute;
-  right: 24px;
+  right: var(--command-rail-right);
   bottom: 24px;
   z-index: 5;
   width: min(520px, calc(100% - 48px));
@@ -2270,8 +2266,11 @@ select {
 }
 
 @media (min-width: 2200px) and (min-height: 1200px) {
+  .app-shell.is-trailer-capture {
+    --command-rail-width: min(580px, calc(100vw - 32px));
+  }
+
   .app-shell.is-trailer-capture .command-console {
-    width: min(580px, calc(100vw - 32px));
     height: 500px;
     max-height: 500px;
     font-size: 17px;

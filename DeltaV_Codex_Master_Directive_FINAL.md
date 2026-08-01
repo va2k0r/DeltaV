@@ -624,7 +624,7 @@ Missile defense is an evasion burn.
 
 An evasion burn spends global tritium / delta-v to invalidate incoming missile trajectories against the targeted ship.
 
-The ship does not need to leave the orbit of the body to evade. This represents a local burn, timing change, trajectory correction or intercept window denial.
+The ship does not need to leave the orbit of the body to evade. This represents a local burn, timing change or trajectory correction sufficient to defeat the incoming solution.
 
 The UI must make this readable as a deliberate cost:
 

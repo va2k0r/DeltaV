@@ -107,7 +107,7 @@ Moons may be:
 - Shipyard;
 - Barren / staging.
 
-Moons are tactical ground: support, Fire, Intercept, staging, contested pressure, and retreat.
+Moons are tactical ground: support, Fire, staging, contested pressure, and retreat.
 
 ## 7. Hybrid system constraint
 
@@ -342,7 +342,7 @@ Role: Pluto support moon
 Hydra
 Type: barren / staging
 Gravity: 0
-Role: far outer staging / escape / intercept node
+Role: far outer staging / escape route
 ```
 
 ## 11. Suggested starting positions
@@ -456,7 +456,7 @@ Outer player has Pluto/Charon shipyard but must reach Neptune/Uranus/Saturn fuel
 Jupiter is a rich but shipyard-less fuel anchor.
 Saturn is the main hybrid hotspot.
 Uranus and Neptune are fuel systems without local shipyards.
-Moons decide Fire, Intercept, staging, and contested support.
+Moons decide Fire, staging, route control, and contested support.
 ```
 
 ## 16. Camera and visual hierarchy

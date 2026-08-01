@@ -49,20 +49,21 @@ type GlossaryHoverHandoffOptions = Readonly<{
 
 type GameGlossaryControllerOptions = Readonly<{
   onTutorialLogbookIntroductionComplete?: () => void;
+  onTutorialLogbookIntroductionStepChange?: () => void;
 }>;
 
 export const tutorialLogbookLabel = "Logbook";
 export const gameMenuGlossaryHoverDwellMs = 240;
-export const tutorialLogbookHoverDwellMs = gameMenuGlossaryHoverDwellMs;
-export const tutorialLogbookHoverInstruction =
+export const tutorialLogbookOpenInstruction =
   "Left-click any word in the logbook to open its explanation.";
-export const tutorialLogbookExpandInstruction = "Left-click the selected term to expand it.";
+export const tutorialLogbookExpandInstruction =
+  "In the open Logbook panel, left-click this instruction to expand the explanation further.";
 export const tutorialLogbookReturnInstruction =
   "Left-click the title to return to the previous explanation.";
 
 export type TutorialLogbookIntroductionStep =
   | "inactive"
-  | "hover-prompt"
+  | "open-prompt"
   | "expand-prompt"
   | "return-prompt";
 
@@ -71,8 +72,8 @@ export function advanceTutorialLogbookIntroduction(
 ): TutorialLogbookIntroductionStep {
   switch (step) {
     case "inactive":
-      return "hover-prompt";
-    case "hover-prompt":
+      return "open-prompt";
+    case "open-prompt":
       return "expand-prompt";
     case "expand-prompt":
       return "return-prompt";
@@ -90,6 +91,7 @@ export type GameGlossaryController = Readonly<{
   beginTutorialLogbookIntroduction: () => void;
   restoreTutorialLogbookIntroduction: () => void;
   endTutorialLogbookIntroduction: () => void;
+  getTutorialLogbookIntroductionStep: () => TutorialLogbookIntroductionStep;
   isTutorialLogbookIntroductionActive: () => boolean;
   closeAll: () => void;
 }>;
@@ -174,7 +176,7 @@ export function createGameGlossaryController(
     root.addEventListener("mouseout", handlePointerOut, true);
     root.addEventListener("focusin", handleFocusIn, true);
     root.addEventListener("focusout", handleFocusOut, true);
-    root.addEventListener("pointerdown", interceptGlossaryPointerDown, true);
+    root.addEventListener("pointerdown", captureGlossaryPointerDown, true);
     root.addEventListener("click", handleGlossaryClick, true);
     root.addEventListener("keydown", handleGlossaryKeydown, true);
   };
@@ -238,6 +240,9 @@ export function createGameGlossaryController(
 
   const isTutorialLogbookIntroductionActive = (): boolean =>
     tutorialLogbookIntroductionStep !== "inactive";
+
+  const getTutorialLogbookIntroductionStep = (): TutorialLogbookIntroductionStep =>
+    tutorialLogbookIntroductionStep;
 
   function handlePointerOver(event: MouseEvent): void {
     const token = getGlossaryToken(event.target);
@@ -316,7 +321,7 @@ export function createGameGlossaryController(
     }
   }
 
-  function interceptGlossaryPointerDown(event: PointerEvent): void {
+  function captureGlossaryPointerDown(event: PointerEvent): void {
     if (getGlossaryToken(event.target) === null) {
       return;
     }
@@ -430,19 +435,6 @@ export function createGameGlossaryController(
   }
 
   function scheduleHover(glossaryId: string, token: HTMLElement): void {
-    if (tutorialLogbookIntroductionStep !== "inactive") {
-      if (tutorialLogbookIntroductionStep === "hover-prompt") {
-        scheduleHoverCopy(
-          "tutorial:logbook-introduction",
-          tutorialLogbookLabel,
-          tutorialLogbookHoverInstruction,
-          token,
-          tutorialLogbookHoverDwellMs
-        );
-      }
-      return;
-    }
-
     const entry = getGameGlossaryEntry(glossaryId);
 
     if (entry === undefined) {
@@ -539,21 +531,6 @@ export function createGameGlossaryController(
   }
 
   function revealGlossaryHoverImmediately(token: HTMLElement): void {
-    if (tutorialLogbookIntroductionStep !== "inactive") {
-      if (tutorialLogbookIntroductionStep !== "hover-prompt") {
-        return;
-      }
-
-      scheduleHoverCopy(
-        "tutorial:logbook-introduction",
-        tutorialLogbookLabel,
-        tutorialLogbookHoverInstruction,
-        token,
-        tutorialLogbookHoverDwellMs
-      );
-      return;
-    }
-
     const glossaryId = token.dataset["glossaryId"];
     const entry = glossaryId === undefined ? undefined : getGameGlossaryEntry(glossaryId);
 
@@ -631,10 +608,6 @@ export function createGameGlossaryController(
     hoverText.textContent = "";
     hoverPanel.classList.remove("is-hidden");
     hoverPanel.classList.add("is-visible", "is-typewriting");
-    hoverText.classList.toggle(
-      "is-tutorial-logbook-attention",
-      tutorialLogbookIntroductionStep === "hover-prompt"
-    );
     hoverPanel.setAttribute("aria-hidden", "false");
 
     const durationMs = getGlossaryTypewriterDuration(text);
@@ -709,12 +682,13 @@ export function createGameGlossaryController(
     event.preventDefault();
     event.stopImmediatePropagation();
 
-    if (tutorialLogbookIntroductionStep === "hover-prompt" && !detailPanel.contains(token)) {
+    if (tutorialLogbookIntroductionStep === "open-prompt" && !detailPanel.contains(token)) {
       clearHoverImmediately();
       tutorialLogbookIntroductionStep = advanceTutorialLogbookIntroduction(
         tutorialLogbookIntroductionStep
       );
       renderTutorialLogbookDetailPrompt();
+      options.onTutorialLogbookIntroductionStepChange?.();
     }
 
     return true;
@@ -782,6 +756,7 @@ export function createGameGlossaryController(
       tutorialLogbookIntroductionStep
     );
     renderTutorialLogbookDetailPrompt();
+    options.onTutorialLogbookIntroductionStepChange?.();
   }
 
   function handleTutorialLogbookDetailKeydown(event: KeyboardEvent): void {
@@ -799,6 +774,7 @@ export function createGameGlossaryController(
       tutorialLogbookIntroductionStep
     );
     renderTutorialLogbookDetailPrompt();
+    options.onTutorialLogbookIntroductionStepChange?.();
   }
 
   function openDetail(glossaryId: string, sourceToken: HTMLElement): void {
@@ -1055,7 +1031,6 @@ export function createGameGlossaryController(
     hoveredHoverToken = null;
     hoverMinimumVisibleUntil = 0;
     hoverPanel.classList.remove("is-visible", "is-typewriting");
-    hoverText.classList.remove("is-tutorial-logbook-attention");
     hoverPanel.classList.add("is-hidden");
     hoverPanel.setAttribute("aria-hidden", "true");
     hoverLabel.textContent = "";
@@ -1118,6 +1093,7 @@ export function createGameGlossaryController(
     beginTutorialLogbookIntroduction,
     restoreTutorialLogbookIntroduction,
     endTutorialLogbookIntroduction,
+    getTutorialLogbookIntroductionStep,
     isTutorialLogbookIntroductionActive,
     closeAll
   };

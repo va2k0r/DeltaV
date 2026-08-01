@@ -54,7 +54,7 @@ const astronomicalRecords = [
       "Earth has a mean radius of 6,371 km, surface gravity of 9.81 m/s² and one natural satellite, the MOON.",
       "Oceans cover about 71% of the surface beneath a nitrogen-oxygen atmosphere and the only confirmed biosphere.",
       "Most people, courts, capital markets and corporate headquarters remain on Earth in 2079.",
-      "Dense tracking networks and stationed interceptors allow near-Earth prohibitions to be enforced rather than merely declared."
+      "Dense tracking networks and stationed defense craft allow near-Earth prohibitions to be enforced rather than merely declared."
     ]
   },
   {

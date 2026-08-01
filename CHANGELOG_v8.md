@@ -18,7 +18,6 @@
 - Contested ship cannot Fire, Evade or Work.
 - Contested upkeep baseline: -4 dV at start of turn.
 - Failure to pay contested upkeep destroys the ship.
-- Intercept now cancels target transfer and creates contested until Burn-out or destruction.
 - Gravity well applies only to Burn from origin; arrival cost removed.
 - Shipyard progress persists; completed ship must Burn out or be destroyed.
 

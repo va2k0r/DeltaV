@@ -23,6 +23,7 @@ import {
   createTutorialEnemyContactVictoryWarningRows,
   createTutorialEnterFireModeLiveRows,
   createTutorialFirstBurnTimeCostRows,
+  createTutorialLogbookIntroductionLiveRow,
   createTutorialOpeningCameraControlLiveRows,
   createTutorialOverlayLiveHintRow,
   createTutorialPostVictoryActionRows,
@@ -231,7 +232,7 @@ describe("tutorial row modules", () => {
   it("builds stable live hint rows through the public barrel", () => {
     expect(createTutorialSelectShipLiveRows("hint-class", "tutorial:test-select")).toEqual([
       {
-        parts: [{ text: "Left-click the ship in Moon orbit to select it." }],
+        parts: [{ text: "Left-click the Moon orbit to select the ship." }],
         className: "hint-class",
         key: "tutorial:test-select"
       },
@@ -302,6 +303,18 @@ describe("tutorial row modules", () => {
       },
       createTutorialSpacerRow("tutorial:test-opening-camera:select-spacer")
     ]);
+
+    expect(createTutorialLogbookIntroductionLiveRow("Open a log term.", true)).toEqual({
+      parts: [{ text: "Open a log term." }],
+      className: tutorialLiveHintClassName,
+      key: "tutorial:live-logbook-introduction"
+    });
+
+    expect(createTutorialLogbookIntroductionLiveRow("Open a log term.", false)).toEqual({
+      parts: [{ text: "Open a log term." }],
+      className: tutorialCompleteHintClassName,
+      key: "tutorial:live-logbook-introduction"
+    });
 
     expect(
       createTutorialZoomFocusLiveRows(

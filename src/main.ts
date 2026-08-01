@@ -1,4 +1,5 @@
 import { createDeltaVApp } from "./ui";
+import { createDeltaVSite } from "./site";
 import "./styles.css";
 
 const root = document.querySelector<HTMLElement>("#app");
@@ -28,10 +29,42 @@ function showStartupFailure(reason: unknown): void {
 }
 
 window.addEventListener("error", (event) => {
+  if (event.message.includes("ResizeObserver loop")) {
+    event.preventDefault();
+    return;
+  }
+
   showStartupFailure(event.error ?? event.message);
 });
 window.addEventListener("unhandledrejection", (event) => {
   showStartupFailure(event.reason);
 });
 
-void createDeltaVApp(appRoot).catch(showStartupFailure);
+function shouldOpenDirectlyInGame(searchParams: URLSearchParams): boolean {
+  return (
+    searchParams.has("game") ||
+    searchParams.has("tutorial") ||
+    searchParams.has("trailer") ||
+    searchParams.has("debug") ||
+    searchParams.has("screen") ||
+    searchParams.get("mode") === "trailer"
+  );
+}
+
+async function startDeltaV(): Promise<void> {
+  const searchParams = new URLSearchParams(window.location.search);
+  const directGameMode = shouldOpenDirectlyInGame(searchParams);
+  const gameHost = document.createElement("div");
+  gameHost.className = "deltav-runtime-host";
+  appRoot.replaceChildren(gameHost);
+
+  await createDeltaVApp(gameHost);
+  if (directGameMode) {
+    return;
+  }
+
+  gameHost.classList.add("is-site-background");
+  createDeltaVSite(appRoot, gameHost);
+}
+
+void startDeltaV().catch(showStartupFailure);

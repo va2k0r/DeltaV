@@ -52,7 +52,6 @@ If documents conflict:
 - Contested ships cannot Fire, Evade or Work.
 - Contested upkeep baseline is -4 dV, paid at start of turn; if unpaid, ship is lost.
 - Gravity applies only to Burn from origin. No arrival gravity cost.
-- Intercept cancels transfer and creates contested until Burn-out or destruction.
 - Normal node capacity is 1 ship. Contested capacity is 2 opposing ships. Third ship cannot enter.
 - Blocked arrivals stop at T-1 and can Fire/Evade.
 - Shipyard progress persists. Completed ship must Burn out or be destroyed.

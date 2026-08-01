@@ -26,6 +26,15 @@ export const gameGlossaryDetailMaxDurationMs = 520;
 
 const mechanicGlossaryEntries = [
   {
+    id: "logbook",
+    label: "LOGBOOK",
+    aliases: ["LOGBOOK"],
+    short: "Hover any word for a brief explanation; left-click it to open the full entry.",
+    detail: [
+      "Hover any word in the command log for a brief explanation. Left-click it to open the full entry; left-click the title to go back."
+    ]
+  },
+  {
     id: "burn-out",
     label: "BURN OUT",
     aliases: ["BURN OUT", "BURNS OUT", "BURNED OUT"],
@@ -267,19 +276,8 @@ const mechanicGlossaryEntries = [
     short: "Commit every queued order and resolve the current turn in a fixed phase order.",
     detail: [
       "EXECUTE locks the current plan and advances one deterministic TURN. Before committing, make sure projected ΔV still covers the survival costs you expect.",
-      "Resolution pays contested upkeep first, then moves mandatory launches, resolves missile impacts and EVADE, handles arrivals and INTERCEPT, and finally resolves ordinary actions and the economy.",
+      "Resolution pays contested upkeep first, then moves mandatory launches, resolves missile impacts and EVADE, handles arrivals, and finally resolves ordinary actions and the economy.",
       "The log reports events in this same causal order, so an earlier entry can explain why a later action failed or never occurred."
-    ]
-  },
-  {
-    id: "intercept",
-    label: "INTERCEPT",
-    aliases: ["INTERCEPT", "INTERCEPTS", "INTERCEPTED", "INTERCEPTING"],
-    short: "A BURN aimed at a moving ship to cancel its transfer and lock it in combat.",
-    detail: [
-      "INTERCEPT can target a ship already in transfer. If successful, it cancels that transfer and places both ships in a temporary CONTESTED orbit.",
-      "Neither ship can WORK there, and the temporary orbit disappears when one ship BURNS out or is destroyed.",
-      "Use INTERCEPT when merely threatening a future EVADE is too weak: it trades your interceptor's freedom for immediate movement denial."
     ]
   },
   {
@@ -290,7 +288,7 @@ const mechanicGlossaryEntries = [
       "Opposing ships share one orbit, locking each other down while both factions pay upkeep.",
     detail: [
       "CONTESTED means one ship from each faction occupies the same orbit. It is a physical lock rather than immediate damage, and neither side can add another ship there.",
-      "Each faction pays 2 ΔV at the start of every turn. The locked ships cannot WORK, FIRE, EVADE or INTERCEPT; they may only STAY or BURN OUT.",
+      "Each faction pays 2 ΔV at the start of every turn. The locked ships cannot WORK, FIRE or EVADE; they may only STAY or BURN OUT.",
       "The ships circle for each other's blind angle while an outside support ship can add a second attack vector. A same-turn arrival creates the lock only after missile impacts, so it cannot block an EVADE that already resolved."
     ]
   },
@@ -387,7 +385,7 @@ const mechanicGlossaryEntries = [
     short: "An orbit where warfare and contesting are disabled by immediate enforcement.",
     detail: [
       "PROTECTED orbits form the enforced Earth-Moon corridor. Weapons remain offline and opposing ships cannot create a contested lock there.",
-      "Launches are registered, nuclear packages remain safed and interceptors are already present, so legal prohibition and physical response operate on the same clock.",
+      "Launches are registered, nuclear packages remain safed and point-defense forces are already present, so legal prohibition and physical response operate on the same clock.",
       "The law continues beyond the corridor, but immediate protection does not. Ordinary destinations remain open to FIRE and CONTESTED occupation."
     ]
   },
@@ -397,7 +395,7 @@ const mechanicGlossaryEntries = [
     aliases: ["BARREN", "STAGING"],
     short: "An orbit with no tritium plant or shipyard, valued for position and timing.",
     detail: [
-      "A BARREN orbit cannot support WORK, but ships can occupy, contest or escape through it, FIRE from it and use it for TRANSFER or INTERCEPT.",
+      "A BARREN orbit cannot support WORK, but ships can occupy, contest or escape through it, FIRE from it and use it for TRANSFER.",
       "Its value is positional: a barren orbit may shorten a route, open a second firing angle, support a contested lock or provide an affordable escape."
     ]
   },
@@ -613,10 +611,6 @@ const mechanicAdviceById: Readonly<Record<string, readonly string[]>> = {
     "Before EXECUTE, check the projected balance against 1 ΔV for each known impact and 2 ΔV for each contested ship.",
     "Use phase order deliberately: a mandatory departure can escape before impact, while a same-turn friendly arrival cannot enable EVADE."
   ],
-  intercept: [
-    "INTERCEPT is strongest against a reinforcement or recovery ship whose destination matters more than your interceptor's freedom.",
-    "Plan an exit or outside support before creating the lock, because both ships lose WORK and the interceptor also begins paying upkeep."
-  ],
   contested: [
     "Project at least two upkeep payments before entering a lock. If the opponent can outlast your reserve, the apparent denial may become a trap.",
     "A lock on a tritium plant or nearly complete yard can justify the cost; a lock on an empty orbit usually needs a route or firing advantage.",
@@ -671,7 +665,7 @@ const mechanicAdviceById: Readonly<Record<string, readonly string[]>> = {
     "Establish CONTESTED one turn before impact if you intend to block EVADE; an arrival on the impact turn resolves too late."
   ],
   eta: [
-    "Compare T+ and T- values directly to identify escapes, interceptions, support windows and turns in which production will be denied."
+    "Compare T+ and T- values directly to identify escapes, support windows and turns in which production will be denied."
   ],
   "projection-arrow": [
     "Treat the right-hand balance as a warning about committed obligations, then inspect the exact BURN, upkeep and impact entries that create it."

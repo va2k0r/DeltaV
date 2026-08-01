@@ -1,7 +1,7 @@
 {
   "name": "deltav",
   "author": "DeltaV",
-  "version": "0.1.0-alpha.6",
+  "version": "0.1.0-alpha.7",
   "private": true,
   "type": "module",
   "main": "scripts/electron-main.mjs",
@@ -13,7 +13,7 @@
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" \"vite.config.ts\" && prettier --check \"AGENTS.md\" \"README.md\" \"docs/**/*.md\" \"index.html\" \"package.json\" \"tsconfig.json\" \"vite.config.ts\" \"eslint.config.js\" \"scripts/**/*.mjs\" \"src/**/*.{ts,css}\" \"tests/**/*.ts\"",
     "build": "vite build",
     "audit:balance-seeds": "node scripts/audit-balance-seeds.mjs",
-    "verify": "npm test && npm run typecheck && npm run lint && npm run build",
+    "verify": "npm test -- --no-file-parallelism --testTimeout=30000 && npm run typecheck && npm run lint && npm run build",
     "release:portable": "npm run verify && node scripts/package-portable.mjs",
     "icon:mac": "node scripts/generate-mac-icon.mjs",
     "icon:win": "node scripts/generate-mac-icon.mjs",

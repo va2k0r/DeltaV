@@ -17,7 +17,7 @@ import {
   contestedUpkeepImpactVisualProgress,
   createReversibleReplaySnapshot,
   createOrbitalTransitionSnapshot,
-  getMissileDefenseInterceptionFlightProgress,
+  getMissileDefenseNeutralizationFlightProgress,
   getTransitionDepartingBurnTransits,
   getTransitionLaunchedMissiles,
   missileImpactVisualProgress,
@@ -168,13 +168,13 @@ describe("Orbital turn interpolation", () => {
     expect(alignMissileFlightProgressToImpactPresentation(missile, 5, 6, 6)).toBe(1);
   });
 
-  it("anchors EVADE interception to the missile position at the defense cue", () => {
+  it("anchors EVADE neutralization to the missile position at the defense cue", () => {
     const missile = {
       issuedTurn: 3,
       missileEtaTurns: 6
     } satisfies Pick<ActiveMissile, "issuedTurn" | "missileEtaTurns">;
 
-    const interceptionProgress = getMissileDefenseInterceptionFlightProgress(missile, 8, 9);
+    const neutralizationProgress = getMissileDefenseNeutralizationFlightProgress(missile, 8, 9);
     const activeMarkerProgress = alignMissileFlightProgressToImpactPresentation(
       missile,
       8,
@@ -182,11 +182,11 @@ describe("Orbital turn interpolation", () => {
       8 + replayMissileDefenseVisualProgress
     );
 
-    expect(interceptionProgress).toBeCloseTo(activeMarkerProgress, 8);
-    expect(interceptionProgress).toBeGreaterThan(
+    expect(neutralizationProgress).toBeCloseTo(activeMarkerProgress, 8);
+    expect(neutralizationProgress).toBeGreaterThan(
       (8 - missile.issuedTurn) / missile.missileEtaTurns
     );
-    expect(interceptionProgress).toBeLessThan(1);
+    expect(neutralizationProgress).toBeLessThan(1);
   });
 
   it("ends exactly at the deterministic next-turn body and node positions", () => {

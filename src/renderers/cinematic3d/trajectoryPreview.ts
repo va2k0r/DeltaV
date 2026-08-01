@@ -18,6 +18,8 @@ const burnPreviewMidspanBowPower = 0.86;
 const burnPreviewMinimumPlanarBowRatio = 0.1;
 const burnPreviewMaximumPlanarBowRatio = 0.24;
 const burnPreviewRadialToPlanarBowRatio = 0.92;
+const burnPreviewBranchBlendRearAlignment = -0.24;
+const burnPreviewBranchBlendForwardAlignment = 0.72;
 const firePreviewMidspanBowPower = 0.92;
 const missilePreviewLiftPower = 0.96;
 const missilePreviewSupportingLiftPower = 1.62;
@@ -691,9 +693,30 @@ function buildLockedTangentSingleSpanTransferPreview(
   originCenter: THREE.Vector3,
   destinationCenter: THREE.Vector3
 ): THREE.Vector3[] {
-  const startPoint = startCandidates[0]?.point ?? originCenter;
-  const endPoint = endCandidates[0]?.point ?? destinationCenter;
-  const planarDirection = endPoint.clone().sub(startPoint);
+  const preferredStart = startCandidates[0];
+  const preferredEnd = endCandidates[0];
+  const preferredPoints = buildReadableSingleSpanTransferPreview(
+    preferredStart?.point ?? originCenter,
+    preferredEnd?.point ?? destinationCenter,
+    profile,
+    transferTurns,
+    arcDirection,
+    style,
+    getTransferEndpointTangents(preferredStart, preferredEnd)
+  );
+  const alternateStart = startCandidates[1];
+  const alternateEnd = endCandidates[1];
+
+  if (
+    preferredStart === undefined ||
+    preferredEnd === undefined ||
+    alternateStart === undefined ||
+    alternateEnd === undefined
+  ) {
+    return preferredPoints;
+  }
+
+  const planarDirection = preferredEnd.point.clone().sub(preferredStart.point);
   planarDirection.y = 0;
 
   if (planarDirection.lengthSq() <= 0.0001) {
@@ -702,54 +725,50 @@ function buildLockedTangentSingleSpanTransferPreview(
   }
 
   if (planarDirection.lengthSq() <= 0.0001) {
-    planarDirection.set(1, 0, 0);
-  } else {
-    planarDirection.normalize();
+    return preferredPoints;
   }
 
-  const startCandidate = getForwardTransferEndpointCandidate(
-    startCandidates,
-    planarDirection,
-    arcDirection
-  );
-  const endCandidate = getForwardTransferEndpointCandidate(
-    endCandidates,
-    planarDirection,
-    arcDirection
-  );
-  return buildReadableSingleSpanTransferPreview(
-    startCandidate?.point ?? originCenter,
-    endCandidate?.point ?? destinationCenter,
+  planarDirection.normalize();
+  const preferredTangents = [preferredStart.tangent, preferredEnd.tangent]
+    .map(getPlanarTransferTangent)
+    .filter((tangent): tangent is THREE.Vector3 => tangent !== null);
+  const preferredAlignment =
+    preferredTangents.length === 0
+      ? 1
+      : preferredTangents.reduce((total, tangent) => total + tangent.dot(planarDirection), 0) /
+        preferredTangents.length;
+  // Blend between the two readable orbital branches over a side-on window. Selecting either
+  // branch with a hard `score > bestScore` threshold flipped every interior point by one full
+  // tangent solution when fast zoom rotated the display chord through 90 degrees.
+  const alternateBlend =
+    1 -
+    smoothStep(
+      burnPreviewBranchBlendRearAlignment,
+      burnPreviewBranchBlendForwardAlignment,
+      preferredAlignment
+    );
+
+  if (alternateBlend <= 0.001) {
+    return preferredPoints;
+  }
+
+  const alternatePoints = buildReadableSingleSpanTransferPreview(
+    alternateStart.point,
+    alternateEnd.point,
     profile,
     transferTurns,
     arcDirection,
     style,
-    getTransferEndpointTangents(startCandidate, endCandidate)
+    getTransferEndpointTangents(alternateStart, alternateEnd)
   );
-}
 
-function getForwardTransferEndpointCandidate(
-  candidates: readonly TransferEndpointCandidate[],
-  planarDirection: THREE.Vector3,
-  preferredArcDirection: -1 | 1
-): TransferEndpointCandidate | undefined {
-  let bestCandidate = candidates[0];
-  let bestScore = Number.NEGATIVE_INFINITY;
-
-  for (const candidate of candidates) {
-    const tangent = getPlanarTransferTangent(candidate.tangent);
-    const forwardAlignment = tangent?.dot(planarDirection) ?? 0;
-    const score =
-      forwardAlignment +
-      (candidate.arcDirection === preferredArcDirection ? Number.EPSILON * 16 : 0);
-
-    if (score > bestScore) {
-      bestCandidate = candidate;
-      bestScore = score;
-    }
+  if (alternateBlend >= 0.999) {
+    return alternatePoints;
   }
 
-  return bestCandidate;
+  return preferredPoints.map((point, index) =>
+    point.clone().lerp(alternatePoints[index] ?? point, alternateBlend)
+  );
 }
 
 function getTransferNodeTangentCandidates(

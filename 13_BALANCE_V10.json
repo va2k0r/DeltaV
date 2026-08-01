@@ -15,7 +15,7 @@
   "turn_order": [
     "contested_upkeep",
     "missile_impact_and_evade",
-    "ship_arrivals_and_intercept",
+    "ship_arrivals",
     "actions",
     "economy_tritium_income",
     "economy_shipyard_progress_completion",

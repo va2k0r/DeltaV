@@ -53,7 +53,7 @@ describe("canonical FIRE preview geometry", () => {
     ] as const;
 
     expect(canonicalFirePreviewGeometryEnabled).toBe(true);
-    expect(canonicalFirePreviewTargetMode).toBe("orbit-center");
+    expect(canonicalFirePreviewTargetMode).toBe("tracked-ship");
 
     for (const testCase of cases) {
       const geometry = buildFirePreviewGeometry({

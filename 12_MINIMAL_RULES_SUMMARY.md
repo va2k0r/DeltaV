@@ -23,7 +23,7 @@ Contested upkeep: 2 dV
 ```text
 1. Contested upkeep
 2. Missile impact + automatic/preventive Evade
-3. Ship arrivals / Intercept resolution
+3. Ship arrivals
 4. Actions
 5. Economy:
    a. Tritium income

@@ -288,8 +288,6 @@ export type Cinematic3dVisualTuning = Readonly<{
   nodeRingMinScreenScale: number;
   nodeRingMaxScreenScale: number;
   bodyPickerScaleMultiplier: number;
-  nodeOrbitPickerMargin: number;
-  nodeOrbitPickerWidthRatio: number;
   moonNodeRingScaleMultiplier: number;
   moonNodeRingMinRadius: number;
   moonNodeRingZoomInMinRadius: number;
@@ -517,7 +515,7 @@ export const defaultCinematic3dVisualTuning: Cinematic3dVisualTuning = {
   fireConfirmedSolutionRevealDurationSeconds: 0.82,
   fireConfirmedSolutionFadeDurationSeconds: 0.18,
   fireConfirmedSolutionAimAcquireProgress: 0.58,
-  pendingFireOpacity: 0.74,
+  pendingFireOpacity: 0.82,
   activeMissileOpacity: 0.96,
   missileMarkerScreenPixels: 8.6,
   missileMarkerExtremeZoomMinScreenPixels: 3.2,
@@ -639,8 +637,6 @@ export const defaultCinematic3dVisualTuning: Cinematic3dVisualTuning = {
   nodeRingMinScreenScale: 1.1,
   nodeRingMaxScreenScale: 4.8,
   bodyPickerScaleMultiplier: 1.55,
-  nodeOrbitPickerMargin: 1.8,
-  nodeOrbitPickerWidthRatio: 0.11,
   moonNodeRingScaleMultiplier: 1.06,
   moonNodeRingMinRadius: 40,
   moonNodeRingZoomInMinRadius: 22,

@@ -260,7 +260,7 @@ export const worldLoreGlossaryEntries = [
     aliases: ["POINT DEFENSE", "POINT-DEFENSE", "DEFENSE"],
     short: "A rapid-fire turret that can defend one ship only within its current engagement cone.",
     detail: [
-      "The turret places tracer bursts around a predicted intercept and tightens them through a spiral-zeroing pattern.",
+      "The turret places tracer bursts around a predicted crossing point and tightens them through a spiral-zeroing pattern.",
       "A missile-drone observes that stream, jinks between corrections and searches for the blind angle near the radiator roots.",
       "EVADE spends 1 ΔV to rotate and translate the ship until the attacker returns to the gun's solved cone.",
       "Within that cone the fire-control system is highly reliable, but geometry matters more than accuracy once the target leaves it.",
@@ -274,7 +274,7 @@ export const worldLoreGlossaryEntries = [
     short: "Defense that destroys an incoming weapon before its terminal solution closes.",
     detail: [
       "Electronic deception first increases uncertainty, after which hard-kill fire attacks the missile's sensors, control surfaces and propulsion.",
-      "The turret does not need to penetrate the warhead casing, but it must intercept far enough away for debris and nuclear effects to miss the ship.",
+      "The turret does not need to penetrate the warhead casing, but it must destroy the missile far enough away for debris and nuclear effects to miss the ship.",
       "A successful EVADE therefore records a completed defensive manoeuvre, not evidence that the original shot was harmless."
     ]
   },
@@ -293,9 +293,9 @@ export const worldLoreGlossaryEntries = [
     id: "spiral-zeroing",
     label: "SPIRAL ZEROING",
     aliases: ["SPIRAL ZEROING", "ZEROING"],
-    short: "A converging fire-control search that uses observed misses to solve an intercept.",
+    short: "A converging fire-control search that uses observed misses to solve a firing solution.",
     detail: [
-      "Tracer telemetry reports where each burst crossed the target plane, allowing the turret to place the next burst closer to the predicted intercept.",
+      "Tracer telemetry reports where each burst crossed the target plane, allowing the turret to place the next burst closer to the predicted crossing point.",
       "Fire control also rotates the error vector so that a missile cannot remain safe by jinking repeatedly to one side.",
       "The spiral contracts faster than a human correction loop could manage; missile guidance survives by changing planes or exceeding turret travel."
     ]
@@ -605,10 +605,11 @@ export const worldLoreGlossaryEntries = [
     id: "earth-moon-corridor",
     label: "EARTH-MOON CORRIDOR",
     aliases: ["EARTH-MOON CORRIDOR", "EARTH MOON CORRIDOR", "PROTECTED CORRIDOR", "CORRIDOR"],
-    short: "The only region where law, sensors and interceptors still operate on the same clock.",
+    short:
+      "The only region where law, sensors and enforcement forces still operate on the same clock.",
     detail: [
       "Earth and lunar traffic is continuously registered, inspected and tracked, while nuclear packages remain under active safeguards.",
-      "A hostile guidance lock can trigger both public and corporate interceptors because enforcement assets are already close to the traffic they protect.",
+      "A hostile guidance lock can trigger both public and corporate defenses because enforcement assets are already close to the traffic they protect.",
       "Beyond the corridor, the same legal rules remain in force but the ships assigned to enforce them fall progressively farther behind events."
     ]
   },
@@ -618,7 +619,7 @@ export const worldLoreGlossaryEntries = [
     aliases: ["INTERDICTED ZONES", "INTERDICTION", "INTERDICTED", "INTERDICTS", "UNSANCTIONED"],
     short: "A prohibition backed by the practical ability to inspect, divert or disable traffic.",
     detail: [
-      "Near Earth, sensors detect launches before payloads can hide and interceptors remain only hours from likely violations.",
+      "Near Earth, sensors detect launches before payloads can hide and defense craft remain only hours from likely violations.",
       "The corridor's ban on armed nuclear operations is therefore enforced physically as well as stated in law.",
       "At Saturn, the same prohibition without a stationed force can support a future prosecution but cannot guarantee immediate compliance."
     ]
@@ -660,7 +661,7 @@ export const worldLoreGlossaryEntries = [
     short: "Decision authority delegated to crews operating beyond useful real-time communication.",
     detail: [
       "Outer-system crews receive objectives, legal constraints and cryptographic authority before deployment because routine decisions cannot wait for Earth.",
-      "They execute burns, intercepts and defensive actions locally, with AI maintaining the tactical picture and humans authorising lethal release.",
+      "They execute burns and defensive actions locally, with AI maintaining the tactical picture and humans authorising lethal release.",
       "This discretion allows ships to respond on operational timescales, but it also allows a crisis to advance before corporate owners can intervene."
     ]
   },

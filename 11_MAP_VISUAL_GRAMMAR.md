@@ -170,7 +170,6 @@ A ship in contested cannot:
 
 - Evade
 - Fire at external targets
-- Intercept
 
 It is already combat-committed.
 

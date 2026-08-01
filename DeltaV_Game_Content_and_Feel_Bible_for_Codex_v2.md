@@ -546,7 +546,7 @@ Missile combat is about:
 
 The defensive answer to incoming missiles is an evasion burn.
 
-An evasion burn is a local maneuver that changes the intercept geometry enough to defeat the incoming volley.
+An evasion burn is a local maneuver that changes the engagement geometry enough to defeat the incoming volley.
 
 The ship does not need to leave orbit of the current celestial body to evade.
 
@@ -558,7 +558,7 @@ Right-clicking or otherwise selecting incoming missiles should eventually allow 
 
 ### 9.3 Why missiles, not railguns
 
-Missiles and autonomous kinetic/nuclear interceptors are the first weapon model because they fit better with orbital interception, warning windows, evasion burns and strategic delta-v expenditure.
+Missiles and autonomous kinetic/nuclear weapons are the first weapon model because they fit better with orbital combat, warning windows, evasion burns and strategic delta-v expenditure.
 
 Railguns are visually appealing but risk pushing the game toward a less plausible and less strategically clean model for the first version. They may be reconsidered only after the missile model is proven.
 
@@ -1040,4 +1040,3 @@ A ship hit by a missile dies.
 A faction dies when it loses recoverable access to tritium.
 
 The game must be cold, technical, readable, minimal, deterministic and strategically cruel.
-

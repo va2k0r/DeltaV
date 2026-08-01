@@ -202,7 +202,9 @@ describe("BURN trajectory preview", () => {
       );
       const arrivalSide = getPlanarRadial(destination.center, points[points.length - 1]);
 
-      expect(getMinimumPlanarProgressDelta(points)).toBeGreaterThanOrEqual(-0.001);
+      expect(getMinimumPlanarProgressDelta(points), `presentation ${index}`).toBeGreaterThanOrEqual(
+        -0.001
+      );
       expect(countPlanarSelfIntersections(points)).toBe(0);
 
       if (expectedArrivalSide === null) {
@@ -210,6 +212,60 @@ describe("BURN trajectory preview", () => {
       } else {
         expect(arrivalSide.dot(expectedArrivalSide)).toBeGreaterThan(0.999);
       }
+    }
+  });
+
+  it("keeps locked endpoint tangents continuous while display scaling rotates the screen chord", () => {
+    const snapshot = { turn: 3 } as SolarSystemSnapshot;
+    const rawOrigin = new THREE.Vector3(0, 0, 0);
+    const rawDestination = new THREE.Vector3(100, 0, 0);
+    let previousStartTangent: THREE.Vector3 | null = null;
+    let previousEndTangent: THREE.Vector3 | null = null;
+
+    for (let degrees = 82; degrees <= 98; degrees += 0.25) {
+      const angle = THREE.MathUtils.degToRad(degrees);
+      const origin = createDisplayNode("rotating-zoom-origin", rawOrigin, snapshot, {
+        rawPosition: rawOrigin,
+        ringRadius: 5
+      });
+      const destination = createDisplayNode(
+        "rotating-zoom-destination",
+        new THREE.Vector3(Math.cos(angle) * 100, 0, Math.sin(angle) * 100),
+        snapshot,
+        { rawPosition: rawDestination, ringRadius: 5 }
+      );
+      const points = buildZoomStableBurnPreviewTrajectory(
+        origin,
+        destination,
+        snapshot.turn,
+        4,
+        undefined,
+        1,
+        { lockArcBranch: true, style: "burn" }
+      );
+      const startTangent = getPlanarSegmentTangent(points[0], points[1]);
+      const endTangent = getPlanarSegmentTangent(
+        points[points.length - 2],
+        points[points.length - 1]
+      );
+
+      expect(startTangent).not.toBeNull();
+      expect(endTangent).not.toBeNull();
+
+      if (previousStartTangent !== null && startTangent !== null) {
+        expect(
+          startTangent.dot(previousStartTangent),
+          `start at ${degrees} degrees`
+        ).toBeGreaterThan(0.98);
+      }
+      if (previousEndTangent !== null && endTangent !== null) {
+        expect(endTangent.dot(previousEndTangent), `end at ${degrees} degrees`).toBeGreaterThan(
+          0.98
+        );
+      }
+
+      previousStartTangent = startTangent;
+      previousEndTangent = endTangent;
     }
   });
 
@@ -358,6 +414,19 @@ function getPlanarRadial(center: THREE.Vector3, point: THREE.Vector3 | undefined
   const radial = (point ?? center).clone().sub(center);
   radial.y = 0;
   return radial.normalize();
+}
+
+function getPlanarSegmentTangent(
+  start: THREE.Vector3 | undefined,
+  end: THREE.Vector3 | undefined
+): THREE.Vector3 | null {
+  if (start === undefined || end === undefined) {
+    return null;
+  }
+
+  const tangent = end.clone().sub(start);
+  tangent.y = 0;
+  return tangent.lengthSq() <= 0.0001 ? null : tangent.normalize();
 }
 
 function getPlanarSegmentDistance(

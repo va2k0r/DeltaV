@@ -20,7 +20,6 @@
 - If contested upkeep cannot be paid, the ship is lost.
 - Gravity applies to Burn out of origin node.
 - No separate arrival/capture gravity cost.
-- Intercept cancels transfer and creates contested until one side Burns out or dies.
 - Normal node capacity: 1 ship.
 - Contested capacity: 2 opposing ships.
 - Third ship cannot enter contested.

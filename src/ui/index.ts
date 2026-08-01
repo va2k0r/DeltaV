@@ -125,6 +125,7 @@ import {
   createGameGlossaryController,
   createGameGlossaryTextSpans,
   gameMenuGlossaryHoverDwellMs,
+  tutorialLogbookOpenInstruction,
   type GameGlossaryLineContext
 } from "./gameGlossaryController";
 import { createPlayerFacingResolutionRows } from "./resolutionCommandRows";
@@ -178,6 +179,7 @@ import {
   type DeltaVDebugRecordingAudioSource
 } from "./recording";
 import { buildDiagnosticGameStateDump } from "./diagnostics";
+import { deltaVExternalLinks } from "../site/externalLinks";
 import {
   applyTutorialCameraHintDisplayLimits,
   removeTutorialCameraHintRows
@@ -218,6 +220,7 @@ import {
   createTutorialMandatoryLaunchRows,
   createTutorialOpeningYearTimelineRows,
   createTutorialOpeningCameraControlLiveRows,
+  createTutorialLogbookIntroductionLiveRow,
   createTutorialOverlayLiveHintRow,
   createTutorialPostVictoryActionRows,
   createTutorialPostVictoryAutomaticBehaviorRows,
@@ -661,12 +664,13 @@ const zeroTimerMinimumTurnPresentationMs = 2_000;
 const postMatchAutoReturnDelayMs = 10_000;
 const gameMenuDemoTurnDelayMs = 2_000;
 const gameMenuDemoRestartDelayMs = 360;
+// The menu is a visual backdrop, not a match. Advancing a full three-faction AI turn every two
+// seconds creates regular main-thread stalls while adding little to the opening composition.
+const gameMenuBackgroundAiTurnsEnabled = false;
 const gameMenuCrtFlickerMinDelayMs = 1_200;
 const gameMenuCrtFlickerMaxDelayMs = 3_400;
 const gameMenuCrtFlickerMinDurationMs = 140;
 const gameMenuCrtFlickerMaxDurationMs = 300;
-const tutorialLogGlossaryHandoffActiveMs = 1_250;
-const tutorialLogGlossaryHandoffMinimumVisibleMs = 1_650;
 const aiAutorunCommandTranscriptDomEntryLimit = 72;
 const commandTypewriterMsPerCharacter = 6;
 const commandTypewriterMinDurationMs = 80;
@@ -724,6 +728,8 @@ const turnTransitionWatchdogMaxMs = turnResolutionPresentationMaxMs;
 export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   root.innerHTML = "";
   const urlSearchParams = new URLSearchParams(window.location.search);
+  const isTutorialRequested =
+    urlSearchParams.get("tutorial") === "1" || urlSearchParams.get("tutorial") === "true";
   const isDebugUiEnabled = urlSearchParams.get("debug") === "1";
   const isTrailerCaptureRequested =
     urlSearchParams.get("trailer") === "1" ||
@@ -1013,6 +1019,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     onTutorialLogbookIntroductionComplete() {
       updateCommandConsole();
       redraw();
+    },
+    onTutorialLogbookIntroductionStepChange() {
+      freezeCompletedTutorialLogbookOpenPrompt();
+      updateCommandConsole();
+      redraw();
     }
   });
   commandGlossaryController.bindRoot(commandTranscript);
@@ -1120,6 +1131,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let cinematicRenderer: CinematicSolarSystemRenderer | null = null;
   let dragStart: Vec2 | null = null;
   let selectedTargetKey: string | null = null;
+  let isRestoringTutorialRequiredShipSelection = false;
   let isTurnTransitionActive = false;
   let aiTurnWorker: Worker | null = null;
   let aiTurnWorkerRequestId = 0;
@@ -1199,11 +1211,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let gameMenuCrtFlickerEndTimer: number | null = null;
   let gameMenuMainActions: HTMLElement | null = null;
   let gameMenuSubmenuActions: HTMLElement | null = null;
+  let gameMenuFullscreenAction: HTMLButtonElement | null = null;
   let gameMenuTypingGeneration = 0;
-  let pendingTutorialGlossaryHandoffPoint: Readonly<{
-    clientX: number;
-    clientY: number;
-  }> | null = null;
   let planningTimerMode: PlanningTimerMode = "auto";
   let planningTimerDurationOverrideMs: number | null = null;
   let beatSyncMode: "on" | "off" = "on";
@@ -1320,7 +1329,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   startMusicOnGameStart();
   startGameMenuDemo();
-  if (isTrailerCtaScreenRequested) {
+  if (isTutorialRequested) {
+    startTutorialFromGameMenu();
+  } else if (isTrailerCtaScreenRequested) {
     activateTrailerCtaScreen();
   } else if (isTrailerScreenRequested) {
     activateTrailerScreen();
@@ -2191,6 +2202,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     renderGameMenu();
     scheduleGameMenuCrtFlicker();
     scheduleGameMenuDemoTurn(0);
+    window.dispatchEvent(new CustomEvent("deltav:game-menu-opened"));
   }
 
   function createGameMenuDemoInitialState(): GameState {
@@ -2266,6 +2278,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
+    window.dispatchEvent(new CustomEvent("deltav:gameplay-entered"));
     isInGameMenuActive = false;
     resumePlanningTimerAfterGameMenu();
     gameMenuScreen = "main";
@@ -2446,9 +2459,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   function scheduleGameMenuDemoTurn(delayMs = gameMenuDemoTurnDelayMs): void {
     if (
+      !gameMenuBackgroundAiTurnsEnabled ||
       !isGameMenuDemoActive ||
       gameMenuDemoTurnTimer !== null ||
-      gameMenuDemoRestartTimer !== null
+      gameMenuDemoRestartTimer !== null ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ) {
       return;
     }
@@ -2553,10 +2568,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
       const title = document.createElement("div");
       title.className = "game-menu__title";
-      title.setAttribute("aria-label", "DELTAV");
+      title.setAttribute("aria-label", "DELTAV — ORBITAL STRATEGY");
       title.tabIndex = 0;
       applyGameMenuHoverCopy(title, "DELTAV", "ORBITAL STRATEGY");
-      typingTargets.push({ element: title, text: "DELTAV" });
+      typingTargets.push({ element: title, text: "DELTAV — ORBITAL STRATEGY" });
 
       const columns = document.createElement("div");
       columns.className = "game-menu__columns";
@@ -2570,22 +2585,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       const mainActions = document.createElement("div");
       mainActions.className = "game-menu__actions game-menu__main-actions";
       mainActions.append(
-        ...(isInGameMenuActive
-          ? [
-              createGameMenuAction(
-                "RESUME",
-                resumeGameFromMenu,
-                {
-                  actionScreen: "main",
-                  tone: "bright",
-                  tooltip: "Return to the current match without changing its state."
-                },
-                typingTargets
-              )
-            ]
-          : []),
         createGameMenuAction(
-          "TUTORIAL",
+          "PLAY TUTORIAL",
           startTutorialFromGameMenu,
           {
             actionScreen: "main",
@@ -2595,6 +2596,30 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           typingTargets
         ),
         createGameMenuAction(
+          "WATCH TRAILER",
+          playTrailerFromGameMenu,
+          {
+            actionScreen: "main",
+            tone: "soft",
+            tooltip: "Watch the trailer sequence inside the DeltaV engine."
+          },
+          typingTargets
+        ),
+        createGameMenuAction(
+          "WISHLIST ON STEAM",
+          openWishlistFromGameMenu,
+          {
+            actionScreen: "main",
+            tone: "dim",
+            tooltip:
+              deltaVExternalLinks.steamWishlist === null
+                ? "Open the Steam section. No official public URL is configured yet."
+                : "Open the official DeltaV Steam page in a new tab."
+          },
+          typingTargets
+        ),
+        createGameMenuSpacer(),
+        createGameMenuAction(
           "NEW GAME",
           () => {
             toggleGameMenuSubmenu("new-game");
@@ -2603,6 +2628,18 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
             actionScreen: "new-game",
             tone: "regular",
             tooltip: "Open match configuration for factions and planning time."
+          },
+          typingTargets
+        ),
+        createGameMenuAction(
+          "PLAYER VS PLAYER",
+          () => {
+            navigateToSiteSection("player-vs-player");
+          },
+          {
+            actionScreen: "main",
+            tone: "regular",
+            tooltip: "Read about deterministic network matches between two human commanders."
           },
           typingTargets
         ),
@@ -2618,6 +2655,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           },
           typingTargets
         ),
+        createGameMenuSpacer(),
         createGameMenuAction(
           "QUIT",
           () => {
@@ -2664,6 +2702,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     submenuActions.innerHTML = "";
+    gameMenuFullscreenAction = null;
     submenuActions.dataset["screen"] = gameMenuScreen;
 
     if (gameMenuScreen === "new-game") {
@@ -2854,6 +2893,22 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       },
       typingTargets
     );
+    const fullscreenAction = createGameMenuAction(
+      getGameMenuFullscreenLabel(),
+      (action) => {
+        void toggleGameMenuFullscreen(action);
+      },
+      {
+        tone: document.fullscreenElement === null ? "regular" : "bright",
+        tooltipLabel: "DISPLAY MODE",
+        tooltip: document.fullscreenEnabled
+          ? "Switch the browser between windowed and fullscreen display."
+          : "This browser does not expose fullscreen mode."
+      },
+      typingTargets
+    );
+    fullscreenAction.disabled = !document.fullscreenEnabled;
+    gameMenuFullscreenAction = fullscreenAction;
     const brightnessControl = createGameMenuBrightnessControl(typingTargets);
     const debugAction = createGameMenuAction(
       "DEBUG",
@@ -2871,9 +2926,45 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       bloomAction,
       reflectionsAction,
       accentsAction,
+      fullscreenAction,
       brightnessControl,
       debugAction
     );
+  }
+
+  function getGameMenuFullscreenLabel(): string {
+    return document.fullscreenElement === null ? "DISPLAY WINDOWED" : "DISPLAY FULLSCREEN";
+  }
+
+  async function toggleGameMenuFullscreen(action: HTMLButtonElement): Promise<void> {
+    action.disabled = true;
+
+    try {
+      if (document.fullscreenElement === null) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      status.textContent =
+        error instanceof Error
+          ? `Fullscreen unavailable: ${error.message}`
+          : "Fullscreen unavailable.";
+    } finally {
+      syncGameMenuFullscreenAction();
+    }
+  }
+
+  function syncGameMenuFullscreenAction(): void {
+    const action = gameMenuFullscreenAction;
+    if (action === null || !action.isConnected) {
+      return;
+    }
+
+    action.disabled = !document.fullscreenEnabled;
+    action.classList.toggle("game-menu__action--bright", document.fullscreenElement !== null);
+    action.classList.toggle("game-menu__action--regular", document.fullscreenElement === null);
+    typeGameMenuAction(action, getGameMenuFullscreenLabel());
   }
 
   function createGameMenuBrightnessControl(
@@ -2997,6 +3088,13 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     return action;
   }
 
+  function createGameMenuSpacer(): HTMLDivElement {
+    const spacer = document.createElement("div");
+    spacer.className = "game-menu__spacer";
+    spacer.setAttribute("aria-hidden", "true");
+    return spacer;
+  }
+
   function applyGameMenuHoverCopy(element: HTMLElement, label: string, text: string): void {
     element.classList.add("game-menu__tooltip-target");
     element.dataset["glossaryHoverLabel"] = label;
@@ -3098,15 +3196,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     });
   }
 
-  function startTutorialFromGameMenu(action: HTMLButtonElement, event: MouseEvent): void {
-    const actionRect = action.getBoundingClientRect();
-    pendingTutorialGlossaryHandoffPoint =
-      event.detail === 0
-        ? {
-            clientX: actionRect.left + actionRect.width / 2,
-            clientY: actionRect.top + actionRect.height / 2
-          }
-        : { clientX: event.clientX, clientY: event.clientY };
+  function startTutorialFromGameMenu(): void {
+    window.dispatchEvent(new CustomEvent("deltav:gameplay-entered"));
     stopGameMenuDemo();
 
     const waitForCurrentTurn = (): void => {
@@ -3121,6 +3212,32 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     waitForCurrentTurn();
   }
 
+  function playTrailerFromGameMenu(): void {
+    window.dispatchEvent(new CustomEvent("deltav:gameplay-entered"));
+    void activateTrailerCapture();
+  }
+
+  function openWishlistFromGameMenu(): void {
+    if (deltaVExternalLinks.steamWishlist !== null) {
+      window.open(deltaVExternalLinks.steamWishlist, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    navigateToSiteSection("steam");
+  }
+
+  function navigateToSiteSection(target: "player-vs-player" | "steam"): void {
+    if (!document.body.classList.contains("is-deltav-site")) {
+      status.textContent =
+        target === "steam"
+          ? "No official Steam URL is configured yet."
+          : "PLAYER VS PLAYER is a planned network expansion; the public service is not available yet.";
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent("deltav:site-navigate", { detail: { target } }));
+  }
+
   function startConfiguredGameFromMenu(): void {
     const mode = getGameMenuGameModeId();
     const isAiShowcaseMode = isGameMenuNewGameAiMode();
@@ -3130,6 +3247,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       enableTrailerPresentationMode();
     }
 
+    window.dispatchEvent(new CustomEvent("deltav:gameplay-entered"));
     stopGameMenuDemo();
 
     const waitForCurrentTurn = (): void => {
@@ -6102,7 +6220,19 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     if (isTutorialLogbookIntroductionBlockingOpening()) {
-      return [];
+      return [
+        ...createTutorialOpeningCameraControlLiveRows(
+          "tutorial:opening-camera-controls",
+          tutorialCameraZoomHintText,
+          tutorialCameraOrbitHintText,
+          tutorialCameraPanHintText,
+          tutorialCameraFocusHintText
+        ),
+        createTutorialLogbookIntroductionLiveRow(
+          tutorialLogbookOpenInstruction,
+          commandGlossaryController.getTutorialLogbookIntroductionStep() === "open-prompt"
+        )
+      ];
     }
 
     const requiredShipSelection = getTutorialRequiredShipSelection(tutorial);
@@ -10722,7 +10852,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function getCinematicPerformanceMode(): CinematicPerformanceMode {
-    return "auto";
+    return isGameMenuOpen() ? "minimal" : "auto";
   }
 
   function getStoredTrajectoryReflectionMode(): CinematicTrajectoryReflectionMode {
@@ -10782,6 +10912,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
     cinematicRenderer = new CinematicSolarSystemRenderer(cinematicFrame, {
       onSelectionChange(selection: CinematicSelection | null) {
+        if (isRestoringTutorialRequiredShipSelection) {
+          return;
+        }
+
         if (isReplayMode) {
           if (selection !== null) {
             cinematicRenderer?.focusTargetWithoutZoom(selection.targetKey);
@@ -10803,15 +10937,17 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         }
 
         selectedTargetKey = selection?.targetKey ?? null;
+        if (restoreTutorialRequiredShipSelectionAfterDeselect()) {
+          return;
+        }
+
         if (selectedTargetKey !== previousTargetKey) {
           playSelectionChangedSfx(selection);
         }
         syncFocusSelectToTarget(selectedTargetKey);
         handleTutorialOverlaySelection(selection);
         handleTutorialSelection(selection);
-        restoreTutorialRequiredShipSelectionAfterDeselect();
         updateStatus();
-        updateCommandConsole();
       },
       onUserFocusChange(targetKey: string) {
         setUserReplayFocusTarget(targetKey);
@@ -11370,11 +11506,23 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     );
   }
 
-  function restoreTutorialRequiredShipSelectionAfterDeselect(): void {
+  function freezeCompletedTutorialLogbookOpenPrompt(): void {
+    if (commandGlossaryController.getTutorialLogbookIntroductionStep() === "open-prompt") {
+      return;
+    }
+
+    for (const line of commandConsole.querySelectorAll<HTMLElement>(
+      '[data-row-key="tutorial:live-logbook-introduction"]'
+    )) {
+      line.className = freezeTutorialLiveHintClassName(line.className) ?? line.className;
+    }
+  }
+
+  function restoreTutorialRequiredShipSelectionAfterDeselect(): boolean {
     const tutorial = tutorialState;
 
     if (tutorial === null) {
-      return;
+      return false;
     }
 
     const requiredNodeId = getTutorialRequiredShipSelection(tutorial)?.nodeId ?? null;
@@ -11385,10 +11533,20 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     );
 
     if (recoveryTargetKey === null) {
-      return;
+      return false;
     }
 
-    cinematicRenderer?.selectTarget(recoveryTargetKey);
+    selectedTargetKey = recoveryTargetKey;
+    syncFocusSelectToTarget(recoveryTargetKey);
+    isRestoringTutorialRequiredShipSelection = true;
+
+    try {
+      cinematicRenderer?.selectTarget(recoveryTargetKey);
+    } finally {
+      isRestoringTutorialRequiredShipSelection = false;
+    }
+
+    return true;
   }
 
   function handleTutorialOverlaySelection(selection: CinematicSelection | null): void {
@@ -13075,6 +13233,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   resizeObserver.observe(canvasFrame);
 
   window.addEventListener("deltav:planning-clock", handleMultiplayerPlanningClockEvent);
+  window.addEventListener("deltav:start-tutorial", startTutorialFromGameMenu);
+  window.addEventListener("deltav:play-trailer", playTrailerFromGameMenu);
+  document.addEventListener("fullscreenchange", syncGameMenuFullscreenAction);
 
   nextTurnButton.addEventListener("click", () => {
     void executeCurrentTurn();
@@ -14182,6 +14343,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
+    stopGameMenuDemo();
     let scenario;
 
     try {
@@ -14197,7 +14359,19 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     state = scenario.state;
     snapshot = createSolarSystemSnapshot(content, state);
     resetRuntimeAfterGameReset();
-    focusTargetWithoutZoom(`node:${scenario.targetNodeId}`);
+    const impactMissile = snapshot.activeMissiles.find((missile) => {
+      return (
+        missile.targetNodeId === scenario.targetNodeId && missile.impactTurn === snapshot.turn + 1
+      );
+    });
+    if (impactMissile === undefined) {
+      focusTargetWithoutZoom(`node:${scenario.targetNodeId}`);
+    } else {
+      const missileTargetKey = `missile:${impactMissile.id}`;
+      selectedTargetKey = missileTargetKey;
+      cinematicRenderer?.selectTarget(missileTargetKey);
+      cinematicRenderer?.focusTargetWithoutZoom(missileTargetKey);
+    }
   }
 
   function resetDebugEvadeTest(): void {
@@ -14264,26 +14438,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       snapshot = createSolarSystemSnapshot(content, state);
       resetRuntimeAfterGameReset({ preserveTutorial: true });
       updateCommandConsoleModeControls();
-      revealCommandConsoleForActiveGame();
       commandGlossaryController.beginTutorialLogbookIntroduction();
-      updateCommandConsole();
-      const handoffPoint = pendingTutorialGlossaryHandoffPoint;
-      pendingTutorialGlossaryHandoffPoint = null;
-      if (handoffPoint !== null) {
-        window.requestAnimationFrame(() => {
-          if (tutorialState === null || commandConsole.classList.contains("is-hidden")) {
-            return;
-          }
-
-          commandGlossaryController.beginHoverHandoff({
-            root: commandConsole,
-            clientX: handoffPoint.clientX,
-            clientY: handoffPoint.clientY,
-            activeDurationMs: tutorialLogGlossaryHandoffActiveMs,
-            minimumVisibleDurationMs: tutorialLogGlossaryHandoffMinimumVisibleMs
-          });
-        });
-      }
+      revealCommandConsoleForActiveGame();
       frameTutorialOpeningCamera();
       lastTutorialCameraHintAt = null;
       lastTutorialCameraHintTurn = null;
@@ -14291,7 +14447,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       scheduleTutorialCameraPanOrbitHint();
     } catch (error) {
       tutorialState = null;
-      pendingTutorialGlossaryHandoffPoint = null;
       commandGlossaryController.endTutorialLogbookIntroduction();
       hideCommandConsoleForGameMenuLaunch();
       commandConsole.classList.remove("is-hidden");

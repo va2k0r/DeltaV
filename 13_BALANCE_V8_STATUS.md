@@ -24,7 +24,7 @@ Shipyard build time candidate: 3 WORK turns
 Barren gravity candidate: 0
 ```
 
-These values should be validated again with the final map, node capacity, blocked arrival, intercept and death-spiral rules.
+These values should be validated again with the final map, node capacity, blocked-arrival and death-spiral rules.
 
 ## Map status
 
@@ -64,7 +64,6 @@ Do not treat this map as locked.
 1. Map candidate with v8 capacity rules.
 2. Barren/staging nodes near high-contest systems.
 3. Blocked arrival to T-1 behavior.
-4. Intercept creating persistent contested until Burn-out/destruction.
 5. Evade formula `3 + missile solutions`.
 6. Death-spiral elimination scoring/reachability.
 7. Balanced starting setups for 2P, 3P and 4P.

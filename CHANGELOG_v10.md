@@ -17,7 +17,6 @@
 - Added UI rule: Evade is automatic/default when possible.
 - Added preventive Evade rule.
 - Confirmed shipyard progress is stealable and node-based.
-- Confirmed Intercept creates a temporary contested intercept node.
 - Added v10 map, balance JSON, and balance status.
 
 ## v10 baseline map

@@ -61,7 +61,8 @@ describe("Electron packaging", () => {
     expect(source).toContain("function showStartupFailure(");
     expect(source).toContain('window.addEventListener("error"');
     expect(source).toContain('window.addEventListener("unhandledrejection"');
-    expect(source).toContain("void createDeltaVApp(appRoot).catch(showStartupFailure);");
+    expect(source).toContain("await createDeltaVApp(gameHost);");
+    expect(source).toContain("void startDeltaV().catch(showStartupFailure);");
     expect(source).toContain("AVVIA-DELTA-V-MODALITA-SICURA.cmd");
   });
 });

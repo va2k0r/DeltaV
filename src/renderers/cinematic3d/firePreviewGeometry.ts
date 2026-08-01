@@ -1,7 +1,7 @@
 import * as THREE from "three";
 
 export const canonicalFirePreviewGeometryEnabled = true;
-export const canonicalFirePreviewTargetMode = "orbit-center" as const;
+export const canonicalFirePreviewTargetMode = "tracked-ship" as const;
 export const firePreviewImpactGapPixels = 1.8;
 
 export type FirePreviewGeometry = Readonly<{

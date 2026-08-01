@@ -2,6 +2,7 @@ import {
   createTutorialSpacerRow,
   freezeTutorialLiveHintClassName,
   tutorialCompleteHintClassName,
+  tutorialLiveHintClassName,
   type TutorialCommandTimelineRow
 } from "./rowCore";
 
@@ -16,7 +17,7 @@ export function createTutorialSelectShipLiveRows(
 ): readonly TutorialCommandTimelineRow[] {
   return [
     {
-      parts: [{ text: "Left-click the ship in Moon orbit to select it." }],
+      parts: [{ text: "Left-click the Moon orbit to select the ship." }],
       className,
       key
     },
@@ -57,6 +58,17 @@ export function createTutorialOpeningCameraControlLiveRows(
     },
     createTutorialSpacerRow(`${key}:select-spacer`)
   ];
+}
+
+export function createTutorialLogbookIntroductionLiveRow(
+  text: string,
+  isAttentionActive: boolean
+): TutorialCommandTimelineRow {
+  return {
+    parts: [{ text }],
+    className: isAttentionActive ? tutorialLiveHintClassName : tutorialCompleteHintClassName,
+    key: "tutorial:live-logbook-introduction"
+  };
 }
 
 export function createTutorialConfirmTransferBurnLiveRows(

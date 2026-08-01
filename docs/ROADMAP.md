@@ -81,6 +81,6 @@ Status: active.
 
 ## Later Milestones
 
-Intercept, campaign, audio, signed native desktop packaging, and mod loading remain later
+Campaign, audio, signed native desktop packaging, and mod loading remain later
 milestones. The portable alpha package is an interim local-browser distribution, not a native
 application shell.
