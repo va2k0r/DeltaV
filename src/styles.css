@@ -633,6 +633,15 @@ select {
     0 1px 2px #020408;
 }
 
+.cinematic-invalid-action-billboard--execute-prompt {
+  border-color: rgba(245, 248, 252, 0.7);
+  background: rgba(5, 12, 18, 0.84);
+  color: rgba(245, 248, 252, 0.96);
+  box-shadow:
+    0 0 12px rgba(245, 248, 252, 0.12),
+    0 0 0 1px rgba(2, 4, 8, 0.48);
+}
+
 .cinematic-invalid-action-billboard.is-hidden {
   display: none;
 }
@@ -1028,6 +1037,17 @@ select {
   opacity: 1;
 }
 
+.command-glossary-hover.is-tutorial-logbook-attention,
+.command-glossary-detail__line.is-tutorial-logbook-attention,
+.command-glossary-detail__label.is-tutorial-logbook-attention {
+  animation: tutorial-live-hint-blink var(--beat-tutorial-hint-duration, 1050ms) steps(2, end)
+    infinite;
+  color: rgba(245, 248, 252, 0.98);
+  text-shadow:
+    0 0 14px rgba(159, 232, 255, 0.22),
+    0 1px 8px rgba(0, 0, 0, 0.54);
+}
+
 .command-glossary-hover__label,
 .command-glossary-detail__label {
   min-height: 1.35em;
@@ -1121,6 +1141,25 @@ select {
   min-height: 1.42em;
   overflow-wrap: anywhere;
   position: relative;
+}
+
+.command-glossary-detail__line--spacer {
+  min-height: 0.92em;
+}
+
+.command-glossary-detail__line--advice {
+  padding-left: 1.05em;
+  text-indent: -1.05em;
+}
+
+.command-glossary-detail__tutorial-action[role="button"] {
+  cursor: pointer;
+}
+
+.command-glossary-detail__tutorial-action[role="button"]:hover,
+.command-glossary-detail__tutorial-action[role="button"]:focus-visible {
+  color: rgba(249, 252, 255, 0.98);
+  outline: none;
 }
 
 .command-glossary-detail.is-typewriting {

@@ -51,7 +51,7 @@ function createPlayerFacingResolutionRow(
         parts: [
           { text: numberPrefix },
           { text: "WORK", className: factionClass },
-          { text: `  ${nodeName}  +${event.dvDelta ?? 2} ΔV` }
+          { text: ` at ${nodeName} produced +${event.dvDelta ?? 2} ΔV.` }
         ]
       };
     case "WORK_SHIPYARD":
@@ -60,7 +60,7 @@ function createPlayerFacingResolutionRow(
           parts: [
             { text: numberPrefix },
             { text: "CAPTURE", className: factionClass },
-            { text: `  ${nodeName}  Shipyard ${event.progress ?? "?"}/5` }
+            { text: ` at ${nodeName}; shipyard progress is now ${event.progress ?? "?"}/5.` }
           ]
         };
       }
@@ -69,19 +69,22 @@ function createPlayerFacingResolutionRow(
         parts: [
           { text: numberPrefix },
           { text: "WORK", className: factionClass },
-          { text: `  ${nodeName}  Shipyard ${event.progress ?? "?"}/5` }
+          { text: ` at ${nodeName} advanced the shipyard to ${event.progress ?? "?"}/5.` }
         ]
       };
     case "CONTESTED_UPKEEP":
       return {
         parts: [
           { text: numberPrefix },
-          { text: "CONTESTED", className: "command-console__event-contested" },
-          { text: `  ${nodeName}` },
-          ...(event.dvDeltas ?? []).map((delta) => ({
-            text: `  ${delta.amount} ΔV`,
-            className: getCommandFactionClass(delta.factionId)
-          }))
+          { text: "CONTESTED upkeep", className: "command-console__event-contested" },
+          { text: ` at ${nodeName} cost ` },
+          ...(event.dvDeltas ?? []).flatMap((delta, index, deltas) => [
+            ...(index === 0 ? [] : [{ text: " and " }]),
+            {
+              text: `${formatResolutionFactionName(factions, delta.factionId)} ${Math.abs(delta.amount)} ΔV${index === deltas.length - 1 ? "." : ""}`,
+              className: getCommandFactionClass(delta.factionId)
+            }
+          ])
         ]
       };
     case "FIRE_LAUNCHED":
@@ -90,7 +93,7 @@ function createPlayerFacingResolutionRow(
           { text: numberPrefix },
           { text: "FIRE", className: factionClass },
           {
-            text: `  ${formatResolutionNodeName(content, event.originNodeId)} -> ${formatResolutionNodeName(content, event.targetNodeId)}  T-${event.missileEtaTurns ?? "?"}`
+            text: ` from ${formatResolutionNodeName(content, event.originNodeId)} to ${formatResolutionNodeName(content, event.targetNodeId)}; impact T-${event.missileEtaTurns ?? "?"}.`
           }
         ]
       };
@@ -100,7 +103,7 @@ function createPlayerFacingResolutionRow(
           { text: numberPrefix },
           { text: "BURN", className: factionClass },
           {
-            text: `  ${formatResolutionNodeName(content, event.originNodeId)} -> ${formatResolutionNodeName(content, event.destinationNodeId)}  T+${event.etaTurns ?? "?"}  -${event.cost ?? "?"}\u00a0ΔV`
+            text: ` from ${formatResolutionNodeName(content, event.originNodeId)} to ${formatResolutionNodeName(content, event.destinationNodeId)}; ETA T+${event.etaTurns ?? "?"}; cost -${event.cost ?? "?"}\u00a0ΔV.`
           }
         ]
       };
@@ -109,7 +112,9 @@ function createPlayerFacingResolutionRow(
         parts: [
           { text: numberPrefix },
           { text: "EVADE", className: factionClass },
-          { text: `  ${nodeName}  ${event.dvDelta ?? -1} ΔV` }
+          {
+            text: ` at ${nodeName} absorbed the impact and cost ${Math.abs(event.dvDelta ?? -1)} ΔV.`
+          }
         ]
       };
     case "EVADE_BLOCKED":
@@ -117,13 +122,13 @@ function createPlayerFacingResolutionRow(
         parts: [
           { text: numberPrefix },
           {
-            text: "EVADE BLOCKED — CONTESTED",
+            text: "EVADE BLOCKED",
             className: mergeResolutionCommandClasses(
               factionClass,
               "command-console__event-contested"
             )
           },
-          { text: `  ${nodeName}` }
+          { text: ` at ${nodeName} because the orbit was CONTESTED.` }
         ]
       };
     case "MISSILE_IMPACT":
@@ -131,7 +136,7 @@ function createPlayerFacingResolutionRow(
         parts: [
           { text: numberPrefix },
           { text: "impact", className: factionClass },
-          { text: `  ${nodeName}` }
+          { text: ` at ${nodeName}.` }
         ]
       };
     case "SIGNAL_LOST":
@@ -140,7 +145,7 @@ function createPlayerFacingResolutionRow(
           parts: [
             { text: numberPrefix },
             { text: "MISSILE SOLUTION BROKEN", className: factionClass },
-            { text: ` — TARGET ESCAPED at ${nodeName}` }
+            { text: ` at ${nodeName}; the target escaped.` }
           ]
         };
       }
@@ -150,7 +155,7 @@ function createPlayerFacingResolutionRow(
           parts: [
             { text: numberPrefix },
             { text: "MISSILE MISSED", className: factionClass },
-            { text: ` — TARGET SAFE at ${nodeName}` }
+            { text: ` at ${nodeName}; the target is safe.` }
           ]
         };
       }
@@ -162,17 +167,17 @@ function createPlayerFacingResolutionRow(
             text: "SIGNAL LOST",
             className: mergeResolutionCommandClasses(factionClass, crewLostCueClassName)
           },
-          { text: " — ", className: crewLostCueClassName },
+          { text: ` at ${nodeName}; `, className: crewLostCueClassName },
           { text: "CREW LOST", className: crewLostCueClassName },
-          { text: ` at ${nodeName}`, className: crewLostCueClassName }
+          { text: ".", className: crewLostCueClassName }
         ]
       };
     case "MANDATORY_LAUNCH":
       return {
         parts: [
           { text: numberPrefix },
-          { text: "MANDATORY LAUNCH REQUIRED", className: factionClass },
-          { text: `  ${nodeName}` }
+          { text: "MANDATORY LAUNCH", className: factionClass },
+          { text: ` is required at ${nodeName}; select a BURN destination.` }
         ]
       };
     case "MANDATORY_LAUNCH_DESTROYED":
@@ -180,7 +185,7 @@ function createPlayerFacingResolutionRow(
         parts: [
           { text: numberPrefix },
           { text: "MANDATORY LAUNCH FAILED", className: factionClass },
-          { text: `  ${nodeName}  insufficient ΔV` }
+          { text: ` at ${nodeName} because the faction had insufficient ΔV.` }
         ]
       };
     case "BURN_FAILED":
@@ -188,7 +193,7 @@ function createPlayerFacingResolutionRow(
         parts: [
           { text: numberPrefix },
           { text: "BURN FAILED", className: factionClass },
-          { text: `  ${nodeName}  insufficient ΔV` }
+          { text: ` at ${nodeName} because the faction had insufficient ΔV.` }
         ]
       };
     case "VICTORY":
@@ -196,7 +201,7 @@ function createPlayerFacingResolutionRow(
         parts: [
           { text: "VICTORY", className: factionClass },
           {
-            text: `  ${event.actorFactionId === undefined ? "Unknown" : formatResolutionFactionName(factions, event.actorFactionId)}  Tritium Collapse`
+            text: ` for ${event.actorFactionId === undefined ? "Unknown" : formatResolutionFactionName(factions, event.actorFactionId)}; every rival has lost tritium access.`
           }
         ]
       };

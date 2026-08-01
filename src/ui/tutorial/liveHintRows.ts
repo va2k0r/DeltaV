@@ -16,7 +16,7 @@ export function createTutorialSelectShipLiveRows(
 ): readonly TutorialCommandTimelineRow[] {
   return [
     {
-      parts: [{ text: "Left click on the orbit to select a ship." }],
+      parts: [{ text: "Left-click the ship in Moon orbit to select it." }],
       className,
       key
     },
@@ -68,9 +68,9 @@ export function createTutorialConfirmTransferBurnLiveRows(
   return createTutorialConfirmLiveRowsWithHints(
     {
       parts: [
-        { text: "Left click to confirm transfer " },
+        { text: "Left-click the destination to confirm the " },
         { text: "BURN", className: playerClassName },
-        { text: "." }
+        { text: " transfer." }
       ],
       className,
       key
@@ -88,7 +88,7 @@ export function createTutorialConfirmFiringSolutionLiveRows(
 ): readonly TutorialCommandTimelineRow[] {
   return createTutorialConfirmLiveRowsWithHints(
     {
-      parts: [{ text: "Left click to confirm firing solution." }],
+      parts: [{ text: "Left-click the target marker to confirm this firing solution." }],
       className,
       key
     },
@@ -106,9 +106,9 @@ export function createTutorialEnterFireModeLiveRows(
   return [
     {
       parts: [
-        { text: "Right click to enter " },
+        { text: "Right-click anywhere to enter " },
         { text: "FIRE", className: playerClassName },
-        { text: " mode." }
+        { text: " mode for the selected ship." }
       ],
       className,
       key
@@ -143,7 +143,7 @@ export function createTutorialConfirmBurnLiveRows(
   options?: TutorialConfirmLiveRowOptions
 ): readonly TutorialCommandTimelineRow[] {
   const confirmRow: TutorialCommandTimelineRow = {
-    parts: [{ text: "Left click to confirm burn." }],
+    parts: [{ text: "Left-click a valid destination to confirm the BURN." }],
     className,
     key
   };

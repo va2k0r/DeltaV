@@ -22,6 +22,19 @@ type GlossaryDetailHistoryEntry = Readonly<{
   label: string;
 }>;
 
+export type GameGlossaryLineContext = Readonly<{
+  kind: "dv";
+  factionLabel: string;
+  currentDv: number;
+  committedDv: number;
+  nextTurnDv: number;
+  pendingBurnCost: number;
+  upkeepCost: number;
+  evadeCost: number;
+  income: number;
+  history: readonly number[];
+}>;
+
 type GlossaryHoverRootOptions = Readonly<{
   dwellMs?: number;
 }>;
@@ -34,12 +47,43 @@ type GlossaryHoverHandoffOptions = Readonly<{
   minimumVisibleDurationMs: number;
 }>;
 
+export const tutorialLogbookLabel = "Logbook";
+export const tutorialLogbookHoverInstruction =
+  "Left-click any word in the logbook to open its explanation.";
+export const tutorialLogbookExpandInstruction = "Left-click the selected term to expand it.";
+export const tutorialLogbookReturnInstruction =
+  "Left-click the title to return to the previous explanation.";
+
+export type TutorialLogbookIntroductionStep =
+  | "inactive"
+  | "hover-prompt"
+  | "expand-prompt"
+  | "return-prompt";
+
+export function advanceTutorialLogbookIntroduction(
+  step: TutorialLogbookIntroductionStep
+): TutorialLogbookIntroductionStep {
+  switch (step) {
+    case "inactive":
+      return "hover-prompt";
+    case "hover-prompt":
+      return "expand-prompt";
+    case "expand-prompt":
+      return "return-prompt";
+    case "return-prompt":
+      return "inactive";
+  }
+}
+
 export type GameGlossaryController = Readonly<{
   hoverPanel: HTMLElement;
   detailPanel: HTMLElement;
   bindRoot: (root: HTMLElement) => void;
   bindHoverRoot: (root: HTMLElement, options?: GlossaryHoverRootOptions) => void;
   beginHoverHandoff: (options: GlossaryHoverHandoffOptions) => void;
+  beginTutorialLogbookIntroduction: () => void;
+  restoreTutorialLogbookIntroduction: () => void;
+  endTutorialLogbookIntroduction: () => void;
   closeAll: () => void;
 }>;
 
@@ -111,6 +155,7 @@ export function createGameGlossaryController(
   let detailSourceToken: HTMLElement | null = null;
   let detailSourceLineKey: string | null = null;
   let detailHistory: GlossaryDetailHistoryEntry[] = [];
+  let tutorialLogbookIntroductionStep: TutorialLogbookIntroductionStep = "inactive";
   const handledActivationEvents = new WeakSet<Event>();
 
   const bindRoot = (root: HTMLElement): void => {
@@ -159,6 +204,28 @@ export function createGameGlossaryController(
       },
       Math.max(0, options.activeDurationMs)
     );
+  };
+
+  const beginTutorialLogbookIntroduction = (): void => {
+    tutorialLogbookIntroductionStep = "inactive";
+    closeAll();
+    tutorialLogbookIntroductionStep = advanceTutorialLogbookIntroduction(
+      tutorialLogbookIntroductionStep
+    );
+  };
+
+  const restoreTutorialLogbookIntroduction = (): void => {
+    if (
+      tutorialLogbookIntroductionStep === "expand-prompt" ||
+      tutorialLogbookIntroductionStep === "return-prompt"
+    ) {
+      renderTutorialLogbookDetailPrompt();
+    }
+  };
+
+  const endTutorialLogbookIntroduction = (): void => {
+    tutorialLogbookIntroductionStep = "inactive";
+    closeAll();
   };
 
   function handlePointerOver(event: MouseEvent): void {
@@ -250,7 +317,8 @@ export function createGameGlossaryController(
     if (
       event.button !== 0 ||
       !detailPanel.classList.contains("is-visible") ||
-      isInsideInteractiveRoot(event.target)
+      isInsideInteractiveRoot(event.target) ||
+      tutorialLogbookIntroductionStep !== "inactive"
     ) {
       return;
     }
@@ -293,6 +361,10 @@ export function createGameGlossaryController(
 
     handledActivationEvents.add(event);
 
+    if (handleTutorialLogbookTokenActivation(event, token)) {
+      return;
+    }
+
     if (shouldPassTutorialReplayCueActivationThrough(token)) {
       closeAll();
       return;
@@ -319,6 +391,10 @@ export function createGameGlossaryController(
     if (event.key === "Enter" || event.key === " ") {
       handledActivationEvents.add(event);
 
+      if (handleTutorialLogbookTokenActivation(event, token)) {
+        return;
+      }
+
       if (shouldPassTutorialReplayCueActivationThrough(token)) {
         closeAll();
         return;
@@ -343,6 +419,18 @@ export function createGameGlossaryController(
   }
 
   function scheduleHover(glossaryId: string, token: HTMLElement): void {
+    if (tutorialLogbookIntroductionStep !== "inactive") {
+      if (tutorialLogbookIntroductionStep === "hover-prompt") {
+        scheduleHoverCopy(
+          "tutorial:logbook-introduction",
+          tutorialLogbookLabel,
+          tutorialLogbookHoverInstruction,
+          token
+        );
+      }
+      return;
+    }
+
     const entry = getGameGlossaryEntry(glossaryId);
 
     if (entry === undefined) {
@@ -439,6 +527,20 @@ export function createGameGlossaryController(
   }
 
   function revealGlossaryHoverImmediately(token: HTMLElement): void {
+    if (tutorialLogbookIntroductionStep !== "inactive") {
+      if (tutorialLogbookIntroductionStep !== "hover-prompt") {
+        return;
+      }
+
+      clearHoverDwellTimer();
+      clearHoverReleaseTimer();
+      hoverGeneration += 1;
+      hoveredHoverKey = "tutorial:logbook-introduction";
+      hoveredHoverToken = token;
+      revealHover(tutorialLogbookLabel, tutorialLogbookHoverInstruction, token, hoverGeneration);
+      return;
+    }
+
     const glossaryId = token.dataset["glossaryId"];
     const entry = glossaryId === undefined ? undefined : getGameGlossaryEntry(glossaryId);
 
@@ -516,6 +618,10 @@ export function createGameGlossaryController(
     hoverText.textContent = "";
     hoverPanel.classList.remove("is-hidden");
     hoverPanel.classList.add("is-visible", "is-typewriting");
+    hoverPanel.classList.toggle(
+      "is-tutorial-logbook-attention",
+      tutorialLogbookIntroductionStep === "hover-prompt"
+    );
     hoverPanel.setAttribute("aria-hidden", "false");
 
     const durationMs = getGlossaryTypewriterDuration(text);
@@ -582,15 +688,118 @@ export function createGameGlossaryController(
     );
   }
 
-  function openDetail(glossaryId: string, sourceToken: HTMLElement): void {
-    const entry = getGameGlossaryEntry(glossaryId);
+  function handleTutorialLogbookTokenActivation(event: Event, token: HTMLElement): boolean {
+    if (tutorialLogbookIntroductionStep === "inactive") {
+      return false;
+    }
 
-    if (entry === undefined) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    if (tutorialLogbookIntroductionStep === "hover-prompt" && !detailPanel.contains(token)) {
+      clearHoverImmediately();
+      tutorialLogbookIntroductionStep = advanceTutorialLogbookIntroduction(
+        tutorialLogbookIntroductionStep
+      );
+      renderTutorialLogbookDetailPrompt();
+    }
+
+    return true;
+  }
+
+  function renderTutorialLogbookDetailPrompt(): void {
+    const isExpandPrompt = tutorialLogbookIntroductionStep === "expand-prompt";
+    const isReturnPrompt = tutorialLogbookIntroductionStep === "return-prompt";
+
+    if (!isExpandPrompt && !isReturnPrompt) {
+      return;
+    }
+
+    detailGeneration += 1;
+    cancelDetailAnimation();
+    detailSourceToken = null;
+    detailSourceLineKey = null;
+    detailHistory = [];
+    detailPanel.removeAttribute("data-glossary-id");
+    detailPanel.removeAttribute("data-source-line-key");
+    detailPanel.dataset["density"] = "brief";
+    detailPanel.dataset["tutorialLogbookStep"] = tutorialLogbookIntroductionStep;
+    detailPanel.classList.remove("is-hidden", "is-typewriting");
+    detailPanel.classList.add("is-visible");
+    detailPanel.setAttribute("aria-hidden", "false");
+    detailLabel.textContent = tutorialLogbookLabel;
+    detailLabel.classList.remove("can-go-back", "is-tutorial-logbook-attention");
+    detailLabel.removeAttribute("tabindex");
+    detailLabel.removeAttribute("role");
+    detailLabel.removeAttribute("aria-label");
+    detailBody.innerHTML = "";
+
+    const action = document.createElement("div");
+    action.className = "command-glossary-detail__line command-glossary-detail__tutorial-action";
+    action.textContent = isExpandPrompt
+      ? tutorialLogbookExpandInstruction
+      : tutorialLogbookReturnInstruction;
+    detailBody.append(action);
+
+    if (isExpandPrompt) {
+      action.classList.add("is-tutorial-logbook-attention");
+      action.tabIndex = 0;
+      action.setAttribute("role", "button");
+      action.setAttribute("aria-label", tutorialLogbookExpandInstruction);
+      return;
+    }
+
+    detailLabel.classList.add("can-go-back", "is-tutorial-logbook-attention");
+    detailLabel.tabIndex = 0;
+    detailLabel.setAttribute("role", "button");
+    detailLabel.setAttribute("aria-label", tutorialLogbookReturnInstruction);
+  }
+
+  function handleTutorialLogbookDetailClick(event: MouseEvent): void {
+    if (
+      tutorialLogbookIntroductionStep !== "expand-prompt" ||
+      getTutorialLogbookDetailAction(event.target) === null
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    tutorialLogbookIntroductionStep = advanceTutorialLogbookIntroduction(
+      tutorialLogbookIntroductionStep
+    );
+    renderTutorialLogbookDetailPrompt();
+  }
+
+  function handleTutorialLogbookDetailKeydown(event: KeyboardEvent): void {
+    if (
+      tutorialLogbookIntroductionStep !== "expand-prompt" ||
+      (event.key !== "Enter" && event.key !== " ") ||
+      getTutorialLogbookDetailAction(event.target) === null
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    tutorialLogbookIntroductionStep = advanceTutorialLogbookIntroduction(
+      tutorialLogbookIntroductionStep
+    );
+    renderTutorialLogbookDetailPrompt();
+  }
+
+  function openDetail(glossaryId: string, sourceToken: HTMLElement): void {
+    const baseEntry = getGameGlossaryEntry(glossaryId);
+
+    if (baseEntry === undefined) {
       return;
     }
 
     const isNestedDetail =
       detailPanel.classList.contains("is-visible") && detailPanel.contains(sourceToken);
+    const entry = isNestedDetail
+      ? baseEntry
+      : createContextualGameGlossaryEntry(baseEntry, sourceToken, document);
     const label = getGlossaryTokenLabel(sourceToken, entry.label);
 
     if (isNestedDetail) {
@@ -609,6 +818,7 @@ export function createGameGlossaryController(
     const generation = detailGeneration;
     cancelDetailAnimation();
     detailPanel.dataset["glossaryId"] = entry.id;
+    detailPanel.removeAttribute("data-tutorial-logbook-step");
     if (detailSourceLineKey === null) {
       detailPanel.removeAttribute("data-source-line-key");
     } else {
@@ -620,12 +830,15 @@ export function createGameGlossaryController(
     detailPanel.dataset["density"] = getGlossaryDetailDensity(entry);
     detailPanel.setAttribute("aria-hidden", "false");
     detailLabel.textContent = label;
+    detailLabel.classList.remove("is-tutorial-logbook-attention");
     syncDetailLabelBackSemantics();
     detailBody.innerHTML = "";
 
-    const lines = entry.detail.map((paragraph) => {
+    const lines = getGameGlossaryDetailParagraphs(entry).map((paragraph) => {
       const line = document.createElement("div");
       line.className = "command-glossary-detail__line";
+      line.classList.toggle("command-glossary-detail__line--spacer", paragraph.length === 0);
+      line.classList.toggle("command-glossary-detail__line--advice", paragraph.startsWith("• "));
       const spans = createGameGlossaryTextSpans(document, paragraph);
       const targets = spans.map((span) => {
         const text = span.textContent ?? "";
@@ -646,6 +859,16 @@ export function createGameGlossaryController(
   }
 
   function handleDetailLabelClick(event: MouseEvent): void {
+    if (tutorialLogbookIntroductionStep === "return-prompt") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      tutorialLogbookIntroductionStep = advanceTutorialLogbookIntroduction(
+        tutorialLogbookIntroductionStep
+      );
+      closeAll();
+      return;
+    }
+
     if (!restorePreviousDetail()) {
       return;
     }
@@ -655,6 +878,19 @@ export function createGameGlossaryController(
   }
 
   function handleDetailLabelKeydown(event: KeyboardEvent): void {
+    if (
+      tutorialLogbookIntroductionStep === "return-prompt" &&
+      (event.key === "Enter" || event.key === " ")
+    ) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      tutorialLogbookIntroductionStep = advanceTutorialLogbookIntroduction(
+        tutorialLogbookIntroductionStep
+      );
+      closeAll();
+      return;
+    }
+
     if ((event.key !== "Enter" && event.key !== " ") || !restorePreviousDetail()) {
       return;
     }
@@ -680,7 +916,11 @@ export function createGameGlossaryController(
       return true;
     }
 
-    renderDetail(previousEntry, previousHistoryEntry.label, false);
+    const restoredEntry =
+      detailHistory.length === 1 && detailSourceToken !== null
+        ? createContextualGameGlossaryEntry(previousEntry, detailSourceToken, document)
+        : previousEntry;
+    renderDetail(restoredEntry, previousHistoryEntry.label, false);
     return true;
   }
 
@@ -781,10 +1021,12 @@ export function createGameGlossaryController(
     detailPanel.removeAttribute("data-glossary-id");
     detailPanel.removeAttribute("data-source-line-key");
     detailPanel.removeAttribute("data-density");
+    detailPanel.removeAttribute("data-tutorial-logbook-step");
     detailPanel.classList.remove("is-visible", "is-typewriting");
     detailPanel.classList.add("is-hidden");
     detailPanel.setAttribute("aria-hidden", "true");
     detailLabel.textContent = "";
+    detailLabel.classList.remove("is-tutorial-logbook-attention");
     syncDetailLabelBackSemantics();
     detailBody.innerHTML = "";
   }
@@ -798,6 +1040,7 @@ export function createGameGlossaryController(
     hoveredHoverToken = null;
     hoverMinimumVisibleUntil = 0;
     hoverPanel.classList.remove("is-visible", "is-typewriting");
+    hoverPanel.classList.remove("is-tutorial-logbook-attention");
     hoverPanel.classList.add("is-hidden");
     hoverPanel.setAttribute("aria-hidden", "true");
     hoverLabel.textContent = "";
@@ -843,6 +1086,8 @@ export function createGameGlossaryController(
   detailPanel.addEventListener("contextmenu", handleDetailPanelContextMenu, true);
   detailPanel.addEventListener("selectstart", preventDetailPanelSelection, true);
   detailPanel.addEventListener("dragstart", preventDetailPanelSelection, true);
+  detailPanel.addEventListener("click", handleTutorialLogbookDetailClick, true);
+  detailPanel.addEventListener("keydown", handleTutorialLogbookDetailKeydown, true);
   detailLabel.addEventListener("click", handleDetailLabelClick);
   detailLabel.addEventListener("keydown", handleDetailLabelKeydown);
   document.addEventListener("pointermove", handleDocumentPointerMove, true);
@@ -855,6 +1100,9 @@ export function createGameGlossaryController(
     bindRoot,
     bindHoverRoot,
     beginHoverHandoff,
+    beginTutorialLogbookIntroduction,
+    restoreTutorialLogbookIntroduction,
+    endTutorialLogbookIntroduction,
     closeAll
   };
 }
@@ -950,6 +1198,12 @@ function getStaticHoverToken(target: EventTarget | null): HTMLElement | null {
     : null;
 }
 
+function getTutorialLogbookDetailAction(target: EventTarget | null): HTMLElement | null {
+  return target instanceof Element
+    ? target.closest<HTMLElement>(".command-glossary-detail__tutorial-action")
+    : null;
+}
+
 function getGlossarySourceLineKey(token: HTMLElement): string | null {
   const line = token.closest<HTMLElement>(".command-console__line");
 
@@ -1000,17 +1254,261 @@ function getGlossaryDetailTypewriterDuration(text: string): number {
 }
 
 function getGlossaryDetailDensity(entry: GameGlossaryEntry): "brief" | "standard" | "dense" {
-  const characterCount = entry.detail.reduce((sum, line) => sum + line.length, 0);
+  const paragraphs = getGameGlossaryDetailParagraphs(entry);
+  const characterCount = paragraphs.reduce((sum, line) => sum + line.length, 0);
 
-  if (entry.detail.length <= 3 && characterCount <= 320) {
+  if (paragraphs.length <= 3 && characterCount <= 320) {
     return "brief";
   }
 
-  if (entry.detail.length >= 7 || characterCount >= 700) {
+  if (paragraphs.length >= 7 || characterCount >= 700) {
     return "dense";
   }
 
   return "standard";
+}
+
+function getGameGlossaryDetailParagraphs(entry: GameGlossaryEntry): readonly string[] {
+  if (entry.advice === undefined || entry.advice.length === 0) {
+    return entry.detail;
+  }
+
+  return [...entry.detail, "", ...entry.advice.map((line) => `• ${line}`)];
+}
+
+function createContextualGameGlossaryEntry(
+  entry: GameGlossaryEntry,
+  sourceToken: HTMLElement,
+  document: Document
+): GameGlossaryEntry {
+  const line = sourceToken.closest<HTMLElement>(".command-console__line");
+
+  if (line === null) {
+    return entry;
+  }
+
+  const telemetryContext = parseGameGlossaryLineContext(line.dataset["glossaryContext"]);
+
+  if (telemetryContext !== null && isDvGlossaryEntry(entry.id)) {
+    const direction = telemetryContext.committedDv - telemetryContext.currentDv;
+    const change =
+      direction === 0 ? "does not change" : `${direction > 0 ? "+" : ""}${direction} ΔV`;
+    const history = telemetryContext.history.join(" → ");
+    const components = [
+      telemetryContext.pendingBurnCost > 0
+        ? `${telemetryContext.pendingBurnCost} for queued BURN orders`
+        : null,
+      telemetryContext.upkeepCost > 0
+        ? `${telemetryContext.upkeepCost} for contested upkeep`
+        : null,
+      telemetryContext.evadeCost > 0
+        ? `${telemetryContext.evadeCost} for known EVADE impacts`
+        : null
+    ].filter((value): value is string => value !== null);
+    const otherCost = Math.max(
+      0,
+      telemetryContext.currentDv -
+        telemetryContext.pendingBurnCost -
+        telemetryContext.upkeepCost -
+        telemetryContext.evadeCost +
+        telemetryContext.income -
+        telemetryContext.nextTurnDv
+    );
+    if (otherCost > 0) {
+      components.push(`${otherCost} reserved for mandatory launch or other known commitments`);
+    }
+    const forecastExplanation =
+      components.length === 0
+        ? `No known mandatory cost is due, and expected income adds ${telemetryContext.income} ΔV.`
+        : `The forecast subtracts ${components.join(", ")} and adds ${telemetryContext.income} expected income.`;
+
+    return {
+      ...entry,
+      detail: [
+        ...entry.detail.slice(0, 2),
+        `On this line, ${telemetryContext.factionLabel} has ${telemetryContext.currentDv} ΔV now. Visible commitments project ${telemetryContext.committedDv} ΔV, so the balance ${change}.`,
+        `The next-turn forecast is ${telemetryContext.nextTurnDv} ΔV. ${forecastExplanation}`
+      ],
+      advice: [
+        `Recent and projected balances read ${history}. A falling sequence signals shrinking freedom to BURN, EVADE or maintain a lock.`,
+        ...(entry.advice ?? []).slice(0, 1)
+      ]
+    };
+  }
+
+  const text = normalizeGlossaryLineText(line.textContent ?? "");
+  const sourceTurn = parseGlossaryLineTurn(line.dataset["turn"]);
+  const latestTurn = getLatestGlossaryLineTurn(document);
+  const burn = parseBurnGlossaryLine(text);
+
+  if (
+    burn !== null &&
+    (entry.id === "burn" ||
+      entry.id === "burn-out" ||
+      isDvGlossaryEntry(entry.id) ||
+      entry.id === "eta")
+  ) {
+    const timing = formatGlossaryCommitTiming(line.dataset["kind"], sourceTurn, latestTurn);
+    return {
+      ...entry,
+      detail: [
+        ...entry.detail.slice(0, 2),
+        `This BURN runs from ${burn.origin} to ${burn.destination}, takes ${burn.etaTurns} turns and costs ${burn.cost} ΔV.`
+      ],
+      advice: [
+        `${timing} The ship reaches its destination ${burn.etaTurns} turns after departure.`,
+        ...(entry.advice ?? []).slice(0, 1)
+      ]
+    };
+  }
+
+  const fire = parseFireGlossaryLine(text);
+
+  if (
+    fire !== null &&
+    (entry.id === "fire" || entry.id === "firing-solution" || entry.id === "eta")
+  ) {
+    return {
+      ...entry,
+      detail: [
+        ...entry.detail.slice(0, 2),
+        `This solution runs from ${fire.origin} to ${fire.target} and reaches impact in ${fire.etaTurns} turns.`
+      ],
+      advice: [
+        `Until impact, the target can break this solution by BURNING away. If it stays, budget 1 ΔV for EVADE and one lost WORK result.`,
+        ...(entry.advice ?? []).slice(0, 1)
+      ]
+    };
+  }
+
+  const progress = parseShipyardProgressGlossaryLine(text);
+
+  if (
+    progress !== null &&
+    (entry.id === "shipyard" || entry.id === "work" || entry.id.startsWith("value:progress:"))
+  ) {
+    const remaining = Math.max(0, 5 - progress);
+    return {
+      ...entry,
+      detail: [
+        ...entry.detail.slice(0, 2),
+        `This yard is at ${progress}/5. It needs ${remaining} more eligible WORK ${remaining === 1 ? "turn" : "turns"} to complete the hull.`
+      ],
+      advice: [
+        `Progress stays at the yard if control changes, so both factions can evaluate the same ${progress}/5 investment.`,
+        ...(entry.advice ?? []).slice(0, 1)
+      ]
+    };
+  }
+
+  return entry;
+}
+
+function isDvGlossaryEntry(id: string): boolean {
+  return id === "delta-v" || id === "cost" || id.startsWith("value:delta-v:");
+}
+
+function parseGameGlossaryLineContext(raw: string | undefined): GameGlossaryLineContext | null {
+  if (raw === undefined) {
+    return null;
+  }
+
+  try {
+    const value = JSON.parse(raw) as Partial<GameGlossaryLineContext>;
+    return value.kind === "dv" && typeof value.currentDv === "number"
+      ? (value as GameGlossaryLineContext)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeGlossaryLineText(text: string): string {
+  return text.replace(/\s+/gu, " ").trim();
+}
+
+function parseBurnGlossaryLine(
+  text: string
+): Readonly<{ origin: string; destination: string; etaTurns: number; cost: number }> | null {
+  const prose =
+    /\bBURN(?: OUT)?\s+from\s+(.+?)\s+to\s+(.+?);\s+ETA\s+T\+(\d+);\s+cost\s+-(\d+)\s*ΔV/iu.exec(
+      text
+    );
+  const compact = /\bBURN(?: OUT)?\s+(.+?)\s+(?:->|→)\s+(.+?)\s+T\+(\d+).*?-(\d+)\s*ΔV/iu.exec(
+    text
+  );
+  const match = prose ?? compact;
+
+  if (match === null) {
+    return null;
+  }
+
+  return {
+    origin: match[1]?.trim() ?? "the origin",
+    destination: match[2]?.trim() ?? "the destination",
+    etaTurns: Number(match[3] ?? 0),
+    cost: Number(match[4] ?? 0)
+  };
+}
+
+function parseFireGlossaryLine(
+  text: string
+): Readonly<{ origin: string; target: string; etaTurns: number }> | null {
+  const prose = /\bFIRE\s+from\s+(.+?)\s+to\s+(.+?);\s+impact\s+T-(\d+)/iu.exec(text);
+  const compact = /\bFIRE\s+(.+?)\s+(?:->|→)\s+(.+?)\s+T[-+](\d+)/iu.exec(text);
+  const match = prose ?? compact;
+
+  if (match === null) {
+    return null;
+  }
+
+  return {
+    origin: match[1]?.trim() ?? "the firing orbit",
+    target: match[2]?.trim() ?? "the target orbit",
+    etaTurns: Number(match[3] ?? 0)
+  };
+}
+
+function parseShipyardProgressGlossaryLine(text: string): number | null {
+  const match = /(?:shipyard[^\d]{0,40})?(\d+)\/5\b/iu.exec(text);
+  return match === null ? null : Number(match[1]);
+}
+
+function parseGlossaryLineTurn(raw: string | undefined): number | null {
+  if (raw === undefined) {
+    return null;
+  }
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed + 1 : null;
+}
+
+function getLatestGlossaryLineTurn(document: Document): number | null {
+  const turns = [...document.querySelectorAll<HTMLElement>(".command-console__line[data-turn]")]
+    .map((line) => parseGlossaryLineTurn(line.dataset["turn"]))
+    .filter((turn): turn is number => turn !== null);
+  return turns.length === 0 ? null : Math.max(...turns);
+}
+
+function formatGlossaryCommitTiming(
+  kind: string | undefined,
+  sourceTurn: number | null,
+  latestTurn: number | null
+): string {
+  if (kind === "live") {
+    return "This order is still queued, so its ΔV will be removed when the next EXECUTE resolves the departure.";
+  }
+
+  if (sourceTurn === null) {
+    return "Its ΔV was removed when the departure resolved.";
+  }
+
+  const elapsed = latestTurn === null ? 0 : Math.max(0, latestTurn - sourceTurn);
+  const elapsedCopy =
+    elapsed === 0
+      ? "on the latest visible turn"
+      : `${elapsed} ${elapsed === 1 ? "turn" : "turns"} before the latest visible turn`;
+  return `Its ΔV was removed when the departure resolved on TURN ${String(sourceTurn).padStart(2, "0")}, ${elapsedCopy}.`;
 }
 
 function clampGlossaryProgress(value: number): number {

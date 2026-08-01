@@ -62,10 +62,11 @@ export const tutorialCameraControlsHintMinimumGapMs = 5200;
 export const tutorialCameraControlsIdleHintDelayMs = 6800;
 export const tutorialCameraGuidancePaused = true;
 export const tutorialCameraPanOrbitHintText =
-  "Left click and drag to pan camera, right click and drag to orbit.";
-export const tutorialCameraZoomHintText = "Mouse wheel to zoom in / out.";
-export const tutorialCameraOrbitHintText = "Right click and drag to orbit.";
-export const tutorialCameraPanHintText = "Left click and drag to pan.";
-export const tutorialCameraFocusHintText = "Double click to focus.";
+  "Drag with the left button to pan the camera, or with the right button to orbit it.";
+export const tutorialCameraZoomHintText = "Use the mouse wheel to zoom in or out.";
+export const tutorialCameraOrbitHintText = "Drag with the right button to orbit the camera.";
+export const tutorialCameraPanHintText = "Drag with the left button to pan the camera.";
+export const tutorialCameraFocusHintText =
+  "Double-click a visible target to focus the camera on it.";
 export const tutorialConfirmCameraPanOrbitHintText =
-  "Left click and drag to pan. Right click and drag to orbit.";
+  "Drag with the left button to pan, or with the right button to orbit the camera.";

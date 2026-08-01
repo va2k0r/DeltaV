@@ -5,6 +5,13 @@ import {
   removeTutorialCameraHintRows
 } from "../../src/ui/tutorial/cameraHintDisplay";
 import { shouldPanTutorialTarget } from "../../src/ui/tutorial/cameraPolicy";
+import {
+  tutorialCameraFocusHintText,
+  tutorialCameraOrbitHintText,
+  tutorialCameraPanHintText,
+  tutorialCameraZoomHintText,
+  tutorialConfirmCameraPanOrbitHintText
+} from "../../src/ui/tutorial/constants";
 import { findFirstTutorialEnemyKillResolutionEvent } from "../../src/ui/tutorial/firstEnemyKillReplay";
 import { isTutorialSupportProductionDestinationAllowed } from "../../src/ui/tutorial/productiveBurnDestination";
 import {
@@ -14,6 +21,7 @@ import {
 import {
   createTutorialConfirmTransferBurnLiveRows,
   createTutorialEnemyContactVictoryWarningRows,
+  createTutorialEnterFireModeLiveRows,
   createTutorialFirstBurnTimeCostRows,
   createTutorialOpeningCameraControlLiveRows,
   createTutorialOverlayLiveHintRow,
@@ -102,7 +110,11 @@ describe("tutorial support production destinations", () => {
 describe("tutorial row modules", () => {
   it("explains that BURN and FIRE markers point to future positions", () => {
     expect(createTutorialFirstBurnTimeCostRows("player-highlight")).toContainEqual({
-      parts: [{ text: "The marker shows where the destination will be when the transfer ends." }],
+      parts: [
+        {
+          text: "The destination marker shows where that orbit will be when the transfer ends, not where it is now. Compare ETA and cost before you confirm."
+        }
+      ],
       className: tutorialLineClassName,
       key: "tutorial:first-burn-arrival-marker"
     });
@@ -110,7 +122,9 @@ describe("tutorial row modules", () => {
       parts: [
         { text: "The X marks the target's predicted position at " },
         { text: "impact", className: "command-console__event-contested" },
-        { text: ", not its current position." }
+        {
+          text: ", not its current position. Confirm only after checking that ETA still creates useful pressure."
+        }
       ],
       className: tutorialLineClassName,
       key: "tutorial:shipyard-fire-impact-marker"
@@ -217,11 +231,29 @@ describe("tutorial row modules", () => {
   it("builds stable live hint rows through the public barrel", () => {
     expect(createTutorialSelectShipLiveRows("hint-class", "tutorial:test-select")).toEqual([
       {
-        parts: [{ text: "Left click on the orbit to select a ship." }],
+        parts: [{ text: "Left-click the ship in Moon orbit to select it." }],
         className: "hint-class",
         key: "tutorial:test-select"
       },
       createTutorialSpacerRow("tutorial:test-select:spacer")
+    ]);
+
+    expect(
+      createTutorialEnterFireModeLiveRows(
+        "hint-class",
+        "tutorial:test-enter-fire",
+        "player-highlight"
+      )
+    ).toEqual([
+      {
+        parts: [
+          { text: "Right-click anywhere to enter " },
+          { text: "FIRE", className: "player-highlight" },
+          { text: " mode for the selected ship." }
+        ],
+        className: "hint-class",
+        key: "tutorial:test-enter-fire"
+      }
     ]);
 
     expect(createTutorialOverlayLiveHintRow("Overlay check")).toEqual({
@@ -239,32 +271,32 @@ describe("tutorial row modules", () => {
     expect(
       createTutorialOpeningCameraControlLiveRows(
         "tutorial:test-opening-camera",
-        "Mouse wheel to zoom in / out.",
-        "Right click and drag to orbit.",
-        "Left click and drag to pan.",
-        "Double click to focus."
+        tutorialCameraZoomHintText,
+        tutorialCameraOrbitHintText,
+        tutorialCameraPanHintText,
+        tutorialCameraFocusHintText
       )
     ).toEqual([
       {
-        parts: [{ text: "Mouse wheel to zoom in / out." }],
+        parts: [{ text: tutorialCameraZoomHintText }],
         className: tutorialCompleteHintClassName,
         key: "tutorial:test-opening-camera:zoom"
       },
       createTutorialSpacerRow("tutorial:test-opening-camera:zoom-spacer"),
       {
-        parts: [{ text: "Right click and drag to orbit." }],
+        parts: [{ text: tutorialCameraOrbitHintText }],
         className: tutorialCompleteHintClassName,
         key: "tutorial:test-opening-camera:orbit"
       },
       createTutorialSpacerRow("tutorial:test-opening-camera:orbit-spacer"),
       {
-        parts: [{ text: "Left click and drag to pan." }],
+        parts: [{ text: tutorialCameraPanHintText }],
         className: tutorialCompleteHintClassName,
         key: "tutorial:test-opening-camera:pan"
       },
       createTutorialSpacerRow("tutorial:test-opening-camera:pan-spacer"),
       {
-        parts: [{ text: "Double click to focus." }],
+        parts: [{ text: tutorialCameraFocusHintText }],
         className: tutorialCompleteHintClassName,
         key: "tutorial:test-opening-camera:focus"
       },
@@ -275,18 +307,18 @@ describe("tutorial row modules", () => {
       createTutorialZoomFocusLiveRows(
         "hint-class",
         "tutorial:test-zoom-focus",
-        "Mouse wheel to zoom in / out.",
-        "Double click to focus."
+        tutorialCameraZoomHintText,
+        tutorialCameraFocusHintText
       )
     ).toEqual([
       {
-        parts: [{ text: "Mouse wheel to zoom in / out." }],
+        parts: [{ text: tutorialCameraZoomHintText }],
         className: tutorialCompleteHintClassName,
         key: "tutorial:test-zoom-focus:zoom"
       },
       createTutorialSpacerRow("tutorial:test-zoom-focus:spacer"),
       {
-        parts: [{ text: "Double click to focus." }],
+        parts: [{ text: tutorialCameraFocusHintText }],
         className: tutorialCompleteHintClassName,
         key: "tutorial:test-zoom-focus:focus"
       }
@@ -296,18 +328,18 @@ describe("tutorial row modules", () => {
       createTutorialZoomFocusLiveRows(
         tutorialLiveHintClassName,
         "tutorial:test-live-zoom-focus",
-        "Mouse wheel to zoom in / out.",
-        "Double click to focus."
+        tutorialCameraZoomHintText,
+        tutorialCameraFocusHintText
       )
     ).toEqual([
       {
-        parts: [{ text: "Mouse wheel to zoom in / out." }],
+        parts: [{ text: tutorialCameraZoomHintText }],
         className: tutorialCompleteHintClassName,
         key: "tutorial:test-live-zoom-focus:zoom"
       },
       createTutorialSpacerRow("tutorial:test-live-zoom-focus:spacer"),
       {
-        parts: [{ text: "Double click to focus." }],
+        parts: [{ text: tutorialCameraFocusHintText }],
         className: tutorialCompleteHintClassName,
         key: "tutorial:test-live-zoom-focus:focus"
       }
@@ -321,28 +353,28 @@ describe("tutorial row modules", () => {
         "tutorial:test-confirm-burn",
         "player-highlight",
         {
-          zoomHintText: "Mouse wheel to zoom in / out.",
-          cameraPanOrbitHintText: "Left click and drag to pan. Right click and drag to orbit."
+          zoomHintText: tutorialCameraZoomHintText,
+          cameraPanOrbitHintText: tutorialConfirmCameraPanOrbitHintText
         }
       )
     ).toEqual([
       {
-        parts: [{ text: "Mouse wheel to zoom in / out." }],
+        parts: [{ text: tutorialCameraZoomHintText }],
         className: tutorialCompleteHintClassName,
         key: "tutorial:test-confirm-burn:zoom-hint"
       },
       createTutorialSpacerRow("tutorial:test-confirm-burn:zoom-hint-spacer"),
       {
-        parts: [{ text: "Left click and drag to pan. Right click and drag to orbit." }],
+        parts: [{ text: tutorialConfirmCameraPanOrbitHintText }],
         className: tutorialCompleteHintClassName,
         key: "tutorial:test-confirm-burn:camera-pan-orbit-hint"
       },
       createTutorialSpacerRow("tutorial:test-confirm-burn:camera-pan-orbit-hint-spacer"),
       {
         parts: [
-          { text: "Left click to confirm transfer " },
+          { text: "Left-click the destination to confirm the " },
           { text: "BURN", className: "player-highlight" },
-          { text: "." }
+          { text: " transfer." }
         ],
         className: tutorialDelayedLiveHintClassName,
         key: "tutorial:test-confirm-burn"
@@ -362,14 +394,18 @@ describe("tutorial row modules", () => {
       {
         parts: [
           { text: "WARNING:", className: "command-console__event-contested" },
-          { text: " enemy contact." }
+          {
+            text: " the guided exercise has ended, but the match continues under normal control."
+          }
         ],
         className: tutorialLineClassName
       },
       createTutorialSpacerRow("tutorial:first-enemy-kill-victory-warning:spacer"),
       {
         parts: [
-          { text: "Remain the last faction with operational tritium extracting capabilities." }
+          {
+            text: "You win by remaining the only faction with a credible route to tritium. Protect your own access while denying rivals the plants, ΔV or ships needed to recover theirs."
+          }
         ],
         className: tutorialLineClassName
       }
@@ -380,22 +416,22 @@ describe("tutorial row modules", () => {
     expect(createTutorialPostVictoryActionRows("player-highlight")).toEqual([
       createTutorialSpacerRow("tutorial:post-victory-actions:before"),
       {
-        parts: [{ text: "Every ship can act once every turn." }],
+        parts: [{ text: "Each ship resolves one operational outcome per turn." }],
         className: tutorialLineClassName,
         key: "tutorial:post-victory-actions:intro"
       },
       createTutorialSpacerRow("tutorial:post-victory-actions:between-actions"),
       {
         parts: [
-          { text: "Either " },
+          { text: "A ship may " },
           { text: "BURN", className: "player-highlight" },
           { text: ", " },
           { text: "FIRE", className: "player-highlight" },
-          { text: ", " },
+          { text: " or remain in place; if it remains eligible, it will " },
           { text: "WORK", className: "player-highlight" },
-          { text: " or " },
+          { text: " automatically. It will also " },
           { text: "EVADE", className: "player-highlight" },
-          { text: "." }
+          { text: " automatically when a missile impacts and the faction can pay." }
         ],
         className: tutorialLineClassName,
         key: "tutorial:post-victory-actions:actions"
@@ -410,7 +446,9 @@ describe("tutorial row modules", () => {
           { text: "WORK", className: "player-highlight" },
           { text: " or " },
           { text: "EVADE", className: "player-highlight" },
-          { text: "." }
+          {
+            text: ". They may stay and preserve the lock, or BURN out; a support ship outside the lock can still FIRE into it."
+          }
         ],
         className: tutorialLineClassName,
         key: "tutorial:post-victory-actions:contested"
@@ -425,15 +463,13 @@ describe("tutorial row modules", () => {
       createTutorialSpacerRow("tutorial:post-victory-automatic-behavior:before"),
       {
         parts: [
-          { text: "Ships will automatically " },
-          { text: "EVADE", className: "player-highlight" },
-          { text: " or " },
+          { text: "A stationary eligible ship performs " },
           { text: "WORK", className: "player-highlight" },
-          { text: " to extract Tritium or advance production if they don't " },
-          { text: "BURN", className: "player-highlight" },
-          { text: " or " },
-          { text: "FIRE", className: "player-highlight" },
-          { text: "." }
+          { text: " automatically. When a missile impacts, it instead attempts to " },
+          { text: "EVADE", className: "player-highlight" },
+          {
+            text: " automatically, paying 1 ΔV per missile. No separate WORK or EVADE order is required."
+          }
         ],
         className: tutorialLineClassName,
         key: "tutorial:post-victory-automatic-behavior"
@@ -445,7 +481,7 @@ describe("tutorial row modules", () => {
         .map((part) => part.text)
         .join("")
     ).toBe(
-      "Ships will automatically EVADE or WORK to extract Tritium or advance production if they don't BURN or FIRE."
+      "A stationary eligible ship performs WORK automatically. When a missile impacts, it instead attempts to EVADE automatically, paying 1 ΔV per missile. No separate WORK or EVADE order is required."
     );
   });
 
@@ -456,20 +492,20 @@ describe("tutorial row modules", () => {
       .map((part) => part.text)
       .join("");
 
-    expect(text).not.toContain("Right click and drag to orbit.");
+    expect(text).not.toContain(tutorialCameraOrbitHintText);
     expect(rows.at(-1)).toEqual(createTutorialSpacerRow());
   });
 
   it("removes camera guidance rows and their spacers after the first tutorial turn", () => {
     const rows = [
       {
-        parts: [{ text: "Mouse wheel to zoom in / out." }],
+        parts: [{ text: tutorialCameraZoomHintText }],
         className: tutorialCompleteHintClassName,
         key: "tutorial:test:zoom-hint"
       },
       createTutorialSpacerRow("tutorial:test:zoom-hint-spacer"),
       {
-        parts: [{ text: "Right click and drag to orbit." }],
+        parts: [{ text: tutorialCameraOrbitHintText }],
         className: tutorialCompleteHintClassName,
         key: "tutorial:test:orbit"
       },
@@ -497,7 +533,9 @@ describe("tutorial row modules", () => {
       parts: [
         { text: "To disengage, " },
         { text: "BURN", className: "player-highlight" },
-        { text: " to any other orbit." }
+        {
+          text: " to another orbit after paying upkeep. Holding can still be correct when it denies valuable production or lets an outside support ship attack."
+        }
       ],
       className: tutorialLineClassName
     });
@@ -505,7 +543,8 @@ describe("tutorial row modules", () => {
     const expandedRows = expandTutorialSentenceRows(rows, "tutorial:test-contested");
     const disengageRowIndex = expandedRows.findIndex((row) => {
       return (
-        row.parts.map((part) => part.text).join("") === "To disengage, BURN to any other orbit."
+        row.parts.map((part) => part.text).join("") ===
+        "To disengage, BURN to another orbit after paying upkeep."
       );
     });
 
@@ -520,18 +559,18 @@ describe("tutorial row modules", () => {
     });
     const rows = [
       {
-        parts: [{ text: "Mouse wheel to zoom in / out." }],
+        parts: [{ text: tutorialCameraZoomHintText }],
         className: tutorialCompleteHintClassName,
         key: "tutorial:live-zoom-focus-hint:zoom"
       },
       createTutorialSpacerRow("tutorial:live-zoom-focus-hint:spacer"),
       {
-        parts: [{ text: "Double click to focus." }],
+        parts: [{ text: tutorialCameraFocusHintText }],
         className: tutorialCompleteHintClassName,
         key: "tutorial:live-zoom-focus-hint:focus"
       },
       {
-        parts: [{ text: "Left click and drag to pan. Right click and drag to orbit." }],
+        parts: [{ text: tutorialConfirmCameraPanOrbitHintText }],
         className: tutorialCompleteHintClassName,
         key: "tutorial:test-confirm:camera-pan-orbit-hint"
       },

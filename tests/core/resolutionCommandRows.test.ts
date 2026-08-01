@@ -27,7 +27,7 @@ describe("player-facing resolution rows", () => {
         reason: "captured-progress",
         progress: 1
       })
-    ).toBe("01  CAPTURE  Saturn  Shipyard 1/5");
+    ).toBe("01  CAPTURE at Saturn; shipyard progress is now 1/5.");
   });
 
   it("keeps a BURN cost and its ΔV unit on the same visual word", () => {
@@ -42,8 +42,23 @@ describe("player-facing resolution rows", () => {
       etaTurns: 4
     });
 
-    expect(rendered).toContain("-3\u00a0ΔV");
+    expect(rendered).toBe("01  BURN from Mercury to Callisto; ETA T+4; cost -3\u00a0ΔV.");
     expect(rendered).not.toContain("-3 ΔV");
+  });
+
+  it("states FIRE origin, target and impact clock in one readable sentence", () => {
+    expect(
+      renderResolutionEvent({
+        turn: 3,
+        type: "FIRE_LAUNCHED",
+        message: "Mercury fired on Callisto",
+        nodeId: "mercury_node",
+        originNodeId: "mercury_node",
+        targetNodeId: "callisto_node",
+        factionId: "opponent",
+        missileEtaTurns: 4
+      })
+    ).toBe("01  FIRE from Mercury to Callisto; impact T-4.");
   });
 
   it("reports a broken missile solution as a successful escape", () => {
@@ -55,7 +70,7 @@ describe("player-facing resolution rows", () => {
         nodeId: "callisto_node",
         factionId: "player"
       })
-    ).toBe("01  MISSILE SOLUTION BROKEN — TARGET ESCAPED at Callisto");
+    ).toBe("01  MISSILE SOLUTION BROKEN at Callisto; the target escaped.");
   });
 
   it("keeps impact lowercase in the command log", () => {
@@ -67,7 +82,7 @@ describe("player-facing resolution rows", () => {
         nodeId: "callisto_node",
         factionId: "opponent"
       })
-    ).toBe("01  impact  Callisto");
+    ).toBe("01  impact at Callisto.");
   });
 
   it("reserves CREW LOST for actual ship destruction", () => {
@@ -79,6 +94,6 @@ describe("player-facing resolution rows", () => {
         nodeId: "callisto_node",
         factionId: "player"
       })
-    ).toBe("01  SIGNAL LOST — CREW LOST at Callisto");
+    ).toBe("01  SIGNAL LOST at Callisto; CREW LOST.");
   });
 });
