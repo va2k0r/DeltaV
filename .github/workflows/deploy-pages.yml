@@ -35,14 +35,7 @@ jobs:
       - name: Resolve GitHub Pages base path
         shell: bash
         run: |
-          repository_name="${GITHUB_REPOSITORY#*/}"
-          repository_owner="${GITHUB_REPOSITORY%%/*}"
-
-          if [[ "${repository_name,,}" == "${repository_owner,,}.github.io" ]]; then
-            echo "VITE_PUBLIC_BASE=/" >> "$GITHUB_ENV"
-          else
-            echo "VITE_PUBLIC_BASE=/${repository_name}/" >> "$GITHUB_ENV"
-          fi
+          echo "VITE_PUBLIC_BASE=/" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: npm ci
