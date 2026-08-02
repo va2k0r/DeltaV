@@ -357,6 +357,19 @@ const mechanicGlossaryEntries = [
     ]
   },
   {
+    id: "dv-chart",
+    label: "ΔV TREND",
+    aliases: [],
+    short:
+      "Up to four previous reserve samples plus the live visible-commitment projection; open the Logbook for the exact construction.",
+    detail: [
+      "The ΔV TREND is a compact chronological chart for one faction. It keeps at most five bars: up to four previous resolved-state balances followed by the current planning projection on the right.",
+      "The live bar begins with current faction ΔV and subtracts visible queued BURN costs, next-turn CONTESTED upkeep and known next-turn EVADE costs. It is a visible-commitment projection, not a promise of every future income or threat.",
+      "Bar height is normalized inside that faction's own five-sample window. The scale ceiling is the greater of 10 ΔV or the largest displayed value; each non-negative value fills a 12-pixel range above a 2-pixel floor, then rounds to a whole pixel. The floor keeps a zero reserve visible.",
+      "Use the chart to scan direction and pressure quickly: a falling shape exposes shrinking freedom to BURN, EVADE or hold CONTESTED, while a rising shape shows recovered operating margin. Read the printed balances for exact values and direct player-versus-enemy comparison, because each faction chart has its own scale."
+    ]
+  },
+  {
     id: "tritium",
     label: "TRITIUM",
     aliases: ["TRITIUM"],

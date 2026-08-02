@@ -47,6 +47,13 @@ type GlossaryHoverHandoffOptions = Readonly<{
   minimumVisibleDurationMs: number;
 }>;
 
+export type GameContextualLogbookEntry = Readonly<{
+  id: string;
+  label: string;
+  detail: readonly string[];
+  advice?: readonly string[];
+}>;
+
 type GameGlossaryControllerOptions = Readonly<{
   onTutorialLogbookIntroductionComplete?: () => void;
   onTutorialLogbookIntroductionStepChange?: () => void;
@@ -54,6 +61,7 @@ type GameGlossaryControllerOptions = Readonly<{
 
 export const tutorialLogbookLabel = "Logbook";
 export const gameMenuGlossaryHoverDwellMs = 240;
+export const tutorialLogbookWordHoverClassName = "is-tutorial-logbook-word-hover";
 export const tutorialLogbookOpenInstruction =
   "Left-click any word in the logbook to open its explanation.";
 export const tutorialLogbookExpandInstruction =
@@ -87,6 +95,7 @@ export type GameGlossaryController = Readonly<{
   detailPanel: HTMLElement;
   bindRoot: (root: HTMLElement) => void;
   bindHoverRoot: (root: HTMLElement, options?: GlossaryHoverRootOptions) => void;
+  openContextualLogbook: (entry: GameContextualLogbookEntry) => void;
   beginHoverHandoff: (options: GlossaryHoverHandoffOptions) => void;
   beginTutorialLogbookIntroduction: () => void;
   restoreTutorialLogbookIntroduction: () => void;
@@ -110,7 +119,7 @@ export function createGameGlossaryTextSpans(
     }
 
     if (token.glossaryId !== undefined) {
-      applyGlossaryTokenSemantics(span, token.glossaryId, token.text);
+      applyGameGlossaryTokenSemantics(span, token.glossaryId, token.text);
     }
 
     return span;
@@ -170,6 +179,10 @@ export function createGameGlossaryController(
 
   const bindRoot = (root: HTMLElement): void => {
     interactiveRoots.add(root);
+    root.classList.toggle(
+      tutorialLogbookWordHoverClassName,
+      tutorialLogbookIntroductionStep === "open-prompt"
+    );
     root.addEventListener("pointerover", handlePointerOver, true);
     root.addEventListener("pointerout", handlePointerOut, true);
     root.addEventListener("mouseover", handlePointerOver, true);
@@ -189,6 +202,17 @@ export function createGameGlossaryController(
     root.addEventListener("mouseout", handleStaticPointerOut, true);
     root.addEventListener("focusin", handleStaticFocusIn, true);
     root.addEventListener("focusout", handleStaticFocusOut, true);
+  };
+
+  const openContextualLogbook = (entry: GameContextualLogbookEntry): void => {
+    const glossaryEntry: GameGlossaryEntry = {
+      ...entry,
+      aliases: [],
+      short: entry.detail[0] ?? entry.label
+    };
+
+    closeAll();
+    renderDetail(glossaryEntry, entry.label, true, false);
   };
 
   const beginHoverHandoff = (options: GlossaryHoverHandoffOptions): void => {
@@ -222,9 +246,11 @@ export function createGameGlossaryController(
     tutorialLogbookIntroductionStep = advanceTutorialLogbookIntroduction(
       tutorialLogbookIntroductionStep
     );
+    syncTutorialLogbookWordHoverState();
   };
 
   const restoreTutorialLogbookIntroduction = (): void => {
+    syncTutorialLogbookWordHoverState();
     if (
       tutorialLogbookIntroductionStep === "expand-prompt" ||
       tutorialLogbookIntroductionStep === "return-prompt"
@@ -235,6 +261,7 @@ export function createGameGlossaryController(
 
   const endTutorialLogbookIntroduction = (): void => {
     tutorialLogbookIntroductionStep = "inactive";
+    syncTutorialLogbookWordHoverState();
     closeAll();
   };
 
@@ -444,7 +471,7 @@ export function createGameGlossaryController(
     scheduleHoverCopy(
       `glossary:${glossaryId}`,
       getGlossaryTokenLabel(token, entry.label),
-      entry.short,
+      getGlossaryTokenShort(token, entry.short),
       token
     );
   }
@@ -553,7 +580,12 @@ export function createGameGlossaryController(
     hoverGeneration += 1;
     hoveredHoverKey = hoverKey;
     hoveredHoverToken = token;
-    revealHover(getGlossaryTokenLabel(token, entry.label), entry.short, token, hoverGeneration);
+    revealHover(
+      getGlossaryTokenLabel(token, entry.label),
+      getGlossaryTokenShort(token, entry.short),
+      token,
+      hoverGeneration
+    );
   }
 
   function handleDocumentPointerMove(event: PointerEvent): void {
@@ -687,6 +719,7 @@ export function createGameGlossaryController(
       tutorialLogbookIntroductionStep = advanceTutorialLogbookIntroduction(
         tutorialLogbookIntroductionStep
       );
+      syncTutorialLogbookWordHoverState();
       renderTutorialLogbookDetailPrompt();
       options.onTutorialLogbookIntroductionStepChange?.();
     }
@@ -802,7 +835,12 @@ export function createGameGlossaryController(
     renderDetail(entry, label, true);
   }
 
-  function renderDetail(entry: GameGlossaryEntry, label: string, shouldTypewrite: boolean): void {
+  function renderDetail(
+    entry: GameGlossaryEntry,
+    label: string,
+    shouldTypewrite: boolean,
+    shouldTokenize = true
+  ): void {
     detailGeneration += 1;
     const generation = detailGeneration;
     cancelDetailAnimation();
@@ -828,7 +866,7 @@ export function createGameGlossaryController(
       line.className = "command-glossary-detail__line";
       line.classList.toggle("command-glossary-detail__line--spacer", paragraph.length === 0);
       line.classList.toggle("command-glossary-detail__line--advice", paragraph.startsWith("• "));
-      const spans = createGameGlossaryTextSpans(document, paragraph);
+      const spans = createDetailTextSpans(paragraph, shouldTokenize);
       const targets = spans.map((span) => {
         const text = span.textContent ?? "";
         applyGlossaryDetailTokenTone(span, text);
@@ -845,6 +883,19 @@ export function createGameGlossaryController(
     if (shouldTypewrite) {
       void typeDetailLines(lines, generation);
     }
+  }
+
+  function createDetailTextSpans(
+    text: string,
+    shouldTokenize: boolean
+  ): readonly HTMLSpanElement[] {
+    if (shouldTokenize) {
+      return createGameGlossaryTextSpans(document, text);
+    }
+
+    const span = document.createElement("span");
+    span.textContent = text;
+    return [span];
   }
 
   function handleDetailLabelClick(event: MouseEvent): void {
@@ -911,8 +962,17 @@ export function createGameGlossaryController(
     tutorialLogbookIntroductionStep = advanceTutorialLogbookIntroduction(
       tutorialLogbookIntroductionStep
     );
+    syncTutorialLogbookWordHoverState();
     closeAll();
     options.onTutorialLogbookIntroductionComplete?.();
+  }
+
+  function syncTutorialLogbookWordHoverState(): void {
+    const shouldHighlightWords = tutorialLogbookIntroductionStep === "open-prompt";
+
+    for (const root of interactiveRoots) {
+      root.classList.toggle(tutorialLogbookWordHoverClassName, shouldHighlightWords);
+    }
   }
 
   function syncDetailLabelBackSemantics(): void {
@@ -1089,6 +1149,7 @@ export function createGameGlossaryController(
     detailPanel,
     bindRoot,
     bindHoverRoot,
+    openContextualLogbook,
     beginHoverHandoff,
     beginTutorialLogbookIntroduction,
     restoreTutorialLogbookIntroduction,
@@ -1138,7 +1199,7 @@ function isPointInsideElement(root: HTMLElement, clientX: number, clientY: numbe
   );
 }
 
-function applyGlossaryTokenSemantics(
+export function applyGameGlossaryTokenSemantics(
   span: HTMLSpanElement,
   glossaryId: string,
   label: string
@@ -1153,6 +1214,11 @@ function applyGlossaryTokenSemantics(
     "aria-label",
     `Explain ${getGlossaryTokenLabel(span, entry?.label ?? "game term")}`
   );
+}
+
+function getGlossaryTokenShort(token: HTMLElement, fallback: string): string {
+  const short = token.dataset["glossaryShort"]?.trim();
+  return short === undefined || short.length === 0 ? fallback : short;
 }
 
 function getGlossaryTokenLabel(token: HTMLElement, fallback: string): string {
@@ -1280,6 +1346,31 @@ function createContextualGameGlossaryEntry(
   }
 
   const telemetryContext = parseGameGlossaryLineContext(line.dataset["glossaryContext"]);
+
+  if (telemetryContext !== null && entry.id === "dv-chart") {
+    const values = telemetryContext.history;
+    const previousValues = values.slice(0, -1);
+    const projectedValue = values.at(-1) ?? telemetryContext.committedDv;
+    const scaleCeiling = Math.max(10, ...values);
+    const previousSampleExplanation =
+      previousValues.length === 0
+        ? "There are no earlier resolved samples yet, so only the live projection is visible."
+        : `${previousValues.length} left-hand ${previousValues.length === 1 ? "bar is" : "bars are"} the latest resolved-state ${previousValues.length === 1 ? "balance" : "balances"}, limited to the four most recent.`;
+
+    return {
+      ...entry,
+      detail: [
+        `On this line, ${telemetryContext.factionLabel} is plotted left to right as ${values.join(" → ")} ΔV. ${previousSampleExplanation}`,
+        `The rightmost bar is the live visible-commitment projection: ${telemetryContext.currentDv} current ΔV becomes ${projectedValue} ΔV after queued BURN, known next-turn CONTESTED upkeep and known next-turn EVADE costs. Expected income belongs to the separate next-turn forecast, currently ${telemetryContext.nextTurnDv} ΔV.`,
+        `This row uses an independent ${scaleCeiling} ΔV ceiling: each value is clamped at zero, divided by ${scaleCeiling}, stretched across 12 pixels, added to a 2-pixel visible floor and rounded. That is why zero still leaves a marker and why equal-height bars in the player and enemy rows need not mean equal reserves.`,
+        "Use the shape to detect acceleration, depletion and the immediate effect of visible commitments without reading every past line. Use the printed current and projected numbers—not cross-row bar height—for exact affordability and player-versus-enemy comparison."
+      ],
+      advice: [
+        "A falling enemy trend can reveal a pressure window; a falling player trend is a reserve warning before EVADE, upkeep or MANDATORY LAUNCH.",
+        "The final bar updates during planning as visible commitments change, while the earlier bars remain resolved history."
+      ]
+    };
+  }
 
   if (telemetryContext !== null && isDvGlossaryEntry(entry.id)) {
     const direction = telemetryContext.committedDv - telemetryContext.currentDv;

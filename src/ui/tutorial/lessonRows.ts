@@ -1,6 +1,5 @@
 import {
   createTutorialSpacerRow,
-  tutorialCompleteHintClassName,
   tutorialLineClassName,
   type TutorialCommandTimelineRow
 } from "./rowCore";
@@ -207,32 +206,17 @@ export function createTutorialShipyardFirePromptRows(): readonly TutorialCommand
   ];
 }
 
-export function createTutorialEnemyContactVictoryWarningRows(): readonly TutorialCommandTimelineRow[] {
+export function createTutorialEnemyContactVictoryRows(): readonly TutorialCommandTimelineRow[] {
   return [
-    createTutorialSpacerRow("tutorial:first-enemy-kill-victory-warning:before"),
-    {
-      parts: [{ text: "TUTORIAL COMPLETE. NORMAL MATCH CONTROL RESTORED." }],
-      className: tutorialCompleteHintClassName,
-      key: "tutorial:first-enemy-kill-handoff"
-    },
-    createTutorialSpacerRow("tutorial:first-enemy-kill-victory-warning:handoff-spacer"),
-    {
-      parts: [
-        { text: "WARNING:", className: "command-console__event-contested" },
-        {
-          text: " the guided exercise has ended, but the match continues under normal control."
-        }
-      ],
-      className: tutorialLineClassName
-    },
-    createTutorialSpacerRow("tutorial:first-enemy-kill-victory-warning:spacer"),
+    createTutorialSpacerRow("tutorial:first-enemy-kill-victory:before"),
     {
       parts: [
         {
           text: "You win by remaining the only faction with a credible route to tritium. Protect your own access while denying rivals the plants, ΔV or ships needed to recover theirs."
         }
       ],
-      className: tutorialLineClassName
+      className: tutorialLineClassName,
+      key: "tutorial:first-enemy-kill-victory"
     }
   ];
 }

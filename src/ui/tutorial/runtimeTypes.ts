@@ -104,7 +104,8 @@ export type TutorialRuntimeState = {
   defensiveMissileImpactTurn: number | null;
   firstEnemyKillReplayEventId: string | null;
   firstEnemyKillReplayNodeId: string | null;
-  firstEnemyKillReplayWarningPending: boolean;
+  firstEnemyKillReplayLineSelected: boolean;
+  firstEnemyKillReplayVictoryLessonPending: boolean;
   cameraZoomFocusHintDisplayCount: number;
   cameraZoomFocusHintVisible: boolean;
   cameraPanOrbitHintDisplayCount: number;

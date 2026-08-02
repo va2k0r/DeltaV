@@ -6,7 +6,7 @@ import { devlogEntries } from "../../src/site/devlogEntries";
 
 describe("public devlog", () => {
   it("publishes a dated, evidence-led development record without timestamp noise", () => {
-    expect(devlogEntries).toHaveLength(13);
+    expect(devlogEntries).toHaveLength(27);
     expect(new Set(devlogEntries.map((entry) => entry.slug)).size).toBe(devlogEntries.length);
     expect(devlogEntries.every((entry) => entry.body.length >= 5)).toBe(true);
     expect(devlogEntries.every((entry) => /^\d{4}-\d{2}-\d{2}$/u.test(entry.date))).toBe(true);
@@ -33,6 +33,8 @@ describe("public devlog", () => {
     expect(publicCopy).not.toContain("familiar strategy-game mistake");
     expect(publicCopy).not.toContain("The first casualty was");
     expect(publicCopy).not.toContain("borrowed the usual verbs");
+    expect(publicCopy).not.toContain("It makes the project harder to contradict");
+    expect(publicCopy).not.toContain("That boundary is a form of creative safety");
     expect(publicCopy.toLowerCase()).not.toContain(["inter", "cept"].join(""));
   });
 
@@ -40,9 +42,12 @@ describe("public devlog", () => {
     const fireEntry = devlogEntries.find((entry) => entry.slug === "what-a-missile-is-for");
     const copy = fireEntry?.body.join(" ") ?? "";
 
-    expect(fireEntry?.title).toBe("What a Missile Is Actually For");
-    expect(copy).toContain("clear majority of decisive matches");
-    expect(copy).toContain("WORK schedule and projected reserve");
+    expect(fireEntry?.title).toBe("What Missiles Do to Production");
+    expect(copy).toContain("tested in two hundred matched games");
+    expect(copy).toContain("69.1 percent");
+    expect(copy).toContain("The firing ship sacrificed its own work as well");
+    expect(copy).toContain("no firing side won without at least one actual impact");
+    expect(copy).toContain("checks what a missile will change on arrival");
     expect(copy).not.toMatch(/\b(?:confidence interval|permutation test|p=)\b/iu);
     expect(copy).not.toMatch(/\b\d{3,}(?:,\d{3})*\b/u);
   });
@@ -55,9 +60,11 @@ describe("public devlog", () => {
     }
     const copy = [aiEntry.deck, ...aiEntry.body].join(" ");
 
-    expect(copy).toContain("No list of model names is needed");
-    expect(copy).toContain("complete browser files");
-    expect(copy).toContain("controlled matches");
+    expect(copy).toContain("real-time lander");
+    expect(copy).toContain("Orbital Maneuver AI");
+    expect(copy).toContain("openly vibe-coded");
+    expect(copy).toContain("follows fixed priorities");
+    expect(copy).toContain("can repeat its mistakes");
     expect(copy).not.toMatch(/\bGPT[- ]?\d/iu);
   });
 
@@ -68,23 +75,23 @@ describe("public devlog", () => {
     const copy = plausibilityEntry?.body.join(" ") ?? "";
 
     expect(plausibilityEntry?.title).toBe("Plausibility Sells the Fantasy");
-    expect(copy).toContain(
-      "an exposed crewed installation that cannot move is strategically dead in the water"
-    );
-    expect(copy).toContain("store disassembled hulls");
-    expect(copy).toContain("a reserve complement transfers across");
-    expect(copy).toContain("Mandatory launch converts the logistics into a game rule");
-    expect(copy).toContain("the uncertainty belongs in simultaneous intent");
+    expect(copy).toContain("A crewed station needs power");
+    expect(copy).toContain("protected stocks of hull sections");
+    expect(copy).toContain("the ship that worked there must depart");
+    expect(copy).toContain("If a yard changes hands halfway through a hull");
+    expect(copy).toContain("keep those simplifications consistent");
   });
 
   it("describes the in-game planner as simultaneous, auditable and solvent", () => {
     const aiEntry = devlogEntries.find((entry) => entry.slug === "how-the-ai-thinks-in-orbits");
     const copy = aiEntry?.body.join(" ") ?? "";
 
-    expect(copy).toContain("rule-based planner using the same public information");
-    expect(copy).toContain("frozen copy of the state at the start of the turn");
-    expect(copy).toContain("repeats that check after all orders have been chosen");
-    expect(copy).toContain("last active tritium worker receives special protection");
+    expect(aiEntry?.title).toBe("How the Computer Opponent Chooses an Order");
+    expect(copy).toContain("same public information");
+    expect(copy).toContain("Every side plans from the same opening position");
+    expect(copy).toContain("Two attractive moves can be rejected together");
+    expect(copy).toContain("The last working tritium ship receives special care");
+    expect(copy).toContain("order currently being chosen");
   });
 
   it("publishes the no-stealth article with the requested source and open-information take", () => {
@@ -98,13 +105,126 @@ describe("public devlog", () => {
       label: "Stealth in Space — Children of a Dead Earth",
       href: "https://childrenofadeadearth.wordpress.com/2016/07/12/stealth-in-space/"
     });
-    expect(copy).toContain("Every ship, transfer and missile is visible");
-    expect(copy).toContain("faction tritium reserves are also public");
-    expect(copy).toContain("A telescope would not read a propellant gauge");
+    expect(copy).toContain("Ships are visible");
+    expect(copy).toContain("shared fuel reserves are public");
+    expect(copy).toContain("a patient player could reconstruct the same total in a notebook");
   });
 
-  it("keeps every devlog article free of photos and animation", () => {
-    expect(devlogEntries.every((entry) => entry.figures === undefined)).toBe(true);
+  it("documents procedural-map rejection as a transfer audit rather than random placement", () => {
+    const mapEntry = devlogEntries.find(
+      (entry) => entry.slug === "auditing-procedural-maps-before-turn-one"
+    );
+    const copy = mapEntry?.body.join(" ") ?? "";
+
+    expect(mapEntry?.title).toBe("How Generated Maps Are Checked");
+    expect(copy).toContain("Every proposed opening is judged by real journeys");
+    expect(copy).toContain("Does a three-sided start leave one fleet exposed");
+    expect(copy).toContain("different random starts produce the same map");
+    expect(copy).toContain("fixed map that has already passed the checks");
+  });
+
+  it("introduces game vocabulary after the plain-language concept", () => {
+    const strategyEntry = devlogEntries.find((entry) => entry.slug === "how-to-wage-war-in-space");
+    const strategyCopy = [strategyEntry?.deck ?? "", ...(strategyEntry?.body ?? [])].join(" ");
+    const publicCopy = devlogEntries
+      .flatMap((entry) => [entry.title, entry.deck, ...entry.body])
+      .join(" ");
+
+    expect(strategyCopy.indexOf("amount of change in speed")).toBeLessThan(
+      strategyCopy.indexOf("WORK")
+    );
+    expect(strategyCopy.indexOf("interface calls this WORK")).toBeGreaterThan(0);
+    expect(strategyCopy.indexOf("interface calls a movement order a BURN")).toBeGreaterThan(0);
+    expect(publicCopy).not.toMatch(
+      /\b(?:GameState|formatter|normalized resolution event|immutable shared snapshot|reachability matrix|gameplay hash|legality gate|headless matches)\b/iu
+    );
+  });
+
+  it("avoids the rejected trailer cadence and unsupported development mythology", () => {
+    const paragraphs = devlogEntries.flatMap((entry) => [entry.deck, ...entry.body]);
+    const copy = paragraphs.join(" ");
+
+    expect(copy).not.toMatch(/(?:^|[.!?]\s+)(?:But|Wrong|Think again|Not quite)[.!,:\s]/u);
+    expect(copy).not.toMatch(
+      /\b(?:the real battlefield|the real weapon|orbital mechanics are king)\b/iu
+    );
+    expect(copy).not.toMatch(/\bappears? to be\b[^.!?]*\b(?:actually|instead)\b/iu);
+    expect(copy).not.toContain("started with squares");
+    expect(copy).not.toContain("started with territory");
+    expect(copy).not.toContain("first casualty");
+    expect(copy).not.toMatch(
+      /\b(?:the cleaner answer|deliberately uncomfortable|the surprising part|the romantic version|creative safety|harder to contradict)\b/iu
+    );
+  });
+
+  it("uses historical images only where they are discussed", () => {
+    const visualEntry = devlogEntries.find(
+      (entry) => entry.slug === "from-hard-scifi-to-cartoon-space-and-back"
+    );
+
+    expect(visualEntry?.figures).toHaveLength(4);
+    expect(
+      devlogEntries
+        .filter((entry) => entry.slug !== "from-hard-scifi-to-cartoon-space-and-back")
+        .every((entry) => entry.figures === undefined)
+    ).toBe(true);
+  });
+
+  it("describes the current runtime map as twenty-two playable places", () => {
+    const mapEntry = devlogEntries.find(
+      (entry) => entry.slug === "why-the-solar-system-got-smaller"
+    );
+    const copy = [mapEntry?.deck ?? "", ...(mapEntry?.body ?? [])].join(" ");
+
+    expect(copy).toContain("22 playable places");
+    expect(copy).toContain("Phobos");
+    expect(copy).toContain("Ganymede");
+    expect(copy).toContain("Titania");
+    expect(copy).toContain("Pluto and Charon");
+    expect(devlogEntries.flatMap((entry) => [entry.deck, ...entry.body]).join(" ")).not.toMatch(
+      /\b(?:18|eighteen)\b/iu
+    );
+  });
+
+  it("explains which design problems the lore resolves", () => {
+    const loreEntry = devlogEntries.find(
+      (entry) => entry.slug === "how-the-lore-became-part-of-the-rules"
+    );
+    const copy = loreEntry?.body.join(" ") ?? "";
+
+    expect(copy).toContain("Tritium first needed to explain");
+    expect(copy).toContain("Corporate fleets provided a reason");
+    expect(copy).toContain("Earth and the Moon");
+    expect(copy).toContain("The 2079 Saturn incident");
+    expect(copy).toContain("No fixed duration is assigned");
+  });
+
+  it("makes the replaceable parts of the game concrete", () => {
+    const structureEntry = devlogEntries.find(
+      (entry) => entry.slug === "schema-first-content-and-vanilla-pack"
+    );
+    const copy = structureEntry?.body.join(" ") ?? "";
+
+    expect(copy).toContain("This is what headless means here");
+    expect(copy).toContain("The renderer draws");
+    expect(copy).toContain("The interface handles clicks");
+    expect(copy).toContain("The content describes");
+    expect(copy).toContain("The player's click first becomes a command");
+    expect(copy).toContain("produces a snapshot");
+    expect(copy).toContain("The renderer reads the snapshot");
+  });
+
+  it("documents the visual detour and the opening alignment", () => {
+    const visualEntry = devlogEntries.find(
+      (entry) => entry.slug === "from-hard-scifi-to-cartoon-space-and-back"
+    );
+    const copy = visualEntry?.body.join(" ") ?? "";
+
+    expect(copy).toContain("DeltaV Arcade v4");
+    expect(copy).toContain("Orbital Maneuver AI");
+    expect(copy).toContain("more cartoonish direction");
+    expect(copy).toContain("some in conjunction and others in opposition");
+    expect(copy).toContain("The first reason is simply that it looks good");
   });
 
   it("starts with the articles and keeps product destinations after the archive", () => {

@@ -53,7 +53,7 @@ describe("canonical FIRE preview geometry", () => {
     ] as const;
 
     expect(canonicalFirePreviewGeometryEnabled).toBe(true);
-    expect(canonicalFirePreviewTargetMode).toBe("tracked-ship");
+    expect(canonicalFirePreviewTargetMode).toBe("orbit-center");
 
     for (const testCase of cases) {
       const geometry = buildFirePreviewGeometry({
@@ -113,6 +113,7 @@ describe("canonical FIRE preview geometry", () => {
       const origin = new THREE.Vector3(7, 0.4, -11).multiplyScalar(scale);
       const impactCenter = new THREE.Vector3(-42, 0.4, 86).multiplyScalar(scale);
       const geometry = buildFirePreviewGeometry({
+        arcDirection: 1,
         etaTurns: 3,
         impactCenter,
         origin
@@ -121,5 +122,37 @@ describe("canonical FIRE preview geometry", () => {
       expect(geometry.flightPoints.at(-1)?.distanceTo(impactCenter)).toBeLessThan(1e-9);
       expect(geometry.reflectionPoints.at(-1)?.distanceTo(impactCenter)).toBeLessThan(1e-9);
     }
+  });
+
+  it("keeps the selected orbital arc branch independent from transformed endpoint positions", () => {
+    const origin = new THREE.Vector3(14, 0, -8);
+    const impactCenter = new THREE.Vector3(-62, 0, 73);
+    const positiveArc = buildFirePreviewGeometry({
+      arcDirection: 1,
+      etaTurns: 4,
+      impactCenter,
+      origin
+    });
+    const negativeArc = buildFirePreviewGeometry({
+      arcDirection: -1,
+      etaTurns: 4,
+      impactCenter,
+      origin
+    });
+    const positiveMidpoint =
+      positiveArc.flightPoints[Math.floor(positiveArc.flightPoints.length / 2)];
+    const negativeMidpoint =
+      negativeArc.flightPoints[Math.floor(negativeArc.flightPoints.length / 2)];
+    const planarDirect = impactCenter.clone().sub(origin).setY(0).normalize();
+    const positiveSide = new THREE.Vector3(-planarDirect.z, 0, planarDirect.x);
+
+    expect(positiveMidpoint).toBeDefined();
+    expect(negativeMidpoint).toBeDefined();
+    expect(
+      (positiveMidpoint ?? origin)
+        .clone()
+        .sub(negativeMidpoint ?? origin)
+        .dot(positiveSide)
+    ).toBeGreaterThan(0);
   });
 });

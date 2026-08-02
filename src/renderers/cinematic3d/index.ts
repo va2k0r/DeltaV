@@ -38,7 +38,8 @@ import {
   canonicalFirePreviewGeometryEnabled,
   canonicalFirePreviewTargetMode,
   firePreviewImpactGapPixels,
-  trimFirePreviewPathBeforeImpact
+  trimFirePreviewPathBeforeImpact,
+  type FireTrajectoryTargetMode
 } from "./firePreviewGeometry";
 import {
   computeApparentBodyBloomSourceGain,
@@ -710,8 +711,6 @@ type RenderableBurnPlan = (CinematicBurnPlan | PendingBurnOrder | ActiveBurnTran
 
 type RenderableFirePlan = CinematicFirePlan | PendingFireOrder | ActiveMissile;
 
-type FireTrajectoryTargetMode = "tracked-ship";
-
 type FireTrajectoryVisualWeight = Readonly<{
   opacityMultiplier: number;
   thicknessMultiplier: number;
@@ -1345,8 +1344,6 @@ const tacticalPresentationTransitionFullUpdateSeconds = 1 / 30;
 const tacticalPresentationTransitionReducedUpdateSeconds = 1 / 30;
 const tacticalPresentationTransitionMinimalUpdateSeconds = 1 / 24;
 const tacticalPresentationMinimumFrameGap = 2;
-const tacticalPresentationReducedZoomUpdateSeconds = 1 / 60;
-const tacticalPresentationMinimalZoomUpdateSeconds = 1 / 40;
 const missileTransientPresentationUpdateSeconds = 1 / 30;
 const missileImpactPresentationFullUpdateSeconds = 1 / 60;
 const tacticalReadabilityFullUpdateSeconds = 1 / 30;
@@ -19019,7 +19016,11 @@ export class CinematicSolarSystemRenderer {
       return;
     }
 
-    const target = this.getFireTargetRenderData(presentation.missile, baseTarget);
+    const target = this.getFireTrajectoryTargetRenderData(
+      presentation.missile,
+      baseTarget,
+      this.getFireTrajectoryTargetMode(presentation.missile)
+    );
     const points = buildMissileTrajectoryPreview(
       origin,
       target,
@@ -21728,27 +21729,10 @@ export class CinematicSolarSystemRenderer {
     const framesSinceLastUpdate =
       this.renderFrameSerial - this.tacticalPresentationLastUpdatedRenderFrameSerial;
 
-    // Wheel zoom changes the non-linear display-space layout used by BURN/FIRE endpoints. Camera
-    // rotation and pan can keep using the existing shader-facing ribbons. Under pressure, reuse
-    // one complete BURN+FIRE presentation for a bounded interval instead of publishing partial
-    // family rebuilds that can make UI or trajectories disappear.
+    // Wheel zoom changes the non-linear display-space layout used by BURN/FIRE endpoints. Publish
+    // both trajectory families on every dirty zoom frame so their orbital anchors remain locked to
+    // the node rails instead of visibly stepping behind rapidly moving display-space positions.
     if (this.tacticalPresentationDisplayScaleDirty) {
-      const performanceMode = this.getEffectivePerformanceMode();
-      const zoomUpdateInterval =
-        performanceMode === "minimal"
-          ? tacticalPresentationMinimalZoomUpdateSeconds
-          : performanceMode === "reduced"
-            ? tacticalPresentationReducedZoomUpdateSeconds
-            : 0;
-
-      if (
-        performanceMode !== "full" &&
-        (elapsed - this.tacticalPresentationLastUpdatedAt < zoomUpdateInterval ||
-          framesSinceLastUpdate < tacticalPresentationMinimumFrameGap)
-      ) {
-        return false;
-      }
-
       this.tacticalPresentationDisplayScaleDirty = false;
       return this.scheduleTacticalPresentationUpdate(elapsed);
     }
@@ -23590,7 +23574,16 @@ export class CinematicSolarSystemRenderer {
 
   private getFireImpactBillboardAnchor(plan: RenderableFirePlan): THREE.Vector3 | null {
     const target = this.getDisplayNodeRenderDataAtTurn(plan.targetNodeId, plan.impactTurn);
-    return target === null ? null : this.getFireTargetRenderData(plan, target).center.clone();
+
+    if (target === null) {
+      return null;
+    }
+
+    return this.getFireTrajectoryTargetRenderData(
+      plan,
+      target,
+      this.getFireTrajectoryTargetMode(plan)
+    ).center.clone();
   }
 
   private getFutureFireTargetLineRadius(): number {
@@ -24097,13 +24090,15 @@ export class CinematicSolarSystemRenderer {
       return null;
     }
 
-    // FIRE predicts the target ship's position on its moving node orbit. Preview, active flight
-    // and detonation all reuse this same terminal anchor so the missile visibly meets the hull.
-    const resolvedTargetMode = targetMode ?? canonicalFirePreviewTargetMode;
-    const target = this.getFireTargetRenderData(plan, baseTarget);
+    // A FIRE solution is an orbital order, so its preview and ordinary in-flight path stay pinned
+    // to the target orbit center. Only the resolving impact phase switches to the target ship's
+    // captured terminal orbit angle, allowing the real missile to meet the hull without making
+    // hover previews depend on continuously animated ship markers.
+    const resolvedTargetMode = targetMode ?? this.getFireTrajectoryTargetMode(plan);
+    const target = this.getFireTrajectoryTargetRenderData(plan, baseTarget, resolvedTargetMode);
     const cacheKey = `${this.getFirePlanPresentationKey(plan)}:${resolvedTargetMode}`;
     const usesCanonicalPreviewGeometry = canonicalFirePreviewGeometryEnabled;
-    const signature = `${usesCanonicalPreviewGeometry ? "canonical-v2;" : "legacy;"}${getDisplayNodeRenderDataTrajectorySignature(
+    const signature = `${usesCanonicalPreviewGeometry ? "canonical-v3;" : "legacy;"}${getDisplayNodeRenderDataTrajectorySignature(
       origin
     )};${getDisplayNodeRenderDataTrajectorySignature(target)}`;
     const cached = this.resolvedFireTrajectoryPathCache.get(cacheKey);
@@ -24111,6 +24106,12 @@ export class CinematicSolarSystemRenderer {
     const rebuiltGeometry =
       cachedGeometry === undefined && usesCanonicalPreviewGeometry
         ? buildFirePreviewGeometry({
+            arcDirection: getTransferArcDirectionFromPositions(
+              toVector3(plan.originPosition),
+              toVector3(plan.targetPositionAtImpact),
+              plan.issuedTurn,
+              plan.missileEtaTurns
+            ),
             ...(origin.departureDirection === undefined
               ? {}
               : { departureDirection: origin.departureDirection }),
@@ -24570,7 +24571,11 @@ export class CinematicSolarSystemRenderer {
         continue;
       }
 
-      const target = this.getFireTargetRenderData(presentation.missile, baseTarget);
+      const target = this.getFireTrajectoryTargetRenderData(
+        presentation.missile,
+        baseTarget,
+        this.getFireTrajectoryTargetMode(presentation.missile)
+      );
       const points = buildMissileTrajectoryPreview(
         origin,
         target,
@@ -25709,13 +25714,27 @@ export class CinematicSolarSystemRenderer {
     };
   }
 
+  private getFireTrajectoryTargetMode(plan: RenderableFirePlan): FireTrajectoryTargetMode {
+    return "launchedTurn" in plan && this.activeMissileTargetAngles.has(plan.id)
+      ? "tracked-ship"
+      : canonicalFirePreviewTargetMode;
+  }
+
+  private getFireTrajectoryTargetRenderData(
+    plan: RenderableFirePlan,
+    target: DisplayNodeRenderData,
+    targetMode: FireTrajectoryTargetMode
+  ): DisplayNodeRenderData {
+    return targetMode === "tracked-ship" ? this.getFireTargetRenderData(plan, target) : target;
+  }
+
   private getFirePlanTargetOrbitAngle(plan: RenderableFirePlan): number | undefined {
     if ("launchedTurn" in plan) {
       return this.activeMissileTargetAngles.get(plan.id);
     }
 
-    // Queued targets keep moving with their rendered ship. A resolving active missile receives a
-    // predicted impact angle at turn start so its final approach and the hull meet on the same frame.
+    // Preview plans never track live ship markers. A resolving active missile receives a predicted
+    // impact angle at turn start so its final approach and the hull meet on the same frame.
     return undefined;
   }
 
@@ -26153,7 +26172,11 @@ export class CinematicSolarSystemRenderer {
       return null;
     }
 
-    const target = this.getFireTargetRenderData(missile, baseTarget);
+    const target = this.getFireTrajectoryTargetRenderData(
+      missile,
+      baseTarget,
+      this.getFireTrajectoryTargetMode(missile)
+    );
     const capturedLaunchPosition = this.reprojectCapturedLaunchPosition(
       this.activeMissileLaunchPositions.get(missile.id),
       this.activeMissileLaunchOriginFrames.get(missile.id),
@@ -26186,35 +26209,13 @@ export class CinematicSolarSystemRenderer {
     }
 
     const previewLaunchKey = `fire-launch:${this.getFirePlanPresentationKey(plan)}`;
-    const factionId = this.getFirePlanOriginFactionId(plan);
-    const currentOrigin = this.getCurrentDisplayNodeRenderData(plan.originNodeId);
-    const renderedLaunchSample =
-      factionId === null
-        ? null
-        : this.getRenderedShipMissileLaunchSample(plan.originNodeId, factionId);
-    // While a turn is resolving, the live ship marker belongs to the interpolated snapshot but a
-    // freshly generated FIRE plan already belongs to its issued-turn snapshot. Feeding the live
-    // world position directly into that future orbital frame turns the planet's turn-to-turn
-    // displacement into a bogus local launch offset and can bow the preview across the system.
-    // Preserve only the launcher's local orbit offset and reproject it into the plan's frame.
-    const renderedLaunchPosition =
-      renderedLaunchSample === null || currentOrigin === null
-        ? undefined
-        : this.reprojectCapturedLaunchPosition(
-            renderedLaunchSample.position,
-            {
-              center: currentOrigin.center,
-              ringRadius: currentOrigin.ringRadius
-            },
-            baseOrigin
-          );
 
     return createLaunchOriginRenderData({
       baseOrigin,
       destination: baseTarget,
-      // Pending FIRE and the active missile now share the rendered launcher mount instead of
-      // switching from a synthetic orbit slot during the launch frame.
-      capturedLaunchPosition: renderedLaunchPosition,
+      // Like BURN, a FIRE preview uses a deterministic orbital launch slot. The actual missile
+      // captures the physical launcher mount only when it departs.
+      capturedLaunchPosition: undefined,
       launchAngle: getStableBurnTransferFieldAngle(previewLaunchKey),
       currentTurn: plan.issuedTurn,
       etaTurns: plan.missileEtaTurns,
@@ -42411,6 +42412,12 @@ function createSunAnimatedCorona(tuning: Cinematic3dVisualTuning): THREE.Mesh {
         return beatElapsed / synchronizedCycle * 6.28318530718;
       }
 
+      float gaussianAngularLobe(float wave, float width) {
+        float angularDistance = acos(clamp(wave, -1.0, 1.0));
+        float normalizedDistance = angularDistance / max(0.001, width);
+        return exp(-0.5 * normalizedDistance * normalizedDistance);
+      }
+
       void main() {
         vec2 point = vUv * 2.0 - 1.0;
         float radius = length(point);
@@ -42458,9 +42465,9 @@ function createSunAnimatedCorona(tuning: Cinematic3dVisualTuning): THREE.Mesh {
           fastFlareAngle * 0.91 +
           sin(flameSampleAngle * 13.0 + slowFlareAngle) * 0.72
         );
-        float largeProminences = pow(0.5 + largeProminenceFlow * 0.5, 5.0);
-        float smallProminences = pow(0.5 + smallProminenceFlow * 0.5, 6.0) * 0.82;
-        float microProminences = pow(0.5 + microProminenceFlow * 0.5, 8.0) * 0.58;
+        float largeProminences = gaussianAngularLobe(largeProminenceFlow, 0.72);
+        float smallProminences = gaussianAngularLobe(smallProminenceFlow, 0.66) * 0.82;
+        float microProminences = gaussianAngularLobe(microProminenceFlow, 0.56) * 0.58;
         float prominenceField = max(largeProminences, max(smallProminences, microProminences));
         float flameField = clamp(
           0.5 + primaryFlow * 0.25 + secondaryFlow * 0.17 + filamentFlow * 0.08,

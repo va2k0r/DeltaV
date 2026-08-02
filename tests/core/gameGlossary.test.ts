@@ -15,6 +15,7 @@ import {
   tutorialLogbookLabel,
   tutorialLogbookOpenInstruction,
   tutorialLogbookReturnInstruction,
+  tutorialLogbookWordHoverClassName,
   type TutorialLogbookIntroductionStep
 } from "../../src/ui/gameGlossaryController";
 import { worldLoreGlossaryEntries } from "../../src/ui/worldLoreGlossary";
@@ -36,11 +37,13 @@ describe("game glossary", () => {
     expect(sequence).toEqual(["open-prompt", "expand-prompt", "return-prompt", "inactive"]);
     expect([
       tutorialLogbookLabel,
+      tutorialLogbookWordHoverClassName,
       tutorialLogbookOpenInstruction,
       tutorialLogbookExpandInstruction,
       tutorialLogbookReturnInstruction
     ]).toEqual([
       "Logbook",
+      "is-tutorial-logbook-word-hover",
       "Left-click any word in the logbook to open its explanation.",
       "In the open Logbook panel, left-click this instruction to expand the explanation further.",
       "Left-click the title to return to the previous explanation."
@@ -54,6 +57,8 @@ describe("game glossary", () => {
     const styles = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
 
     expect(controllerSource).toContain("handleTutorialLogbookTokenActivation(event, token)");
+    expect(controllerSource).toContain("syncTutorialLogbookWordHoverState();");
+    expect(controllerSource).toContain('tutorialLogbookIntroductionStep === "open-prompt"');
     expect(controllerSource).toContain("renderTutorialLogbookDetailPrompt();");
     expect(controllerSource).not.toContain("tutorialLogbookHoverDwellMs");
     expect(controllerSource).not.toContain("tutorialLogbookHoverInstruction");
@@ -81,6 +86,8 @@ describe("game glossary", () => {
     expect(styles).not.toContain(".command-glossary-hover.is-tutorial-logbook-attention,");
     expect(styles).toContain(".command-glossary-detail__line.is-tutorial-logbook-attention,");
     expect(styles).toContain(".command-glossary-detail__label.is-tutorial-logbook-attention {");
+    expect(styles).toContain(".is-tutorial-logbook-word-hover .command-glossary-token:hover,");
+    expect(styles).toContain("color: #c8f6ff;");
   });
 
   it("reserves the first activation for context and closes it before the log action", () => {
@@ -346,6 +353,36 @@ describe("game glossary", () => {
     expect(uiSource).toContain('line.dataset["glossaryContext"] = JSON.stringify');
     expect(uiSource).toContain("nextTurnDv: recovery.projectedDvByTurn[0] ?? projectedDv");
     expect(uiSource).toContain("pendingBurnCost: Math.max(0, currentDv - recovery.currentDv)");
+  });
+
+  it("explains each faction ΔV chart through a contextual tooltip and Logbook entry", () => {
+    const chartEntry = getGameGlossaryEntry("dv-chart");
+    const chartCopy = [chartEntry?.short, ...(chartEntry?.detail ?? [])].join(" ");
+    const controllerSource = readFileSync(
+      join(process.cwd(), "src/ui/gameGlossaryController.ts"),
+      "utf8"
+    );
+    const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
+    const styles = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
+
+    expect(chartCopy).toMatch(/four previous.*live visible-commitment projection/iu);
+    expect(chartCopy).toMatch(/greater of 10 ΔV.*12-pixel.*2-pixel floor/iu);
+    expect(chartCopy).toMatch(/each faction chart has its own scale/iu);
+    expect(controllerSource).toContain('entry.id === "dv-chart"');
+    expect(controllerSource).toContain(
+      "On this line, ${telemetryContext.factionLabel} is plotted left to right as"
+    );
+    expect(controllerSource).toContain(
+      "why equal-height bars in the player and enemy rows need not mean equal reserves"
+    );
+    expect(controllerSource).toContain("getGlossaryTokenShort(token, entry.short)");
+    expect(uiSource).toContain(
+      'applyGameGlossaryTokenSemantics(bars, "dv-chart", `${factionLabel} ΔV trend`)'
+    );
+    expect(uiSource).toContain('bars.dataset["glossaryShort"]');
+    expect(styles).toMatch(/\.dv-bars \{[\s\S]*justify-content: flex-end;[\s\S]*width: 27px;/u);
+    expect(styles).toContain(".dv-bars.command-glossary-token:hover span");
+    expect(styles).toContain(".dv-bars.command-glossary-token:focus-visible span");
   });
 
   it("keeps atomic commands mechanical while routing physical phrases into lore", () => {

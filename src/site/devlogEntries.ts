@@ -32,20 +32,19 @@ const devlogArchive = [
     category: "STRATEGY",
     slug: "how-to-wage-war-in-space",
     title: "How to Wage War in Space",
-    date: "2026-08-01",
-    deck: "Orbital warfare is about what can be reached, when it can be reached and what the trip will cost. DeltaV has no front line and little reason to fight over empty space.",
+    date: "2026-08-02",
+    deck: "Every ship draws movement, defense and contested upkeep from the same fuel reserve. Depleting that reserve can defeat a fleet whose ships are still intact.",
     body: [
-      "Empty space cannot be held in the same way as land. Every useful position is moving, and a ship that appears to be retreating may be improving its route to an encounter several turns away. Position is therefore a list of options: where the fleet can go, when it can arrive, which enemy can get there first and how much fuel will remain afterwards.",
-      "The objective follows the same logic. A faction stays in the war while it has a workable route to tritium, the resource that restores the delta-v used to move and evade. Destroying the enemy fleet can remove that route, but occupying a productive orbit, stealing work from a shipyard or forcing repeated evasions may cost less. A ship matters because of the moves its remaining reserve still allows.",
-      "The map is organized around planets and moons, not territory. Their changing positions open and close transfer windows. A moon can provide a cheap staging point near tritium, a shipyard or an expected route. For that reason, a barren moon may be more useful than a productive one when it offers the only affordable support position near a contested orbit.",
-      "A command decision compares whole plans across several turns. The relevant values are arrival time, delta-v left on arrival, exposure to missiles and the WORK turns given up by every ship involved. A short route can still be a poor choice if it arrives too late or leaves no reserve for the response.",
-      "Delta-v is fuel, but it also sets how many options a faction can keep open. A large reserve pays for expensive departures, repeated evasions and forced transfers. Spending it changes the position even when no ship is lost. At low reserve, a visible missile can close a route because the target cannot afford both the transfer and the likely evasion.",
-      "Production has its own timing. A ship that uses WORK cannot FIRE in the same turn, and a ship forced to EVADE loses that turn's production. Five WORK turns at a shipyard complete a vessel, but the progress stays with the yard and can be stolen. An industrial attack can therefore succeed by interrupting work or arriving just before completion, without destroying the facility.",
-      "Missiles also work through timing. FIRE sets an arrival turn instead of causing immediate damage, so the target has time to change its plan. An uncontested ship with enough reserve will usually evade, spending delta-v and losing its WORK for that turn. A missile becomes lethal after repeated attacks drain the reserve, when a contested orbit blocks evasion, or when leaving would surrender a more valuable position. The best target is often the ship whose work or transfer schedule can be disrupted, not the easiest hull to destroy.",
-      "Local superiority is not a simple hull count. Two ships in a contested orbit can hold each other in place while both factions pay upkeep. A third ship outside the contest may decide the outcome by firing at the trapped opponent, reaching the reinforcement route first or threatening the escape route. Sending every available hull into the contest can remove the outside support needed to sustain it.",
-      "Orders resolve at the same time, so a faction cannot react to an enemy choice made earlier in the turn. Everyone sees the same map, but not the orders being prepared. A ship able to reach three destinations forces the opponent to prepare for all three even though it will choose only one. The uncertainty comes from intent and cost, not hidden units.",
-      "Campaign planning begins by counting each side's workable routes to tritium. The next step is to find which routes can be made too expensive. Denying a WORK turn is worthwhile when it costs less than the income prevented. Missiles should arrive after a target has committed to work or movement, and shipyards are most vulnerable near completion. A battle has little value when it changes none of the routes, production, support or recovery options that follow it.",
-      "DeltaV does not calculate every detail of real spaceflight. Geometry sets the available routes, delta-v sets which routes can be afforded, and timing sets when a choice can no longer be changed. The cheapest transfer, the earliest arrival and the move that keeps a faction supplied are often three different orders."
+      "Most of DeltaV's strategy follows from the fact that a fleet can still have ships but no longer have enough mobility to use them effectively.",
+      "Each side has one shared reserve of delta-v, meaning the amount of change in speed the fleet can still produce. Moving to another orbit spends it. Dodging a missile spends it. Keeping a ship beside an enemy in a contested orbit spends it every turn. A larger fleet has more options, but all of those ships depend on the same reserve.",
+      "Tritium plants are the only reliable way to refill that reserve. A ship that gives an entire turn to a plant adds two points of delta-v; the interface calls this WORK. Moving, firing or dodging means giving up that work, so a missile can affect the economy without hitting its target.",
+      "The interface calls a movement order a BURN. The destination keeps moving while the ship is in flight, and the same route can become cheaper, slower or unaffordable as the Solar System changes shape. Choosing a destination also means checking whether the ship will arrive in time and retain enough fuel for the following turn.",
+      "Arrival does not grant an instant turn of production. A new ship can block an enemy immediately, but it must survive until the following turn before operating a plant or shipyard. A reinforcement that arrives one beat after a missile or a completed hull has missed the decisive moment, even if the map makes it look close.",
+      "Enemy ships can share a valuable orbit and make it contested. Neither can work, fire or dodge there, and both sides pay to keep the lock in place. A supporting ship is often more dangerous just outside: it can fire on the pinned enemy, cover an escape or wait for another arrival without surrendering its freedom to act.",
+      "Shipyards turn time into new hulls, but not into a private stockpile. Work already completed remains at the yard if control changes. When a hull is finished, the ship that assembled it must leave and the new ship stays behind. Production therefore creates a departure that an opponent can anticipate.",
+      "Orders are chosen simultaneously. Ships, fuel, construction and weapons already in flight are public; the choice being made now is not. Strategy comes from creating several believable futures and committing before the opponent reveals which future was chosen.",
+      "Victory follows the same logic as the fuel reserve. A side remains in the war while it still has a credible route back to tritium, whether through a working ship, a journey already under way, a contest it can afford or a hull close enough to completion to reopen the map. The war ends when every such route has closed, not when the last model disappears from the screen.",
+      "DeltaV leaves out component damage, manual piloting and exact spacecraft flight plans. It keeps moving destinations, travel time, visible attacks and the competition between industrial work and military action because those elements affect fleet-level decisions."
     ]
   },
   {
@@ -53,16 +52,15 @@ const devlogArchive = [
     slug: "plausibility-sells-the-fantasy",
     title: "Plausibility Sells the Fantasy",
     date: "2026-07-31",
-    deck: "DeltaV derives its units and objectives from the constraints of orbital warfare, then introduces only the abstractions required to make those constraints playable.",
+    deck: "The military rules begin with a practical question: what can a crewed structure do once an enemy has measured its orbit?",
     body: [
-      "Under DeltaV's assumptions, an exposed crewed installation that cannot move is strategically dead in the water. Its position is known, its machinery must radiate heat, and it cannot spend delta-v to force an attacker to recalculate the approach. Armour and defensive weapons can make an attack more expensive, but only movement can prevent the encounter before close combat begins.",
-      "A surface installation has better prospects because rock provides armour and a moon supplies an obstructing horizon. It can be buried, dispersed and difficult to identify precisely. Its military problem begins when it needs to affect another orbit. Propellant, finished hardware and people must emerge through a limited set of launch corridors, after which their trajectories become visible and predictable. DeltaV therefore treats tritium plants and shipyards as strategic locations whose military value depends on mobile forces able to reach and operate them.",
-      "DeltaV therefore has no immobile stations acting as roadblocks, no planetary batteries with arbitrary range and no civilian population represented as hit points. Ships are the military units because they carry enough delta-v to change position before an attack arrives. A facility matters only when a mobile force can work there, contest it or block access to it.",
-      "A normal build queue hides a great deal of transport. A finished warship needs crew, fuel and command equipment, while a completed ship left on the surface or beside a fixed station would inherit the same vulnerability as the facility. DeltaV shipyards therefore store disassembled hulls: protected pressure sections, docking spines, radiators and drive modules that remain in pieces until a ship supervises launch, assembly and testing.",
-      "The ship working the yard carries the reserve personnel, fuel canisters and command authority required to commission the new hull. When assembly finishes, a reserve complement transfers across and the incumbent must burn away, leaving the newly commissioned ship at the yard. Mandatory launch converts the logistics into a game rule: a route and its cost must be reserved before completion, while the opposing faction can schedule pressure around a departure known to be compulsory.",
-      "The stored hull is one plausible answer, not the only engineering answer. What matters is that industry can stay under armour and spread across several facilities, while military power appears only after the parts and crew become a mobile ship. Shipyard progress can be captured because the finished parts and completed tests remain at the site.",
-      "DeltaV makes other compromises of the same kind. Astronomical distances are compressed unevenly so that moons remain visible without making interplanetary travel feel local. Transfers are expressed as discrete orders rather than continuously replanned burns. Terminal combat becomes missile pressure, evasion and orbital contests instead of a second-by-second guidance simulation. Tritium reserves are public even though no telescope could read the gauge, because the uncertainty belongs in simultaneous intent rather than private accounting.",
-      "The standard is not whether every displayed curve could serve as a real flight plan. Each rule must preserve the strategic pressure created by physics, and each simplification needs a clear purpose. The setting remains believable when players can predict the broad result from the situation and the game states its exceptions clearly."
+      "The military and industrial rules became easier to define after separating what can be protected on a planetary surface from what remains exposed in orbit.",
+      "A crewed station needs power and must release waste heat through radiators. If it cannot move far enough to spoil an attacker's prediction, armour only makes the eventual attack harder. A base beneath rock has a different advantage: it can be dispersed, buried and hidden beyond the local horizon until something has to launch.",
+      "That distinction shaped the economy. Tritium plants and shipyards sit on or near planetary bodies, but they need a mobile ship in orbit to become useful. The facility does not defend itself across the map. Its military value comes from the ship that can reach it, remain there long enough to work and still afford the response when an enemy arrives.",
+      "A conventional production queue created an awkward fiction: complete warships could apparently wait in perfect safety until deployment. Shipyards were therefore treated as protected stocks of hull sections, engines, radiators and other major assemblies. A working ship brings the crew, fuel and command presence needed to turn those parts into another active vessel.",
+      "When construction finishes, the newly assembled ship remains at the yard and the ship that worked there must depart. Its next route has to be affordable before the final turn of construction. An opponent can see that moment coming and prepare for the forced movement.",
+      "Construction also belongs to the place, not to the flag above it. If a yard changes hands halfway through a hull, the work does not evaporate. Capturing a nearly finished ship can be more valuable than taking an untouched facility, and industry becomes something to threaten without giving every building a health bar.",
+      "The setting does not imply a perfect simulation. Sizes and distances are compressed so the Solar System can be read, and a missile encounter stands in for guidance, defenses and a final maneuver. The physical reasoning is used to keep those simplifications consistent with one another."
     ]
   },
   {
@@ -70,7 +68,7 @@ const devlogArchive = [
     slug: "there-is-no-stealth-in-space",
     title: "There Is No Stealth in Space",
     date: "2026-07-31",
-    deck: "A warship is a hot machine throwing reaction mass into a cold background. It may be distant, poorly resolved and difficult to identify, but those limitations do not justify fog of war or a concealed economy in DeltaV.",
+    deck: "Ships, trajectories, fuel and construction are visible. The uncertainty lies in what an opponent will do next with that public information.",
     references: [
       {
         label: "Stealth in Space — Children of a Dead Earth",
@@ -78,32 +76,29 @@ const devlogArchive = [
       }
     ],
     body: [
-      "The Children of a Dead Earth article linked above works through the engineering cost of hiding exhaust, radiators and a combat-capable power system. Space offers an excellent cold background and very little in the way of a convenient horizon. A vessel can reduce a particular signature, coast after a previously observed burn or hide hardware on a planetary surface, but none of those measures makes an operating interplanetary warship disappear at a militarily useful range.",
-      "DeltaV adopts the strategic consequence without pretending to simulate an infrared telescope. Every ship, transfer and missile is visible to every commander, including its destination and arrival turn once it has launched. Shipyard progress and faction tritium reserves are also public, so the interface reveals exactly how much delta-v remains available for burns, upkeep and evasion.",
-      "A telescope would not read a propellant gauge from across the Solar System. Showing the reserve is a game-design choice, not a claim about sensor resolution. If that number were hidden, players would need an external ledger or would have to guess whether an escape was affordable. With a public reserve, everyone knows what an opponent can pay for while the chosen order and willingness to pay remain unknown.",
-      "Complete information does not make an opponent predictable. Orders are simultaneous, and only the commander knows which cost is acceptable. A ship beside a tritium plant may WORK, FIRE or depart, and a large reserve makes all three believable. Deception therefore comes from posture, commitment and resource allocation rather than undiscovered units.",
-      "The distinction between detection and identification also survives. The game exposes mechanically relevant state because hiding it would add bookkeeping, yet the strategic meaning of that state is not labelled. A missile with a visible arrival time may be intended to drain one point of delta-v, cancel a productive turn, drive a ship out of a contested orbit or distract support from a shipyard. The projectile supplies position and timing but not the strategic purpose of the order.",
-      "Removing fog of war changes the interface as much as the balance. The planetarium must show distant threats without filling the screen with warnings, and the log must show how a reserve was spent. Dotted trajectories, arrival labels and public reserves are part of the shared game state, not optional hints.",
-      "Plausible concealment remains possible for dormant hardware on or beneath a moon, civilian traffic whose purpose is misrepresented, or vehicles accepting severe limits on power and travel time. The current rules instead model mobile forces after propulsion and combat systems are active. At that operational stage, hidden reserves would primarily add accounting uncertainty while visible orders and simultaneous intent already provide strategic uncertainty."
+      "DeltaV assumes that active spacecraft and their trajectories can be tracked reliably. A ship can leave, pass behind a body for a moment or choose not to light its engines, but it does not disappear because a detection roll failed.",
+      "The Children of a Dead Earth article linked above follows the problem through engines, power plants and radiators. An active interplanetary ship has several signatures to suppress at once, and a path already measured remains informative even after the engine shuts down.",
+      "DeltaV starts after the fleets and their industries are active. Ships are visible. Journeys and missiles show where they are going and when they will arrive. There is no separate search action and no memory game about which contact was seen by which unit.",
+      "Even the shared fuel reserves are public. That is not presented as miraculous sensor data. Since spending is visible, a patient player could reconstruct the same total in a notebook. Showing it directly removes bookkeeping and keeps the uncertainty where it can produce a decision.",
+      "Only the order being chosen now remains hidden. A visible ship may be able to reach several valuable places. A missile may be intended to force a dodge, interrupt a final construction turn, clear a route or punish a ship already pinned by another. The trajectory becomes public after launch, once all sides have revealed their plans together.",
+      "Several credible uses for each visible ship leave room for deception without hidden contacts. The player reads fuel, timing and opportunity instead of maintaining a second map of uncertain detections."
     ]
   },
   {
     category: "AI / STRATEGY",
     slug: "how-the-ai-thinks-in-orbits",
-    title: "How the AI Thinks in Orbits",
+    title: "How the Computer Opponent Chooses an Order",
     date: "2026-07-23",
-    deck: "The AI does not begin by looking for the highest-value target. It first checks whether the faction can still move, evade and produce after the attack.",
+    deck: "The opponent looks first at fuel, future arrivals and work that can be interrupted. It is allowed to make mistakes, but not to cheat.",
     body: [
-      "The opponent is not a language model and it does not learn during a match. It is a rule-based planner using the same public information as the player: every orbit, transfer, missile, shipyard and tritium reserve. It cannot see the human orders being prepared during the current turn. Rival AI factions receive the same limitation.",
-      "Every faction plans from a frozen copy of the state at the start of the turn. Without that copy, an AI processed later could react to an order that should still be secret. The game checks that planning did not change the shared state, then combines all orders only after every faction has finished. Processing order therefore gives no faction extra information.",
-      "The planner first asks whether the faction can keep paying its costs. It checks safe and threatened tritium, usable income, upkeep in contested orbits, likely evasion costs, forced departures from completed shipyards and the reserve left afterwards. That estimate selects a broad approach: cautious expansion, normal expansion, recovery from a shortage or closing the remaining enemy supply routes.",
-      "The AI then considers concrete actions: racing for tritium, securing a second source, stealing work from a nearly complete shipyard or firing at a productive ship. These targets are valuable for different reasons. The yard contains work that can be captured, the tritium orbit provides income, and a missile can cancel WORK or force the target to spend reserve.",
-      "Each proposed action must pass an affordability check. A burn is rejected when it abandons the last safe tritium worker, spends reserve needed for an incoming missile, creates upkeep the faction cannot sustain or completes a ship without enough delta-v to move the old ship out of the yard. A valuable target does not justify a plan that leaves the attacking faction unable to operate.",
-      "The planner repeats that check after all orders have been chosen. Several attacks may be affordable on their own but impossible to maintain together. When the full plan costs too much, the AI cancels the least useful new contest. If existing contests already cause the shortage, it looks for the cheapest one to leave.",
-      "The AI can also create a small fork by threatening two tritium sources or combining a missile with a movement problem. It chooses a fork when the opponent cannot pay every resulting cost at once, not simply because several attacks are legal.",
-      "The last active tritium worker receives special protection. Earlier planning rules could send that ship toward a valuable target and remove the income needed to finish the operation or survive the response. The current rule allows departure only when another tritium route is available or the move produces a result worth the lost income.",
-      "The planner is still a collection of forecasts, priorities and vetoes rather than a general intelligence. It does not search every campaign to the end, and playtesting can overturn its assumptions. When it repeats a bad strategy, the selected target, score and rejection reasons can be inspected directly.",
-      "This makes the planner a practical test of DeltaV's strategy. Terms such as safe tritium, affordable contest, useful missile and stealable yard need exact meanings before the AI can act on them. Repeated failures show which parts of the game still lack a clear rule for judging a position."
+      "The computer opponent was designed to use the same public information and the same fuel constraints available to the player.",
+      "The opponent sees ships, fuel, journeys already under way, launched missiles and work completed at shipyards. It never sees the order currently being chosen. Every side plans from the same opening position, and only then are the orders brought together.",
+      "It first estimates which tritium plants will still work after known arrivals and missile impacts. It then sets aside fuel for dodges, contested orbits and the forced departure that follows a completed hull.",
+      "Possible plans include securing a second source of tritium, meeting an expansion, stealing work from a half-built yard or firing at a productive ship. Each plan needs an actual route, an arrival turn and enough fuel left for the rest of the fleet. Two attractive moves can be rejected together when their combined cost makes both reckless.",
+      "The last working tritium ship receives special care. Sending it away or using it to fire also gives up the income it would have produced. The opponent usually moves that ship only after another fuel source is secure or when staying would close the final route to recovery.",
+      "Missiles are judged by what they interrupt. Another shot is useful when it will consume the last point needed for a dodge, stop a decisive work turn or reach a ship that cannot evade because an enemy already shares its orbit. Firing at a comfortable target simply because the weapon is available is usually a bad trade.",
+      "Near the end of a match, the opponent checks every visible route by which the enemy could return to tritium. A ship already travelling, a nearby support vessel or a nearly completed hull can keep the war open. The opponent is not allowed to call the position won just because the obvious route has failed.",
+      "Its choices are repeatable. When the same bad move appears again, the reason can be followed back to a fuel estimate, a threat or an escape route it valued poorly, which makes that part of its strategy possible to revise."
     ]
   },
   {
@@ -111,15 +106,14 @@ const devlogArchive = [
     slug: "why-one-turn-is-three-days",
     title: "Why One Turn Is About Three Days",
     date: "2026-05-24",
-    deck: "A turn is a block of planning time, not a stopwatch. About three days lets orbits and logistics change without turning a local crisis into one large calculation.",
+    deck: "Three days gives ships time to move, missiles time to be answered and industry time to produce something worth interrupting.",
     body: [
-      "The Earth–Moon transfer provides the rough scale: one turn represents about three days. Not every displayed arc is a literal three-day flight, and match length does not set an official duration for the fictional war. The conversion simply tells the player whether a warning should be understood in days, seconds or months.",
-      "A much shorter turn caused two problems. Orbital phases changed too little between decisions, and even modest transfers required a stack of nearly empty turns. The player was nominally in command at all times but rarely had a new strategic fact to consider. A much longer turn had the opposite defect: local maneuvers and industrial work collapsed into the same coarse interval, making it difficult to create a threat that could be observed and answered before resolution.",
-      "At this scale, the shortest ship transfer can finish in one turn while a missile needs at least two. The defender therefore gets a chance to plan before impact, and a nearby ship may move sooner than the weapon threatening it. Longer routes change with orbital alignment, producing useful transfer windows without asking the player to run a full orbital calculation.",
-      "Industry uses the same clock. A shipyard needs five uninterrupted WORK turns to finish a hull, placing construction at roughly two weeks rather than an afternoon or a fiscal quarter. Progress is public and can be stolen, so both sides can plan around the completion turn. Completion also tells everyone when the working ship will be forced to leave during mandatory launch.",
-      "The turn also suits command across several planetary systems. Communication delay makes continuous remote control less plausible, while local crews and software can carry out orders already received. DeltaV does not track message delay as another resource. Simultaneous planning keeps the relevant result: commanders commit a group of orders that cannot be revised halfway through resolution.",
-      "Physical scale is compressed in layers. Interplanetary distance is compressed more than travel inside a moon system; otherwise most of a campaign would be spent waiting. The important relationships remain intact: local action is faster than distant reinforcement, missiles provide warning, production can be interrupted, and poor alignment costs time or delta-v.",
-      "The interface uses whole turns to coordinate orders and approximate days only to communicate scale. The conversion does not alter the rules or claim the precision of a real flight plan."
+      "One turn represents roughly three days. This interval keeps local movement, missile warning and industrial work visible as separate events.",
+      "The scale began with a useful human reference: a journey between Earth and the Moon. It is not a claim that every route lasts an exact number of days. Destinations keep moving, and travel still depends on where they will be when a ship arrives.",
+      "A short journey inside one planetary system can finish in one turn. A missile always needs at least two, guaranteeing a full turn of warning. Longer reinforcements cross several turns while the changing arrangement of the planets alters their cost and timing.",
+      "Shorter turns made too many decisions feel like waiting for counters to fall. Longer turns swallowed local movement, missile warning and several stages of construction inside one click. Three days leaves room for all three to interfere with one another.",
+      "Industry shares the same clock. A ship must spend the full turn at a tritium plant or shipyard to make progress. A ship that has just arrived waits until the next turn. Moving, firing or dodging consumes the same span of time and therefore replaces the work that could have happened.",
+      "All sides prepare orders for that period and resolve them together. This carries some of the uncertainty of distant command without asking the player to schedule messages or calculate communication delay. The smooth movement between turns helps the eye follow the result and does not add moments in which orders can change."
     ]
   },
   {
@@ -127,61 +121,74 @@ const devlogArchive = [
     slug: "why-deltav-begins-with-missiles",
     title: "Why DeltaV Begins with Missiles",
     date: "2026-05-24",
-    deck: "Lasers, railguns and nuclear devices all belong in space warfare. Missiles come first because they create decisions on the orbital map without requiring a full close-combat simulation.",
+    deck: "A missile takes time to arrive, which gives both sides a decision before impact. Guns and lasers need a different scale of combat to do the same.",
+    references: [
+      {
+        label: "Space Guns — Children of a Dead Earth",
+        href: "https://childrenofadeadearth.wordpress.com/2016/06/14/space-guns/"
+      },
+      {
+        label: "The Photon Lance — Children of a Dead Earth",
+        href: "https://childrenofadeadearth.wordpress.com/2016/07/02/the-photon-lance/"
+      }
+    ],
     body: [
-      "Each plausible weapon needs a different close-combat model. Lasers arrive at light speed but depend on aperture, beam quality, aiming and heat rejection. Railguns and coilguns depend on power, barrel mass, recoil, projectile mass and accuracy. Nuclear payloads lose the atmospheric blast wave familiar on Earth, so distance and radiation become more important. Any one of these systems could support a large simulation by itself.",
-      "DeltaV begins one level above that engineering detail. Its central decisions concern reach, timing and the shared delta-v reserve, so the first weapon needed to participate in all three. A missile leaves a known orbit, follows a visible transfer and arrives in a future turn. Its propulsion can be evaluated by the same geometry used for ships, while its travel time creates room for evasion, reinforcement and the possibility that the target will voluntarily abandon something productive.",
-      "A laser does not fit the current level of detail. At this scale, firing and impact would happen together, so the real decisions would concern heat, aiming, time on target, armour and component damage. Without those variables the laser becomes an arbitrary range check. With them, DeltaV would need a separate close-combat and ship-design game.",
-      "Railguns have the same problem from another direction. Their chance to hit depends on distance, relative speed, projectile spread, target size and the approach chosen before the encounter. DeltaV decides whether two ships can force a local contest, but it does not simulate the few seconds in which they pass each other at several kilometres per second. A gun added without that encounter model would leave out the variables that decide the shot.",
-      "Missiles permit a cleaner abstraction because the defender's response is itself an orbital maneuver. An uncontested target with enough delta-v automatically evades each impacting missile at a cost of one. The rule collects guidance, terminal defense and a great deal of detailed engineering into a result that remains strategically useful: the attack forces movement expenditure and interrupts WORK. If the target is already contested or cannot pay, the impact destroys it. There are no hit points to erode because hull damage is not the scale at which the player is commanding.",
-      "FIRE costs no delta-v at launch, although the firing ship forfeits its action and therefore cannot WORK during that turn. This prevents ammunition accounting from becoming a second economy while preserving a substantial cost for casual attacks. A ship beside a tritium plant gives up immediate income to create future pressure; whether the exchange is favourable depends on the target's reserve, work schedule and available escape routes.",
-      "Choosing missiles first does not remove lasers or guns from the setting. It sets a design rule: a weapon belongs in DeltaV when it creates a distinct command problem that can be shown on the map. Missiles do that through travel time, reserve cost and interrupted work. A laser or railgun will need its own clear decision, not just a different effect for the same result."
+      "Missiles were chosen first because their travel time creates a decision between launch and impact. A weapon that resolved immediately would need a different combat scale.",
+      "The weapon travels toward one specific ship and remains visible while it closes. If the target leaves its orbit, the firing solution breaks. If it stays, the countdown continues and the defender must decide whether the work being done there is worth the coming dodge.",
+      "A ship with fuel and room to maneuver survives automatically when the missile arrives. The dodge costs fuel and cancels that turn's production. A ship pinned beside an enemy cannot dodge; a fleet with an empty reserve cannot pay for survival. Guidance, defensive fire and final corrections are compressed into those outcomes because position and timing are the command decisions.",
+      "Lasers would arrive too quickly for the same warning. Their useful limits would come from optics, wavelength, power, cooling, aim and the exposed face of the target. Without some of those constraints, a beam would only be a line with an arbitrary range.",
+      "Guns ask for relative velocity, approach direction, spread, ammunition, heat and a much closer view of the encounter. DeltaV can say that two enemies in one orbit prevent safe work. It does not yet follow the seconds of a gun pass closely enough to make those details honest.",
+      "Missiles also avoid a separate ammunition economy for now. The firing ship gives up its own work that turn. A launch from a tritium plant sacrifices fuel production; a launch from a yard delays the next hull. Even a clean miss has occupied time that could have been used elsewhere.",
+      "Guns and lasers may be added only after their physical limits can support decisions that missiles do not already provide. Changing the graphic alone would leave the current combat rule unchanged."
     ]
   },
   {
     category: "SIMULATION / BALANCE",
     slug: "what-a-missile-is-for",
-    title: "What a Missile Is Actually For",
+    title: "What Missiles Do to Production",
     date: "2026-07-23",
-    deck: "The first FIRE rule was expensive and easy to evade. Matches on paired maps tested whether missiles changed a campaign or merely added activity to the screen.",
+    deck: "Two hundred matched games showed that missiles win through chains of pressure: an impact matters, but so do every dodge, departure and lost turn of work before it.",
     body: [
-      "The test compared pairs of generated maps. One AI could FIRE and the other could not, then their starting positions were swapped and the match was repeated. The firing policy won a clear majority of decisive matches. Swapping sides mattered because a favourable starting geometry could otherwise decide the result before missile policy had any effect.",
-      "Destructive impacts accounted for only a small fraction of the advantage. Most missiles were evaded, diverted by a departing target or launched at the cost of productive work by the firing ship. The policy succeeded because those exchanges repeatedly disrupted the opponent's schedule. Evasions consumed delta-v, threatened ships abandoned productive orbits, and WORK disappeared on both sides of the firing solution.",
-      "FIRE changed strategic outcomes, although geometry and endgame choices still decided whether the advantage could be used. Successful attacks shared clear conditions: missiles arrived against productive ships, low reserves or positions the defender could not cheaply leave.",
-      "The benchmark did not show that firing whenever possible was sensible. A target with ample delta-v will evade, and the attacking ship may surrender more tritium than the defender spends. FIRE becomes attractive when impact coincides with productive work, when several missiles make evasion expensive, or when leaving the orbit would concede a shipyard, tritium plant or local support position. Firing priority is therefore calculated from the target's WORK schedule and projected reserve before the probability of hull destruction.",
-      "Two coordinated missiles illustrate the difference. If they arrive against an uncontested ship with sufficient reserve, the ship can survive both by paying twice and losing the turn's work. If another ship has already made the orbit contested, evasion is unavailable and the same impacts become lethal. If the target burns away before impact, the firing solutions are broken. Every outcome depends on preparation visible several turns earlier.",
-      "A useful firing doctrine follows from the opportunity cost. Prefer productive targets, ships already constrained by another commitment, and arrivals that coincide with a transfer window the defender wants to use. Avoid firing merely because the command is legal. Pressure several parts of the reserve when possible, because a missile that forces an expensive burn may matter more than one that finally hits an immobile ship.",
-      "The test kept FIRE because it changed strategy in a way ordinary movement did not. It also set a balance requirement: missiles need costs that prevent players from selecting FIRE every turn. Those costs are the lost WORK turn, visible travel time and automatic evasion. Further tuning should adjust that exchange rather than introduce hit points unrelated to the rest of the game."
+      "The role of missiles was tested in two hundred matched games. Each opening was played twice, with the starting sides exchanged, and one opponent was forbidden to fire.",
+      "The side allowed to use missiles won 69.1 percent of the games that reached a clear result. That advantage survived the exchange of starting positions, so it could not be dismissed as one fortunate side of the map.",
+      "Impacts explained only part of the result. Targets also spent fuel to dodge, abandoned work to leave or arrived too late to restart production. The firing ship sacrificed its own work as well, so every launch exchanged useful time in the current turn for possible disruption later.",
+      "The side with missiles often collected less tritium because its workers spent turns firing. It still tended to finish with more ships. The side without missiles could hold a larger fuel reserve and yet lose the routes and hulls needed to use it.",
+      "The results also corrected an earlier assumption about missile pressure: no firing side won without at least one actual impact. Dodges and interrupted work increased the value of an attack but did not replace lethality. The strongest attacks used that pressure to create the position for a later hit.",
+      "More missiles were not automatically better. The chance of a kill dropped sharply after the first shot. Very deep salvos almost never destroyed the target, although they frequently forced repeated dodges. Another launch was worthwhile only when it crossed a real threshold: the last point of fuel, the final construction turn or a target already unable to evade.",
+      "Some matches lasted the full two hundred turns because firing kept the opponent poor without closing every route back to tritium. Those loops changed the opponent's priorities: it now values the end of a recovery path more than the continuation of pressure for its own sake.",
+      "The resulting targeting rule checks what a missile will change on arrival. It values launches that interrupt a production or movement schedule the opponent cannot easily restore."
     ]
   },
   {
     category: "TACTICS",
     slug: "contested-orbits",
-    title: "Contested Orbits and the Geometry of a Siege",
+    title: "When Enemies Share an Orbit",
     date: "2026-05-25",
-    deck: "Opposing ships in the same useful orbit lock each other out of normal work. The ships and routes around that orbit decide which side can afford to stay.",
+    deck: "Two enemies in the same useful orbit stop each other from working or dodging. Fuel, support and the timing of withdrawal decide which side can stay.",
     body: [
-      "Resolving local combat immediately would make it too simple. The first ship to reach a productive orbit would either capture it outright or enter a fight decided by unit count. CONTESTED instead means that two crewed ships deny each other safe operation without opening a separate close-combat game.",
-      "A contested ship cannot WORK, FIRE or EVADE. It may stay or burn away, and each faction in the orbit pays two delta-v per turn. That payment covers continued maneuver, readiness and local control; it is not damage to the hull.",
-      "With equal reserves and one ship per faction, a contest is a symmetric resource drain. Support outside the orbit breaks that symmetry. A supporting ship can fire into the position, reach a reinforcement route first or occupy the likely escape route, while the vessel inside prevents the target from evading. The local balance therefore includes the surrounding support geometry rather than only the ships inside the contested orbit.",
-      "Productive sites make the timing sharper. Contested tritium produces nothing, so an attacker may accept the same upkeep cost as the defender merely to stop income. At a shipyard, existing progress is frozen but remains attached to the facility. Arriving shortly before completion can therefore capture work already performed, provided the attacker can survive the local response and eventually clear the contest.",
-      "Remaining is rational when denied production exceeds upkeep, support is approaching, or departure would give the opponent an immediate strategic route. Departure is rational when continued upkeep consumes the reserve required for a higher-value burn. Public reserves allow both factions to estimate the turn on which maintaining the contest ceases to be viable.",
-      "The rule leaves close combat unresolved and keeps only the consequences needed at campaign scale. A detailed combat layer would be useful only if it added decisions not already covered by contest, outside support, upkeep and escape routes."
+      "When opponents meet in the same useful orbit, DeltaV treats the position as an ongoing standoff rather than opening a separate combat screen.",
+      "The game marks the orbit CONTESTED. Both ships remain, neither side can operate the local plant or yard, and neither ship can fire or dodge. Each fleet pays two points of delta-v per turn to keep its vessel in the standoff.",
+      "The payment happens before the rest of the turn. If one side cannot afford it, that ship is lost, but the survivor still does not work immediately because the orbit was contested when the turn began. Production can resume on the following turn.",
+      "Missiles make the lock dangerous. A ship that began the turn contested cannot dodge an impact, even if the enemy beside it is removed moments earlier. A friendly arrival during that turn is also too late to rewrite the opening condition. Support has to be established before the weapon reaches the orbit.",
+      "Leaving is legal and often sensible. The departing ship gives up the facility and spends fuel on the journey, but missiles aimed at its old path lose their target. Withdrawal preserves a fleet at the price of admitting that this position is no longer worth its future cost.",
+      "The second friendly ship usually belongs nearby rather than inside the lock. From outside it can fire at the pinned enemy, cover the most likely exit or wait for reinforcements. One ship denies the facility; the other decides whether the denial can be sustained.",
+      "A tritium plant produces the same two fuel points that one contested ship spends each turn. Future income, missile timing, the cost of escape and nearby support determine whether maintaining that exchange is worthwhile for either side."
     ]
   },
   {
     category: "VICTORY / ECONOMY",
     slug: "war-ends-before-last-ship-dies",
-    title: "Tritium Viability as a Victory Condition",
+    title: "Why Access to Fuel Decides Victory",
     date: "2026-05-25",
-    deck: "DeltaV does not wait for every ship to be destroyed. A faction loses when it no longer has a workable route to the tritium needed for movement, evasion and attack.",
+    deck: "A side remains in the war while one credible route to tritium is still open. Extra ships cannot postpone defeat once every route has closed.",
     body: [
-      "A conventional elimination rule waits until the final hull has been destroyed even when the remaining fleet has no affordable route to production or contact. A score based on bodies, facilities or territory has the related defect of measuring possession without testing whether a faction can continue to move and contest those assets.",
-      "The victory check asks whether each faction still has a believable route to produce tritium or contest access to it within the next few turns. Ships already working count, but so do ships in transit, affordable transfers and vessels about to leave a shipyard. A large fleet can therefore lose while it is still intact if none of those ships can restore supply.",
-      "This changes the meaning of defense. Protecting the last tritium source is not equivalent to protecting a capital in a territorial game, because the relevant object is a path rather than a place. A faction may deliberately abandon the current plant if it can reach another source with enough reserve to survive the journey. Conversely, occupying several valuable orbits means little when none can replenish the movement required to hold them.",
-      "Missiles and contested upkeep become decisive through this rule without needing a destruction quota. Repeated evasion can push a reserve below the cost of the only recovery burn. A contest can make an otherwise productive source economically unavailable. A well-timed arrival can close the last viable route even if most of the opposing fleet remains untouched elsewhere.",
-      "The viability check also tells the AI when to change posture. Once opponents have no stable tritium and the leading faction can maintain its own access, expansion becomes less important than closing the remaining recovery routes. When its own projection turns negative, the same planner stops treating attacks as ordinary opportunities and enters a conservative recovery mode. Victory and AI strategy are consequently evaluating the same material question from different sides.",
-      "The check looks only a few turns ahead and includes orders already in progress. Searching every possible future would be too expensive, while checking only the current orbit would end some matches too early. Defeat is declared when no route inside that short horizon can restore tritium access or contest the opponent's supply."
+      "The victory condition is based on future access to fuel rather than the number of ships that remain on the map.",
+      "A fleet can be intact but unable to pay for another useful movement. It can occupy several planets and moons that will not produce the fuel needed to leave them. Counting ships or territory would reward positions that are already dead.",
+      "DeltaV instead asks whether each side can return to tritium. A ship may already be working at a plant, travelling toward one or close enough to reach one with the remaining reserve. Arrival alone does not count: it must survive until the following turn and actually begin production.",
+      "The check applies known costs before adding expected income. Contested ships must be maintained, visible missiles must be escaped or dodged and a ship finishing a hull may be forced to leave its yard. Tritium that will be interrupted by one of those events is not counted.",
+      "Every route is checked separately. One may end in an unaffordable standoff, another under a missile, and a third may remain viable because a support ship can arrive first. The match stays open as long as one of those futures can still be reached honestly.",
+      "A nearly completed shipyard can also preserve a side's chances. The new hull may reach fuel when every existing ship is stranded, provided construction can finish and the current worker can make its required departure.",
+      "Defeat is declared only after those possibilities are gone. Ships elsewhere may still exist, but they cannot change the position. This ends the match before several turns of unavoidable decline without cutting off a recovery that remains possible."
     ]
   },
   {
@@ -189,59 +196,302 @@ const devlogArchive = [
     slug: "map-of-future-positions",
     title: "Designing the Planetarium Around Future Position",
     date: "2026-07-26",
-    deck: "The planetarium is built to show future position, not literal scale. Distances, body sizes and curves are adjusted only when the real proportions would hide a useful decision.",
+    deck: "The planetarium bends size and distance for readability, but every order still points to where its destination will be when the journey ends.",
     body: [
-      "Astronomical scale is hostile to interface design. Render the Solar System literally and the moons disappear beside their planets, ships disappear beside the moons, and most of the screen becomes distance without usable information. Equalize every separation and the opposite happens: a transfer between planets feels equivalent to moving between neighbouring moons. DeltaV compresses both, but it compresses interplanetary space more aggressively so that local and distant movement remain different classes of commitment.",
-      "Bodies follow predictable orbital paths, while their starting positions vary with the map seed. Transfer windows come from those positions rather than a random event. A route can become cheaper as the destination moves into a favourable place, and the same order on another turn may cost more or arrive later. The player does not need to solve the orbital equations, but the map must show that destination and travel time belong to the same decision.",
-      "Transfer previews use orbital geometry without claiming flight-plan accuracy. An arc leaves the current orbit, rises out of the common plane so it can be seen and meets the predicted destination. The rules calculate cost, duration and arrival; the curve shows how they fit together. One early BURN curve doubled back around its endpoints even though every number was valid, so the shape described the wrong maneuver.",
-      "The camera is part of the interface. Left drag pans, right drag orbits, the wheel changes scale and a double click selects a new focus. Pitch limits prevent an unreadable edge-on view while keeping enough perspective to separate high transfers from local orbits. Stable controls let the player compare the same position across several turns.",
-      "Long shadows, enlarged bodies and luminous orbital rings are explicit visual distortions. Shadows separate small bodies from a dark background and establish the direction of the central light source. Enlarged bodies maintain visibility across compressed distance scales. Orbit rings expose trajectory and future position. Each distortion is retained only when it communicates a relationship used by the rules.",
-      "The same rule applies around the map. Command history must be wide enough to explain a complicated turn without covering the emptiness that communicates system scale. Tooltips, dotted paths and labels are reserved for information needed to plan or understand an outcome. Repeated and decorative information is removed."
+      "The planetarium uses different visual scales for bodies, moon systems and interplanetary distance so that all three remain readable in the same view.",
+      "At a literal scale, a planet would disappear before its moons and a destination across the Solar System could share the same view. DeltaV compresses the gaps between planetary systems, compresses local moon systems differently and enlarges bodies that would otherwise be pixels.",
+      "The strategic position is not flattened with them. Every planet and moon advances along its orbit. When a ship is ordered to move, the destination is placed where it will be on arrival, not where it is now. The preview shows that future position, which is why a correct journey may appear to aim into empty space.",
+      "The bright route is a diagram rather than a claim about an exact spacecraft path. It rises away from the orbital plane so it can be followed through a crowded view. Cost and arrival are settled first; the curve is then allowed to choose clarity.",
+      "That freedom has limits. One early route drew a graceful loop around both ends and looked completely wrong even though its numbers were right. The saved match and camera view made the mismatch obvious: a readable calculation still needs a drawing that suggests the same maneuver.",
+      "Shadows, enlarged planets, orbit rings and the Sun's glow follow the same separation. They affect how the player reads the scene but do not change what a ship can afford or where it arrives."
     ]
   },
   {
     category: "PLAYTEST / INTERFACE",
     slug: "playing-past-the-tutorial",
-    title: "Playing Past the Tutorial",
+    title: "What a Full Tutorial Playthrough Found",
     date: "2026-07-30",
-    deck: "Long play sessions exposed problems that rule tests could not see: misleading curves, controls fighting over the same click and a command history that ran out of room.",
+    deck: "A full playthrough found several moments where the match resolved correctly but the interface taught a rule that did not exist.",
     body: [
-      "The test continued through the tutorial and into a normal match, until several fleets, transfers and missiles overlapped on the same map. Performance remained comfortable. The important failures came from correct game state being shown in a misleading way.",
-      "The BURN pretzel was the clearest example. Origin, destination, cost and ETA all passed their tests, while the curve between them looped around the local system and showed the wrong maneuver. Automated checks could confirm the numbers but not whether a moving camera made the path understandable.",
-      "The same session exposed a firing preview detached from its target, support fire that disappeared at wide zoom, command history clipping after longer explanations and a glossary interaction that captured a click intended for replay. These defects did not alter simulation state, but each prevented the player from reading or operating on that state correctly.",
-      "Saved states allow the exact turn and camera context to be reopened after a correction. Replay verification checks both deterministic state and the explanation associated with it. A correction is incomplete when the current turn renders properly but rewinding restores the misleading presentation.",
-      "The command history serves the same requirement. Hovering or selecting an event can return the planetarium to the ships, missiles and orbits involved, while the Logbook explains the relevant rule without covering the map permanently. Instruction is attached to the record of the match because a specific failure is more useful than generic advice once several causes overlap.",
-      "Readability is part of correctness when orders are committed several turns ahead. A failed order should be explained by orbital geometry, insufficient delta-v or an enemy choice. The presentation must not hide those causes or suggest rules that do not exist."
+      "A complete playthrough of the public build found several turns where the rules resolved correctly but the interface described a different event.",
+      "The public build was played beyond its guided sequence into ordinary matches. Whenever a result felt suspicious, the turn, the visible history and the camera position were kept together. Continuing the match mattered because several problems appeared only after earlier journeys, missiles and unfinished construction had accumulated.",
+      "In one turn, a target left before a missile arrived. The ship survived and the weapon disappeared correctly, but the history announced that the crew had died. In another, an enemy captured a half-built yard and then worked there. Both moments were labelled WORK, making one ship appear to build twice in a single turn.",
+      "A quieter error gave the computer opponent extra fuel during the tutorial. The journey cost was correct, but it was paid from a reserve that had silently been refilled. Nothing on the map or in the history could explain the increase.",
+      "The final fixes were mostly changes in meaning, not spectacle. A broken missile solution now says that the target escaped. Capturing a yard and adding another turn of work are distinct events. Existing fuel is no longer replaced. The menu pauses the clock even when a new turn begins behind it.",
+      "The replay itself exposed another edge. Clicking a highlighted word could open its explanation while preventing the same row from rewinding to the moment it described. Treating the whole row as one event made the interaction agree with the history it was supposed to clarify.",
+      "Every visible cost, capture, escape or death now comes from the event that changed the match. This matters because a correct number beside the wrong explanation can teach the player an incorrect rule."
     ]
   },
   {
-    category: "ARCHITECTURE",
+    category: "STRUCTURE",
     slug: "simulation-that-can-disagree",
-    title: "Separating Simulation from Presentation",
+    title: "Keeping the Rules Separate from the Screen",
     date: "2026-07-23",
-    deck: "The early prototype kept rules, controls and drawing in one page. That made experiments fast but made it difficult to tell whether a strange result came from the game or the picture.",
+    deck: "The match result is resolved before the planetarium draws it, so changing an animation or route curve does not alter fuel, timing or survival.",
     body: [
-      "The single-page browser prototype supported experiments with real-time piloting, orbital assistance, lasers, touch controls and several incompatible rule sets. Once the turn-based game needed repeatable results, that structure became risky: moving a label could alter state, and a drawing shortcut could quietly become a rule.",
-      "The replacement separated a deterministic headless simulation from every browser and rendering concern. Core logic owns legal orders, transfer cost, missile arrival, contested upkeep, production and victory. It has no knowledge of Canvas, WebGL, camera focus, lighting, labels or animation. The planetarium consumes a result after the simulation has decided it, which is why a cinematic impact can be delayed for emphasis without delaying the actual rule.",
-      "A temporary two-dimensional renderer remains useful for debugging and accessibility, while the three-dimensional planetarium is the player-facing view. Both read the same snapshots, and neither may decide that a ship can afford a burn or that an impact should destroy it. If the views disagree, the simulation can be inspected independently of animation timing.",
-      "The simulation can now run matches without drawing them. Weapon policies can be compared across generated maps, then useful failures can be reopened in the browser. A saved seed reproduces the same opening, while content checks keep scenario values within the rules.",
-      "Repeatable simulation is a development tool, not a requirement that every match play the same way. Starting phases, maps and enemy decisions provide variation. A recorded outcome can still be replayed until its cause is understood, separating a real rule interaction from a bug in state or order resolution.",
-      "The architecture enforces a strict ownership rule. Rendering may clarify, exaggerate and dramatize the state, but only the headless simulation may determine legality and outcome. Any disagreement between picture and state is therefore a presentation defect rather than an ambiguous gameplay result."
+      "DeltaV resolves what happened in a turn before the planetarium decides how that result should be shown.",
+      "The rules decide whether an order is legal, how much fuel it costs, when a ship or missile arrives, whether a facility works and when a side has lost its last path to tritium. Only after that result exists does the planetarium animate it.",
+      "A destroyed ship may remain visible for a final moment. A journey line may bend away from a crowded orbit. Planets may be enlarged until they can be read. None of those choices can refund fuel, delay an arrival or save the ship underneath the animation.",
+      "The simpler two-dimensional view reads the same match. If the views disagree about where a ship is, the recorded turn settles the question. If both pictures agree but the history describes a death that never occurred, the explanation is wrong rather than the result.",
+      "This structure also allows entire matches to be played without graphics. Unfair openings and repetitive opponents can be found in large groups, then the interesting position can be opened in the planetarium and examined as a player would see it.",
+      "This structure cannot show whether a rule is enjoyable. It can separately show whether the rule worked, whether the opponent handled it and whether the screen explained the result accurately."
     ]
   },
   {
-    category: "AI / DEVELOPMENT",
+    category: "MAP GENERATION / BALANCE",
+    slug: "auditing-procedural-maps-before-turn-one",
+    title: "How Generated Maps Are Checked",
+    date: "2026-07-23",
+    deck: "A new map is discarded before turn one if fuel access, opening pressure or escape routes leave one side without a reasonable response.",
+    body: [
+      "Generated maps are checked before play because a different arrangement can still produce an unfair or uninteresting opening.",
+      "The planets are not dragged into invented positions. The generator works with the Solar System as it stands, choosing roles and starting forces among eligible planets and moons while keeping Earth and the Moon outside the war economy.",
+      "Every proposed opening is judged by real journeys. Can each side reach fuel? Is a second source available after the obvious one is contested? Can one player attack a shipyard before the defender has a meaningful choice? Does a three-sided start leave one fleet exposed to both opponents with no useful exit?",
+      "Hundreds of layouts may be considered for a single opening. Many fail, and some random starts produce no acceptable result at all. In that case the game prefers a fixed map that has already passed the checks over a novel position known to be broken.",
+      "That safety net once made different random starts produce the same map often enough to look like a failed generator. The starts were different; they had simply all been rejected before falling back to the same approved layout.",
+      "The game now tries fresh starts before giving up and keeps the reason each map failed. In a sample of one hundred requests, ninety-nine distinct playable layouts appeared and only two needed the fixed fallback. Those duplicate fallbacks remain visible in the results.",
+      "These checks cover the opening. Complete matches are still needed to find maps where both sides can survive indefinitely, one rich system dominates every route or an escape is technically possible but never strategically useful."
+    ]
+  },
+  {
+    category: "DEVELOPMENT",
     slug: "what-the-machine-was-good-for",
     title: "What the Machine Was Good For",
     date: "2026-08-01",
-    deck: "Artificial intelligence contributed throughout development, but useful output appeared only when tests, recorded matches and direct inspection could reject a wrong answer.",
+    deck: "DeltaV is openly vibe-coded. Fast generation made broad experimentation possible; canon, replays and taste were needed to decide which results deserved to stay.",
     body: [
-      "The first prototypes could be generated as complete browser files. That was fast enough to test whether orbital movement produced useful decisions, but poor at preserving rules from one version to the next. Once the project had a repository, repeatable tests, recorded matches and browser control, the machine shifted from replacing the whole prototype to changing one system and checking the effects elsewhere.",
-      "This capability did not improve judgment automatically. The machine invented a resource called DCC, renamed physical orbits as abstract nodes, forgot established rules when new ones arrived and once described a lighting improvement that produced an almost identical image. It also drew the circle that became the BURN pretzel. Each failure identified a missing constraint, source of project memory or verification step.",
-      "Canon files preserve vocabulary and rule priority. The headless simulation checks outcomes without graphics, while browser sessions expose problems of scale, motion and interaction. Saved states connect the calculated result to the picture on screen. A change is proposed, run, inspected and revised with the failure kept as evidence.",
-      "Artificial intelligence also appears inside DeltaV's science fiction, where distance prevents a remote authority from making every useful decision near the outer planets. Fleets and industrial systems need local models because instructions can arrive after the operational situation has changed. The game does not represent this as an intelligence statistic. Compute remains constrained by power, heat, communications and maintenance, the same physical systems that constrain every other useful machine in space.",
-      "The same requirement applies inside the setting. A model is useful only when instruments can detect a bad result and an operator can reject it. During development those instruments are tests, recorded matches and the running game. For a fleet they are sensors, local information and the physical systems available on site.",
-      "No list of model names is needed. The visible change is from whole-file generation to small repository edits, terminal experiments, controlled matches and direct inspection of the running game. Better constraints and faster checks mattered more than claims about model capability."
+      "DeltaV is openly vibe-coded. Generative tools have produced much of the software, while the direction of the game has been judged through playable results rather than assumed from the generated work.",
+      "Generative tools were useful for making a question playable quickly. The archive moves through a real-time lander, predicted orbits, gun duels, the Orbital Maneuver AI prototype and finally fleet command. Each version could be tried before the previous direction required a larger commitment.",
+      "That speed also produced confident nonsense. A new resource appeared without a reason. Physical orbits were described as abstract territories. A journey line looped beautifully around both ends while implying the wrong maneuver. A lighting change was declared successful when the comparison image barely changed.",
+      "The useful response was not to pretend every line of the project was understood in traditional engineering detail. It was to make the game leave evidence that could be judged: one current set of rules, exact replays, visible before-and-after images and many matches that could expose a bad idea repeatedly.",
+      "The machine was especially good at breadth. It could generate many openings, play hundreds of matches, preserve strange failures and offer several ways to express the same rule. Direction still came from deciding which outcome felt like DeltaV and refusing the ones that merely looked finished.",
+      "That distinction matters for the computer opponent too. The opponent inside the game is not a generative model improvising during play. It follows fixed priorities, sees only public information and can repeat its mistakes. The tool helping to build the game and the adversary playing it are deliberately different things.",
+      "The current rule documents and replay process are used to compare generated changes with the game that is already playable, especially when a change affects several parts of a match at once."
+    ]
+  },
+  {
+    category: "PROJECT STRUCTURE",
+    slug: "schema-first-content-and-vanilla-pack",
+    title: "What Can Change Without Changing a Match",
+    date: "2026-08-02",
+    deck: "The planetarium, menus and map content can be replaced without also changing how fuel, movement, missiles and production resolve.",
+    body: [
+      "DeltaV has already replaced large parts of its appearance and interface. The early two-dimensional prototypes, the current three-dimensional planetarium and the simpler tactical view can all present the same kinds of movement and combat without owning their rules.",
+      "The match rules live in a part of the game that can run without drawing a screen. This is what headless means here. It decides whether an order is legal, how much fuel it costs, when ships and missiles arrive, whether a ship can work and when a side has lost access to tritium.",
+      "Other parts have narrower jobs. The renderer draws the three-dimensional Solar System and its animations. The interface handles clicks, menus, previews and the written history. The content describes which planets and moons are active, where facilities exist and which values a scenario uses. Any of these can be rewritten or replaced while the match rules continue to receive the same kind of information.",
+      "A BURN from the Moon to Venus shows the full path. The player's click first becomes a command naming the ship and destination. The simulation checks that command against the current fuel and rules, resolves the turn and produces a snapshot, meaning a complete record of the match at that moment. The renderer reads the snapshot and draws the ship in transit. The simpler two-dimensional view can read the same snapshot and show the same journey differently.",
+      "This separation has prevented visual changes from altering results. A journey curve once looped around both ends and suggested the wrong maneuver, but the ship still paid the correct cost and reached the correct place because the drawing did not decide either value. The curve could be replaced without rewriting movement.",
+      "It also makes disagreements easier to locate. During a playtest, a target escaped before a missile arrived but the history reported that its crew had died. The simulation snapshot contained the surviving ship, so the error belonged to the interface text rather than the missile rule. In another turn, the interface described a shipyard capture as a second turn of work even though the stored construction had changed hands correctly.",
+      "Maps and scenarios use the same arrangement. Changing which moon contains a shipyard changes the input to the match, not the meaning of construction. If the construction rule itself changes, the headless simulation and its saved replays must change deliberately; a new planet model or menu layout does not require that rule to be touched."
+    ]
+  },
+  {
+    category: "PLAYTEST / DEVELOPMENT",
+    slug: "replay-led-debugging-became-the-workflow",
+    title: "Using Replays to Investigate Strange Turns",
+    date: "2026-08-02",
+    deck: "A suspicious turn is preserved and replayed instead of being argued from memory. The result, the explanation and the image can then be compared at the same moment.",
+    body: [
+      "Unusual turns are saved because memory alone is rarely precise enough to identify which part of a match looked wrong.",
+      "DeltaV keeps the complete position around unusual moments. The same turn can be reopened with the same ships, fuel, journeys and missiles, then viewed from the planetarium or the simpler tactical map.",
+      "This proved useful whenever different parts of the game told different stories. A ship could survive correctly while the history mourned its crew. A capture and a turn of construction could look like two turns of work. A route could have the right cost and still be drawn like a knot.",
+      "Replaying the exact moment removes the temptation to fix whichever part is easiest. First the result is compared with the current rule. Then the opponent's decision, the written explanation and the picture are checked against that same result.",
+      "Some faults only exist across time. A menu can pause the current clock but fail to pause the next one. A live view can be correct while rewinding restores an older, misleading sentence. Preserving the sequence catches those failures better than a single image.",
+      "Even when the rule is working, replaying the saved turn can show that the interface gave the player an inaccurate explanation of the result."
+    ]
+  },
+  {
+    category: "GAME DESIGN",
+    slug: "delta-v-secrecy-is-timing-not-stealth",
+    title: "Secrecy in DeltaV Is About Timing",
+    date: "2026-08-01",
+    deck: "Everyone sees the same ships, trajectories and resources. What remains secret is the next commitment, revealed only after all sides have chosen.",
+    body: [
+      "DeltaV keeps ships and existing trajectories visible while hiding the orders currently being chosen.",
+      "The map reveals current fuel, visible journeys, missiles in flight and work completed at shipyards. What it withholds is the order being chosen during the present turn.",
+      "That single unknown is enough because one ship may have several affordable futures. It can protect production, leave before a missile arrives, contest a yard or fire and sacrifice its own work. The opponent has to prepare for intentions without inventing unseen units.",
+      "Simultaneous planning turns information into timing. A move that would be safe after seeing the enemy order may be reckless when both choices must be locked first. Surprise comes from commitment, not from a random failure to detect an object that was already active in space.",
+      "This limited information gap keeps larger positions readable. Players study the same public facts and can still reach different conclusions about the opponent's next commitment."
+    ]
+  },
+  {
+    category: "DESIGN / STRATEGY",
+    slug: "shipyard-completion-is-a-commitment",
+    title: "Why Completing a Hull Forces a Departure",
+    date: "2026-08-02",
+    deck: "Finishing a ship forces the current worker to leave the yard, turning production into a visible movement problem rather than a passive reward.",
+    body: [
+      "Completing a hull also forces the ship currently working at the yard to leave.",
+      "When construction finishes, the new vessel remains at the yard and the ship that did the work must leave. The departure needs a legal destination and enough fuel, so the final construction turn cannot be separated from the map around it.",
+      "The rule prevents yards from becoming safe warehouses. A nearly completed hull announces a coming movement. The producing side may delay the last turn because every exit is dangerous; the opponent may time a missile, an arrival or a nearby support ship around that hesitation.",
+      "The new ship is therefore not simply more material. It changes which vessel holds the yard, exposes the old worker to a route and can consume fuel at the exact moment the fleet hoped to become stronger.",
+      "Both sides can see the approach of this production deadline. The producing fleet must therefore consider whether it can afford the movement and change of positions that completion requires."
+    ]
+  },
+  {
+    category: "AI / STRATEGY",
+    slug: "deterministic-opponent-for-better-mistakes",
+    title: "Why the Opponent Does Not Learn Mid-Match",
+    date: "2026-08-02",
+    deck: "The computer opponent uses fixed priorities and makes the same decision from the same position, so repeated mistakes can be investigated directly.",
+    body: [
+      "The computer opponent follows fixed priorities and produces the same decision when it receives the same position.",
+      "DeltaV's opponent follows fixed priorities and chooses the same order from the same position. It does not learn the player's habits during a match and does not receive a private difficulty bonus.",
+      "That consistency suits a strategy game built around public information. Players learn how fuel, timing and contested positions shape behavior instead of trying to guess an unseen mood. The opponent can still surprise them because simultaneous orders hide its immediate intention.",
+      "Repeatability is just as valuable when the opponent is wrong. A wasteful missile, a premature retreat or a missed recovery route can be reopened exactly. The cause remains there long enough to be understood.",
+      "Repeatable mistakes can be linked to the opponent's reading of fuel, threats or recovery routes and revised without adding hidden information or bonuses."
+    ]
+  },
+  {
+    category: "COMBAT / DESIGN",
+    slug: "the-long-argument-over-one-dodge",
+    title: "Why Evasion Became Automatic",
+    date: "2026-08-02",
+    deck: "Evasion changed repeatedly before becoming an automatic fuel cost paid on impact, without requiring a separate defensive order from the player.",
+    body: [
+      "The evasion rule changed several times because it had to account for fuel, multiple incoming missiles, lost production and the amount of defensive input expected from the player.",
+      "Early versions treated a dodge as a large emergency burn that cleared every missile aimed at the ship. Later versions made the price rise with the number of incoming weapons. Both made sense on paper, but they encouraged the player to manage a separate defensive action instead of thinking about production and position.",
+      "Under the current rule, an unpinned ship automatically spends one point of delta-v when a missile arrives. Several missiles arriving together demand one point each, and the ship loses its turn of work.",
+      "The attacker can see whether the defending fleet has enough fuel, can stack arrivals to exceed the available reserve or can first contest the orbit and remove the target's room to evade. The defender plans around the threat without confirming the same survival choice after every impact.",
+      "A ship that leaves before impact breaks the firing solution entirely. A ship that remains beside an enemy cannot dodge at all. Those positional answers are more interesting than opening a defensive menu after the important decisions have already been made.",
+      "The one-point cost is simpler than the earlier versions, while the relevant choices remain in the timing of launches, the available fuel and the target's position when the missile arrives."
+    ]
+  },
+  {
+    category: "TIMING / TACTICS",
+    slug: "a-missile-arrives-before-reinforcement",
+    title: "A Missile Arrives Before the Reinforcement",
+    date: "2026-08-02",
+    deck: "Several days went into deciding how a forced shipyard departure, a missile impact and a reinforcement arrival resolve when they share one turn.",
+    body: [
+      "Several days were spent deciding the order of three events that can affect the same orbit in one turn: a forced shipyard departure, a missile impact and a reinforcement arrival.",
+      "DeltaV resolves the forced departure first, then the missile, then the incoming ship. The new hull left at the yard can still dodge if the orbit was not already contested when the turn began. Only after the weapon has been answered does the reinforcement arrive and change control of the position.",
+      "Putting the reinforcement first would let a ship launched days earlier erase the defender's ability to dodge at the final instant. Putting the missile before the forced departure would punish a ship that had already committed to leaving. Both answers created tactics that felt detached from the orders players had actually made.",
+      "To pin a target for an incoming missile, the attacking ship must already share its orbit before that turn begins. Arriving during the same turn is too late to affect that impact.",
+      "This order also keeps construction consistent. The worker leaves because the new hull exists, the hull answers any threat already due, and only then does the arriving ship contest the yard."
+    ]
+  },
+  {
+    category: "ECONOMY / STRATEGY",
+    slug: "the-most-valuable-yard-is-half-built",
+    title: "Why Shipyard Progress Can Be Captured",
+    date: "2026-08-02",
+    deck: "Construction stays at the yard when control changes. Taking an enemy's unfinished hull can be more valuable than owning an idle shipyard from the start.",
+    body: [
+      "Construction progress remains at a shipyard when control changes, so a partly completed enemy hull can affect the value of an attack.",
+      "Construction progress belongs to the yard, not to the side that began it. If one fleet completes two turns of work at Mars and is driven away, another fleet can capture Mars and continue from there.",
+      "Resetting the counter on capture was the obvious clean rule, but it made unfinished work strategically weightless. The defender lost only future access, while the attacker gained the same empty facility it could have taken at any other moment.",
+      "Persistent progress increases the value of a yard as completion approaches. Its owner may stay longer to protect the investment, while an attacker may spend more fuel than the location is normally worth because part of the next hull is already complete.",
+      "The rule also gives meaning to interruption. Firing from the yard delays construction. A missile that forces a dodge delays it again. A contest freezes the work without erasing it, so both sides can wait beside a valuable unfinished hull neither is currently able to complete.",
+      "When the yard changes hands, the history now says CAPTURE before it says WORK. This wording was corrected during playtesting because calling both events work concealed the transfer of stored construction."
+    ]
+  },
+  {
+    category: "MAP / STRATEGY",
+    slug: "why-the-solar-system-got-smaller",
+    title: "Why DeltaV Uses Twenty-Two Playable Places",
+    date: "2026-08-02",
+    deck: "The current map uses 22 planets and moons. It includes enough local positions for support and route control without asking the player to manage every real moon in the Solar System.",
+    body: [
+      "The current runtime map contains 22 playable places. They are Mercury, Venus, Earth, the Moon, Mars, Phobos, Deimos, Jupiter, Io, Europa, Ganymede, Callisto, Saturn, Titan, Iapetus, Uranus, Oberon, Titania, Neptune, Triton, Pluto and Charon.",
+      "Earlier map studies also considered asteroids, Trojan groups, more distant objects and different selections of moons. Adding real names was easy, but many of those locations repeated a decision that already existed nearby or added another place to wait without changing the surrounding routes.",
+      "The current set keeps the major planets as the large-scale structure and gives the most important outer systems several local positions. Mars has Phobos and Deimos; Jupiter has Io, Europa, Ganymede and Callisto; Saturn has Titan and Iapetus; Uranus has Oberon and Titania. These moons allow a fleet to support a nearby contest, approach from another orbit or remain outside a full position without creating a new class of unit.",
+      "Earth and the Moon are included because they orient the whole map and form the protected corridor, not because they provide another battlefield. Pluto and Charon are separate playable places in the current runtime, which gives the outer edge a local relationship instead of treating the pair as one combined destination.",
+      "Not every real moon becomes playable. A moon is included when its position can change access to fuel, construction, support or movement between systems. Smaller satellites can remain visible as part of the Solar System without adding another location the player must inspect every turn.",
+      "Twenty-two places leave room for local tactics without losing the larger geography. The player can read Mars, Jupiter, Saturn, Uranus and the outer edge as different groups while the changing alignment between those groups continues to alter long journeys."
+    ]
+  },
+  {
+    category: "TACTICS",
+    slug: "the-third-ship-stays-outside",
+    title: "Why the Third Ship Stays Outside",
+    date: "2026-08-02",
+    deck: "A contested orbit holds one ship from each side. Additional ships remain outside, where support becomes a separate tactical role instead of a larger stack.",
+    body: [
+      "A contested orbit accepts one ship from each side. A third ship remains outside and supports the contest from a separate position.",
+      "A normal orbit holds one ship. A contested orbit holds two opponents. Another arrival waits outside rather than turning the location into a stack of units whose individual roles are difficult to read.",
+      "From that outer position, support remains active. It can fire on the enemy pinned inside, threaten the route of withdrawal or wait to occupy the facility after the contest ends.",
+      "The limit also keeps numerical superiority from resolving itself automatically. Three ships do not become a larger damage total applied to one defender. They must arrive in the right order, preserve fuel and use time to convert their extra freedom into an actual advantage.",
+      "If an orbit is already full when another ship arrives, the waiting ship remains exposed and may still receive orders, but it has not joined the contest. The time needed to enter after a place becomes available must be included in the plan.",
+      "The capacity limit allows support, blockade and relief to remain distinct uses for the same kind of ship instead of combining every nearby vessel into one stack."
+    ]
+  },
+  {
+    category: "MAP / INFORMATION",
+    slug: "a-moving-map-without-a-time-machine",
+    title: "Why DeltaV Does Not Show Every Future Route",
+    date: "2026-08-02",
+    deck: "The planetarium shows the journey that can be ordered now, not an unlimited forecast. Moving geography remains a source of timing without becoming a planning spreadsheet.",
+    body: [
+      "An early planning version allowed the player to move the map forward and inspect routes that would become available on later turns.",
+      "DeltaV tried that idea and removed it. A full future scrubber turned the map into a timetable that had to be searched before every order. The orbit stopped feeling like a changing opportunity and became another layer of calculation performed outside the turn.",
+      "The current preview answers the immediate question. If a ship leaves now, it shows the cost, travel time, route and position of the destination on arrival. That is enough to compare the commitments actually available this turn.",
+      "Future windows still exist because the bodies keep moving. Waiting can improve one route and worsen another, but the player reads that possibility from the shape and rhythm of the map rather than consulting a perfect catalogue of later prices.",
+      "The current information horizon is intended to explain the consequence of an available order without requiring the player to search every future turn for the lowest possible route cost."
+    ]
+  },
+  {
+    category: "LORE / DESIGN",
+    slug: "how-the-lore-became-part-of-the-rules",
+    title: "How the Lore Became Part of the Rules",
+    date: "2026-08-02",
+    deck: "The setting developed to explain the limits already present in play: one vital fuel, corporate fleets, protected space around Earth and a war with no fixed campaign length.",
+    body: [
+      "The lore developed alongside the rules and was revised whenever the setting implied a kind of game that DeltaV was not trying to become.",
+      "Tritium first needed to explain why one compact resource could support movement, industry and political power without adding cargo routes and several separate economies. Making it important to fusion travel and to the AI-heavy economy on Earth gave the fleet's delta-v reserve a wider context while leaving the player with one resource to manage.",
+      "Corporate fleets provided a reason for several comparable factions to fight without turning the match into a conventional war between states. They can operate through private security, contractors and deniable actions, which suits limited forces and shared ship capabilities better than national navies fighting an unrestricted total war.",
+      "That premise created another problem around Earth and the Moon. These are the most familiar places on the map, but allowing them to be conquered, mined and attacked made every match gravitate toward Earth. The setting now gives terrestrial states a continuing monopoly of force in that corridor, where debris, nuclear weapons and damage to civilian infrastructure would trigger intervention. The two bodies remain useful for orientation and transit but are outside the corporate war.",
+      "Beyond the Moon, enforcement becomes less credible as distance and cost increase. This explains why the conflict can continue around Jupiter, Saturn and the outer planets without implying that governments have disappeared. It also supports the restrained language of the command log: the war is observable from Earth, but its operational details arrive through corporate reports rather than a complete public account.",
+      "The 2079 Saturn incident was added later as the first confirmed use of a registered ship weapon against another registered vessel. It gives the log a specific historical point without defining a complete chronology for the campaign that follows.",
+      "No fixed duration is assigned to that conflict. One turn is useful to think of as roughly three days for movement and warning, but a thirty-turn match is not automatically a ninety-day historical war. Keeping those scales separate avoids forcing balance changes or unusually long matches to rewrite the setting.",
+      "The current lore is kept when it explains a rule, a boundary or the tone of the information shown to the player. Named heroes, mechanical faction advantages and additional political detail remain outside the baseline because they do not yet solve a problem that appears in play."
+    ]
+  },
+  {
+    category: "VISUAL DEVELOPMENT",
+    slug: "from-hard-scifi-to-cartoon-space-and-back",
+    title: "From Hard Sci-Fi to Cartoon Space and Back",
+    date: "2026-08-02",
+    deck: "The visual direction moved from a dark lander prototype through brighter ships and softer space imagery before returning to a restrained strategic planetarium.",
+    body: [
+      "The first preserved build, DeltaV Arcade v4, already used a dark field, a sparse interface and a very small spacecraft against a large planet. Its presentation was simple, but the scale made the vehicle look vulnerable and kept the surrounding space dominant.",
+      "The Orbital Maneuver AI prototype moved in a more cartoonish direction. It used colorful clouds, a dense starfield, soft rounded panels and a bright white ship that could be read immediately while it turned and fired. Those choices helped a real-time action prototype, where the player needed to find the vehicle quickly, but they made space feel warmer and less severe than the later strategy game required.",
+      "A later ship reference explored a large illuminated ring, a central crewed body and clearly separated solar structures. It had a memorable silhouette and communicated function better than a generic spacecraft shape. At the normal strategic scale, however, the ring asked to be viewed as a hero object and made the ship appear much larger than its role on the map.",
+      "The current direction returned to hard sci-fi without pursuing photorealism. Ships are small systems of engine light, secondary lights and brief correction burns. Planets remain clean and somewhat stylized, but hard lighting, sparse stars, thin orbit lines and restrained color restore distance and physical exposure to the scene.",
+      "Some features from the brighter phase remained because they improved recognition. Faction color stays on operational lights and orbit lines, ships still have small attitude changes, and planets are enlarged enough to remain identifiable. Color now describes ownership, movement or danger instead of decorating the whole background.",
+      "The opening view places the major planets close to a common line through the Sun, with some in conjunction and others in opposition. The first reason is simply that it looks good. The alignment gives the wide image a clear structure, creates large areas of empty space for the interface and makes the different planetary scales easier to compare. A random spread was more astronomically ordinary but looked like unrelated points rather than one Solar System.",
+      "The alignment is an opening composition, not a bonus hidden in the rules or a claim about one exact historical date. Once the match advances, the planets continue along their accelerated orbits and the arrangement breaks apart into the changing route geometry used by play."
+    ],
+    figures: [
+      {
+        afterParagraph: 0,
+        src: new URL("./assets/devlog/visual-history-arcade-v4.png", import.meta.url).href,
+        alt: "DeltaV Arcade v4 with a small white lander resting against a large blue planet",
+        caption:
+          "DeltaV Arcade v4: the earliest preserved build already gave most of the frame to the planet and the surrounding darkness."
+      },
+      {
+        afterParagraph: 1,
+        src: new URL("./assets/devlog/visual-history-orbital-maneuver-ai.png", import.meta.url)
+          .href,
+        alt: "Orbital Maneuver AI with a bright white ship, colorful space clouds and rounded controls",
+        caption:
+          "Orbital Maneuver AI: stronger color and a more immediately readable vehicle suited the real-time prototype, but shifted the overall tone."
+      },
+      {
+        afterParagraph: 2,
+        src: new URL("../../resources/DeltaV-ship-user-angle-v2.png", import.meta.url).href,
+        alt: "Intermediate DeltaV ship reference built around a large illuminated structural ring",
+        caption:
+          "The ring-ship reference gave the vehicle a distinctive functional silhouette while making it visually dominant at close range."
+      },
+      {
+        afterParagraph: 5,
+        src: new URL("./assets/devlog/machine-development.png", import.meta.url).href,
+        alt: "Current DeltaV planetarium with sparse orbit lines, small ships and planets arranged across the Sun",
+        caption:
+          "The current planetarium uses the opening alignment as a composition, then allows the bodies to move apart during play."
+      }
     ]
   }
 ] as const satisfies readonly DevlogEntry[];

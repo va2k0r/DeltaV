@@ -1,8 +1,10 @@
 import * as THREE from "three";
 
 export const canonicalFirePreviewGeometryEnabled = true;
-export const canonicalFirePreviewTargetMode = "tracked-ship" as const;
+export const canonicalFirePreviewTargetMode = "orbit-center" as const;
 export const firePreviewImpactGapPixels = 1.8;
+
+export type FireTrajectoryTargetMode = "orbit-center" | "tracked-ship";
 
 export type FirePreviewGeometry = Readonly<{
   flightPoints: readonly THREE.Vector3[];
@@ -11,6 +13,7 @@ export type FirePreviewGeometry = Readonly<{
 }>;
 
 export type FirePreviewGeometryOptions = Readonly<{
+  arcDirection?: -1 | 1;
   departureDirection?: THREE.Vector3;
   etaTurns: number;
   impactCenter: THREE.Vector3;
@@ -44,7 +47,7 @@ export function buildFirePreviewGeometry(options: FirePreviewGeometryOptions): F
   );
   const departure = getReadableDepartureDirection(options.departureDirection, direct);
   const side = new THREE.Vector3(-planarDirect.z, 0, planarDirect.x).multiplyScalar(
-    getStableArcDirection(origin, impactCenter)
+    options.arcDirection ?? getStableArcDirection(origin, impactCenter)
   );
   const etaTurns = Math.max(1, options.etaTurns);
   const controlDistance = clamp(

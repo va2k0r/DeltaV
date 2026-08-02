@@ -54,6 +54,26 @@ jobs:
           npm run lint
           npm run build
 
+      - name: Exclude unreleased audio from the public build
+        shell: bash
+        run: |
+          find dist -type f \( \
+            -iname '*.mp3' -o \
+            -iname '*.wav' -o \
+            -iname '*.ogg' -o \
+            -iname '*.flac' \
+          \) -delete
+
+          if find dist -type f \( \
+            -iname '*.mp3' -o \
+            -iname '*.wav' -o \
+            -iname '*.ogg' -o \
+            -iname '*.flac' \
+          \) -print -quit | grep -q .; then
+            echo 'Unreleased audio is still present in the public build.' >&2
+            exit 1
+          fi
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
 

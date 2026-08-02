@@ -34,15 +34,14 @@ describe("Cinematic 3D architecture boundary", () => {
       methodSource.indexOf("if (this.tacticalPresentationDisplayScaleDirty)"),
       methodSource.indexOf("const isCameraMotionActive")
     );
-    expect(displayScaleDirtyBranch).toContain("tacticalPresentationReducedZoomUpdateSeconds");
-    expect(displayScaleDirtyBranch).toContain("tacticalPresentationMinimalZoomUpdateSeconds");
-    expect(displayScaleDirtyBranch).toContain('performanceMode !== "full"');
+    expect(displayScaleDirtyBranch).not.toContain("tacticalPresentationReducedZoomUpdateSeconds");
+    expect(displayScaleDirtyBranch).not.toContain("tacticalPresentationMinimalZoomUpdateSeconds");
+    expect(displayScaleDirtyBranch).not.toContain('performanceMode !== "full"');
+    expect(displayScaleDirtyBranch).not.toContain("return false");
     expect(displayScaleDirtyBranch).toContain(
       "return this.scheduleTacticalPresentationUpdate(elapsed);"
     );
-    expect(displayScaleDirtyBranch.indexOf('performanceMode !== "full"')).toBeLessThan(
-      displayScaleDirtyBranch.indexOf("this.tacticalPresentationDisplayScaleDirty = false")
-    );
+    expect(displayScaleDirtyBranch).toContain("this.tacticalPresentationDisplayScaleDirty = false");
     expect(source).toContain("const tacticalPresentationMinimumFrameGap = 2");
     expect(methodSource).toContain("framesSinceLastUpdate < tacticalPresentationMinimumFrameGap");
     expect(methodSource).toContain(
@@ -334,28 +333,15 @@ describe("Cinematic 3D architecture boundary", () => {
       'row.className?.includes("command-console__line--tutorial-complete-hint") === true'
     );
 
-    const animationStart = source.indexOf(
-      "async function renderLiveCommandRowsWithDynamicAnimation("
-    );
-    const animationEnd = source.indexOf(
-      "async function appendResolutionTranscriptRows(",
-      animationStart
-    );
-    const animationSource = source.slice(animationStart, animationEnd);
-
-    expect(animationStart).toBeGreaterThanOrEqual(0);
-    expect(animationEnd).toBeGreaterThan(animationStart);
-    expect(animationSource).toContain("metadata: row.metadata");
-    expect(animationSource).toContain(
-      "previousLiveDynamicCommandRows = getDynamicCommandRows(rows);"
-    );
-    expect(animationSource).not.toContain("renderLiveCommandRowsInstant(rows);");
+    expect(source).not.toContain("renderLiveCommandRowsWithDynamicAnimation");
+    expect(source).not.toContain("eraseCommandConsoleLine");
+    expect(source).toContain("renderLiveCommandRowsInstant(rows);");
 
     const reserveStart = source.indexOf("function reserveTypewriterLineHeight(");
     const reserveEnd = source.indexOf("function startCommandLineTypewriter(", reserveStart);
     const reserveSource = source.slice(reserveStart, reserveEnd);
     const releaseStart = source.indexOf("function releaseTypewriterLineHeight(");
-    const releaseEnd = source.indexOf("function eraseCommandConsoleLine(", releaseStart);
+    const releaseEnd = source.indexOf("function waitForCommandConsoleMs(", releaseStart);
     const releaseSource = source.slice(releaseStart, releaseEnd);
 
     expect(reserveSource).toContain("line.getBoundingClientRect().height");
@@ -418,7 +404,9 @@ describe("Cinematic 3D architecture boundary", () => {
 
     expect(uiSource).toContain("new DeltaVMusicEngine()");
     expect(uiSource).toContain("musicButton");
-    expect(uiSource).toContain("let isMusicEnabled = true;");
+    expect(uiSource).toContain("const isMusicTemporarilyUnavailable = true;");
+    expect(uiSource).toContain("let isMusicEnabled = false;");
+    expect(uiSource).toContain('musicButton.textContent = "Music Unavailable"');
     expect(uiSource).toContain('musicButton.textContent = "Music On"');
     expect(uiSource).toContain('musicButton.setAttribute("aria-pressed", "true")');
     expect(uiSource).toContain('"Music On"');
@@ -680,17 +668,17 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("Beat Sync ${beatSyncMode.toUpperCase()}");
     expect(uiSource).toContain("formatTurnForConsole(snapshot.turn)");
     expect(uiSource).toContain("isCommandConsoleResolving");
-    expect(uiSource).toContain("isCommandConsoleAnimatingLiveRows");
+    expect(uiSource).not.toContain("isCommandConsoleAnimatingLiveRows");
     expect(uiSource).toContain("shouldTypeNextLiveCommandBlock");
-    expect(uiSource).toContain("renderLiveCommandRowsWithDynamicAnimation");
+    expect(uiSource).not.toContain("renderLiveCommandRowsWithDynamicAnimation");
     expect(uiSource).toContain("appendLiveCommandBlockSequential");
     expect(uiSource).toContain("for (const row of rows)");
     expect(uiSource).toContain("attachCommandLiveRowsBlock()");
     expect(uiSource).toContain("commandTranscript.append(commandLiveRows)");
     expect(uiSource).not.toContain("commandLive.append(commandLiveRows)");
     expect(uiSource).toContain("prepareCommandTranscriptForTimelineAppend()");
-    expect(uiSource).toContain("await line.typewriterDone");
-    expect(uiSource).toContain("eraseCommandConsoleLine");
+    expect(uiSource).toContain("await line.startTypewriter?.()");
+    expect(uiSource).not.toContain("eraseCommandConsoleLine");
     expect(uiSource).toContain("appendCommandBlockSequential");
     expect(uiSource).not.toContain("reserveCommandBlockBottomUpHeight");
     expect(uiSource).not.toContain("measureCommandRowsHeight");
@@ -712,7 +700,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("getCommandTranscriptScrollEnd()");
     expect(uiSource).toContain("commandTranscript.scrollHeight - commandTranscript.clientHeight");
     expect(uiSource).toContain("window.requestAnimationFrame(typeNextFrame)");
-    expect(uiSource).toContain("window.requestAnimationFrame(eraseNextFrame)");
+    expect(uiSource).not.toContain("window.requestAnimationFrame(eraseNextFrame)");
     expect(uiSource).not.toContain("trimCommandTranscriptToFit");
     expect(uiSource).toContain("command-console__type-cursor");
     expect(uiSource).toContain('controlType: "ai"');
@@ -877,19 +865,14 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(styles).toContain("line-height: 1.36");
     expect(styles).toContain("--command-console-line-right-gutter: clamp(22px, 2.4vw, 56px)");
     expect(styles).toContain("--command-console-line-right-gutter: clamp(14px, 4vw, 30px)");
-    expect(styles).toContain("--command-console-transcript-headroom: clamp(112px, 15vh, 220px)");
-    expect(styles).toContain("--command-console-transcript-headroom: 0px");
+    expect(styles).toContain("--command-console-section-gap: 0.72em");
+    expect(styles).not.toContain("--command-console-transcript-headroom");
     expect(styles).toContain("contain: layout paint style");
     expect(styles).toContain("pointer-events: none");
     expect(styles).toContain("user-select: none");
     expect(styles).toContain("-webkit-user-select: none");
     expect(styles).toContain(".command-console__transcript");
-    expect(styles).toContain(".command-console__transcript::before");
-    expect(styles).toContain("flex: 1 1 var(--command-console-transcript-headroom)");
-    expect(styles).toContain("max-height: var(--command-console-transcript-headroom)");
-    expect(styles).toContain(
-      "Collapse decorative headroom before the transcript starts scrolling."
-    );
+    expect(styles).not.toContain(".command-console__transcript::before");
     expect(styles).toContain(".command-console__transcript > *");
     expect(styles).toContain("flex-shrink: 0");
     expect(styles).toContain(".command-console__type-cursor {");
@@ -906,9 +889,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(styles).toContain("overflow-anchor: none");
     expect(styles).toContain("scrollbar-width: none");
     expect(styles).not.toContain("mask-image: linear-gradient");
-    expect(styles).toContain(
-      "padding-bottom: calc(0.45em + var(--command-console-tail-snap-padding))"
-    );
+    expect(styles).toContain("padding-bottom: var(--command-console-section-gap)");
     expect(styles).toContain("justify-content: flex-start");
     expect(styles).toContain("pointer-events: auto");
     expect(styles).toContain("display: none;");
@@ -957,7 +938,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(styles).toContain(".command-console__type-cursor");
     expect(styles).toContain(".command-console__line--turn");
     expect(styles).toContain(".command-console__line--command-start");
-    expect(styles).toContain(".command-console__line--erasing");
+    expect(styles).not.toContain(".command-console__line--erasing");
     expect(styles).toContain(".command-console__line--linked-event");
     expect(styles).toContain("touch-action: none");
     expect(styles).toContain("width: 100%");
@@ -1822,7 +1803,7 @@ describe("Cinematic 3D architecture boundary", () => {
     );
     expect(uiSource).not.toContain("Left click to confirm transfer burn.");
     expect(uiSource).toContain("includeTutorialHints: false");
-    expect(uiSource).toContain("return rows.filter((row) => row.key !== undefined);");
+    expect(uiSource).not.toContain("return rows.filter((row) => row.key !== undefined);");
     expect(uiSource).toContain("TUTORIAL TEXT OFF");
     expect(uiSource).toContain("CONTEXT BLINK OFF");
     expect(uiSource).toContain('type TutorialOverlayMode = "on" | "off"');
@@ -2099,7 +2080,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(styles).toContain(".command-console__line--tutorial-spacer");
     expect(styles).toContain(".command-console__line--spacer");
     expect(styles).toContain(".command-console__line--spacer + .command-console__line--turn");
-    expect(styles).toContain("min-height: 0.48em");
+    expect(styles).toContain("min-height: var(--command-console-section-gap)");
     expect(styles).toContain("opacity: calc(0.72 + var(--execute-attention-pulse) * 0.28)");
     expect(styles).toContain(".command-console__block + .command-console__block");
     expect(styles).toContain("tutorial-live-hint-blink var(--beat-tutorial-hint-duration, 1050ms)");
@@ -2119,7 +2100,7 @@ describe("Cinematic 3D architecture boundary", () => {
     );
     expect(uiSource).toContain("shouldTypewriteCommandTimelineRow(row, options)");
     expect(uiSource).toContain("typewriter: shouldTypewriteRow");
-    expect(uiSource).toContain("typewriter: isNewRow && shouldTypewriteLiveCommandRow(row)");
+    expect(uiSource).not.toContain("typewriter: isNewRow && shouldTypewriteLiveCommandRow(row)");
     expect(uiSource).not.toContain("tutorial-popup");
     expect(uiSource).not.toContain("tutorial billboard");
   });
@@ -2587,6 +2568,11 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("uniform float surfaceRadius");
     expect(source).toContain("float filamentFlow =");
     expect(source).toContain("float microProminenceFlow =");
+    expect(source).toContain("float gaussianAngularLobe(float wave, float width)");
+    expect(source).toContain("float angularDistance = acos(clamp(wave, -1.0, 1.0))");
+    expect(source).toContain("gaussianAngularLobe(largeProminenceFlow, 0.72)");
+    expect(source).toContain("gaussianAngularLobe(smallProminenceFlow, 0.66) * 0.82");
+    expect(source).toContain("gaussianAngularLobe(microProminenceFlow, 0.56) * 0.58");
     expect(source).toContain("float microProminences =");
     expect(source).toContain("float prominenceField =");
     expect(source).toContain("float coronalTongues =");
@@ -6318,7 +6304,7 @@ describe("Cinematic 3D architecture boundary", () => {
       "  function pauseTutorialForFirstEnemyKillReplayCue(): boolean {"
     );
     const completeStart = uiSource.indexOf(
-      "  function completeTutorialFirstEnemyKillReplayCue(): void {",
+      "  async function completeTutorialFirstEnemyKillReplayCue(): Promise<void> {",
       pauseStart
     );
     const pauseSource = uiSource.slice(pauseStart, completeStart);
@@ -6573,6 +6559,7 @@ describe("Cinematic 3D architecture boundary", () => {
 
   it("keeps title-screen hover explanations concise and left of the menu log column", () => {
     const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
+    const indexSource = readFileSync(join(process.cwd(), "index.html"), "utf8");
     const glossaryControllerSource = readFileSync(
       join(process.cwd(), "src/ui/gameGlossaryController.ts"),
       "utf8"
@@ -6595,8 +6582,16 @@ describe("Cinematic 3D architecture boundary", () => {
       'tooltip: "Begin the guided introduction to movement, production and combat."'
     );
     expect(uiSource).toContain(
-      'tooltip: "Open match configuration for factions and planning time."'
+      '"Not active in version 0.7. Open the Logbook to see what the full match mode will include."'
     );
+    expect(uiSource.match(/unavailable: true/g)).toHaveLength(2);
+    expect(uiSource).toContain('openUnavailableGameMenuLogbook("new-game")');
+    expect(uiSource).toContain('openUnavailableGameMenuLogbook("player-vs-player")');
+    expect(glossaryControllerSource).toContain(
+      "openContextualLogbook: (entry: GameContextualLogbookEntry) => void;"
+    );
+    expect(styleSource).toContain(".game-menu__action.is-unavailable");
+    expect(indexSource).toContain("<title>DeltaV Orbital Strategy 0.7</title>");
     expect(uiSource).toContain(
       'tooltip: "Open audio, display and trajectory presentation settings."'
     );
@@ -6659,8 +6654,8 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(optionsSource).toContain("setGameMenuAccentsMode(nextAccentsMode);");
     expect(optionsSource).toContain("getGameMenuFullscreenLabel()");
     expect(optionsSource).toContain("toggleGameMenuFullscreen(action)");
-    expect(optionsSource).toContain('"DEBUG"');
-    expect(optionsSource).toContain("openDebugDrawerFromGameMenu");
+    expect(optionsSource).not.toContain('"DEBUG"');
+    expect(optionsSource).not.toContain("openDebugDrawerFromGameMenu");
     expect(optionsSource).not.toContain("getGameMenuPerformanceLabel()");
     expect(optionsSource).not.toContain("performanceAction");
     expect(optionsSource).toContain(
@@ -6671,8 +6666,7 @@ describe("Cinematic 3D architecture boundary", () => {
         "      reflectionsAction,\n" +
         "      accentsAction,\n" +
         "      fullscreenAction,\n" +
-        "      brightnessControl,\n" +
-        "      debugAction\n" +
+        "      brightnessControl\n" +
         "    );"
     );
     expect(optionsSource).toContain("createGameMenuBrightnessControl(typingTargets)");
@@ -6686,7 +6680,7 @@ describe("Cinematic 3D architecture boundary", () => {
     );
     expect(uiSource).toContain('type GameMenuAccentsMode = "on" | "burn" | "fire" | "off";');
     expect(uiSource).toContain("return `ACCENTS ${getGameMenuAccentsMode().toUpperCase()}`;");
-    expect(uiSource).toContain(
+    expect(uiSource).not.toContain(
       "if (!debugToggleButton.isConnected || !header.isConnected) {\n" +
         "      canvasFrame.append(debugToggleButton, header);\n" +
         "    }"
@@ -6882,9 +6876,16 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(scrollSource).toContain("if (!commandTranscriptFollowsTail) {");
     expect(scrollSource).toContain("function snapCommandTranscriptToLiveTail(): void");
     expect(scrollSource).toContain("commandTranscriptFollowsTail = true;");
-    expect(scrollSource).toContain("snapCommandTranscriptTailWithoutClippedLine();");
-    expect(scrollSource).toContain('"--command-console-tail-snap-padding"');
-    expect(scrollSource).toContain('querySelectorAll<HTMLElement>(".command-console__line")');
+    expect(scrollSource).toContain("function getCommandTranscriptBehavior(): ScrollBehavior");
+    expect(scrollSource).toContain(
+      'scrollCommandTranscriptTo(getCommandTranscriptScrollEnd(), "auto")'
+    );
+    expect(scrollSource).toContain("commandTranscript.scrollTo({ top, behavior })");
+    expect(scrollSource).toContain('? "auto"\n      : "smooth"');
+    expect(scrollSource).not.toContain("commandTranscriptMaxScrollSpeedPixelsPerMs");
+    expect(scrollSource).not.toContain("Math.exp(");
+    expect(scrollSource).not.toContain("snapCommandTranscriptTailWithoutClippedLine");
+    expect(scrollSource).not.toContain('"--command-console-tail-snap-padding"');
     expect(scrollSource).toContain("function isCommandTranscriptAtEnd(): boolean");
     expect(wheelSource).toContain("commandTranscriptFollowsTail = isCommandTranscriptAtEnd();");
     expect(
@@ -6920,8 +6921,8 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("sampleFixedTimelineReviewPosition(");
     expect(uiSource).toContain("normalizeCommandLogWheelDelta(");
     expect(uiSource).toContain('commandTranscript.classList.add("has-scrollback")');
-    expect(styles).toContain(".command-console__transcript.has-scrollback::before");
-    expect(styles).toContain("max-height: 0;");
+    expect(styles).not.toContain(".command-console__transcript.has-scrollback::before");
+    expect(styles).not.toContain("max-height: 0;");
     expect(uiSource).toContain("getReplayEntryVisualProgress");
     expect(uiSource).not.toContain("beginTrailerReplayLogRewrite");
     expect(uiSource).not.toContain("syncTrailerReplayCommandLog");
@@ -6988,8 +6989,8 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(rendererSource).not.toContain("tacticalPresentationUpdatePhase");
     expect(rendererSource).toContain("private scheduleTacticalPresentationUpdate(elapsed: number)");
     expect(rendererSource).not.toContain("tacticalPresentationDeferredFireUpdate");
-    expect(rendererSource).toContain("tacticalPresentationReducedZoomUpdateSeconds");
-    expect(rendererSource).toContain("tacticalPresentationMinimalZoomUpdateSeconds");
+    expect(rendererSource).not.toContain("tacticalPresentationReducedZoomUpdateSeconds");
+    expect(rendererSource).not.toContain("tacticalPresentationMinimalZoomUpdateSeconds");
     expect(rendererSource).toContain(
       "this.isTimelinePreviewActive && this.replayPresentationEffectsEnabled"
     );
@@ -7339,7 +7340,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("getReplayTransitionIndexForResolutionEventId");
     expect(uiSource).toContain("getReplayPositionForResolutionEventId");
     expect(uiSource).toContain("getCommandLogEventIdNearReviewPosition");
-    expect(uiSource).toContain("showTutorialFirstEnemyKillReplayFollowupHint(tutorial)");
+    expect(uiSource).toContain("showTutorialFirstEnemyKillReplayRewindHint(tutorial)");
     expect(uiSource).toContain("isTutorialFirstEnemyKillReplayCueInputPending");
     expect(uiSource).toContain("waitForCommandLogReplayFocusBeforePlayback");
     expect(uiSource).toContain("focusCommandScrollbackLineTarget(line)");
@@ -7349,32 +7350,38 @@ describe("Cinematic 3D architecture boundary", () => {
     );
     expect(uiSource).toContain("preserveCurrentFocus: true");
     expect(uiSource).toContain(
-      "completeTutorialFirstEnemyKillReplayCue();\n        scrollCommandTranscriptToEnd();"
+      "await completeTutorialFirstEnemyKillReplayCue();\n        scrollCommandTranscriptToEnd();"
     );
     expect(uiSource).toContain(
-      "showTutorialFirstEnemyKillReplayFollowupHint(tutorial);\n    updateInteractionLocks();"
+      "showTutorialFirstEnemyKillReplayRewindHint(tutorial);\n    updateInteractionLocks();"
     );
-    expect(uiSource).toContain("tutorial:first-enemy-kill-replay-followup-hint");
-    expect(uiSource).toContain("Left-click the blinking log line again to rewind to that event.");
-    expect(uiSource).toContain("Left-click the same line once more to resume from the present.");
+    expect(uiSource).toContain("tutorial:first-enemy-kill-replay-rewind-hint");
+    expect(uiSource).toContain("tutorial:first-enemy-kill-replay-return-hint");
     expect(uiSource).toContain(
-      "commandLogTimeReviewState !== null) {\n        freezeTutorialFirstEnemyKillReplayFollowupHints();"
+      "Left-click the blinking log line once to select it, then left-click it again to rewind to that event."
     );
-    expect(uiSource).toContain("const hintRowKeys = new Set([`${key}:rewind`, `${key}:replay`]);");
+    expect(uiSource).toContain("Left-click the selected log line again to return to the present.");
+    expect(uiSource).toContain(
+      'freezeTutorialFirstEnemyKillReplayHint("rewind");\n        showTutorialFirstEnemyKillReplayReturnHint(tutorial);'
+    );
+    expect(uiSource).toContain(
+      'function freezeTutorialFirstEnemyKillReplayHint(kind: "rewind" | "return")'
+    );
     expect(uiSource).toContain("const frozenRow = freezeTutorialLiveHintRow(row);");
-    expect(uiSource).toContain("appendTutorialFirstEnemyKillPostReplayWarning(tutorial)");
-    expect(uiSource).toContain("firstEnemyKillReplayWarningPending = true");
+    expect(uiSource).toContain("appendTutorialFirstEnemyKillPostReplayVictoryLesson(tutorial)");
+    expect(uiSource).toContain("firstEnemyKillReplayVictoryLessonPending = true");
+    expect(uiSource).toContain("commitLiveTutorialTimelineRowsToTranscript(");
     expect(uiSource).toContain("tutorialPostVictoryActionLessonTurn = snapshot.turn;");
     expect(uiSource).toContain("tutorialPostVictoryActionLessonTurn + 1 === snapshot.turn");
     expect(uiSource).toContain("createTutorialPostVictoryAutomaticBehaviorRows");
     expect(uiSource).toContain("snapshot.turn > tutorialPostVictoryActionLessonTurn");
     expect(uiSource).toContain(
-      "updateTutorialCommandConsoleWithTypewriter();\n    handOffTutorialToNormalMatch(tutorial);\n    updateInteractionLocks();"
+      "handOffTutorialToNormalMatch(tutorial);\n    updateInteractionLocks();\n    updateCommandConsole();"
     );
     expect(uiSource).toContain("handOffTutorialToNormalMatch(tutorial);");
     expect(uiSource).toContain("tutorialState = null;");
     expect(uiSource).not.toContain("completeTutorialGuidedSegment({ immediate: true });");
-    expect(uiSource).toContain("createTutorialEnemyContactVictoryWarningRows()");
+    expect(uiSource).toContain("createTutorialEnemyContactVictoryRows()");
     expect(uiSource).toContain("requestedReplayStartTransitionIndex");
     expect(uiSource).toContain(".slice(firstTransitionIndex)");
     expect(uiSource).toContain("requestAnimationFrame(tick)");
@@ -8829,21 +8836,17 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(createPreviewFireLaunchOriginSource).toContain(
       "getStableBurnTransferFieldAngle(previewLaunchKey)"
     );
-    expect(createPreviewFireLaunchOriginSource).toContain(
+    expect(createPreviewFireLaunchOriginSource).toContain("capturedLaunchPosition: undefined");
+    expect(createPreviewFireLaunchOriginSource).toContain("destination: baseTarget");
+    expect(createPreviewFireLaunchOriginSource).not.toContain(
       "this.getRenderedShipMissileLaunchSample("
     );
-    expect(createPreviewFireLaunchOriginSource).toContain("plan.originNodeId, factionId");
-    expect(createPreviewFireLaunchOriginSource).toContain(
-      "const currentOrigin = this.getCurrentDisplayNodeRenderData(plan.originNodeId);"
+    expect(createPreviewFireLaunchOriginSource).not.toContain(
+      "this.getRenderedShipMarkerWorldPosition("
     );
-    expect(createPreviewFireLaunchOriginSource).toContain("this.reprojectCapturedLaunchPosition(");
-    expect(createPreviewFireLaunchOriginSource).toContain("center: currentOrigin.center");
-    expect(createPreviewFireLaunchOriginSource).toContain("ringRadius: currentOrigin.ringRadius");
-    expect(createPreviewFireLaunchOriginSource).toContain(
-      "capturedLaunchPosition: renderedLaunchPosition"
+    expect(createPreviewFireLaunchOriginSource).not.toContain(
+      "this.reprojectCapturedLaunchPosition("
     );
-    expect(createPreviewFireLaunchOriginSource).toContain("destination: baseTarget");
-    expect(createPreviewFireLaunchOriginSource).not.toContain("this.getFireTargetRenderData(");
     expect(getFireTargetRenderDataSource).toContain(
       "const lockedTargetOrbitAngle = this.getFirePlanTargetOrbitAngle(plan);"
     );
@@ -8854,15 +8857,25 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain(
       'if ("launchedTurn" in plan) {\n      return this.activeMissileTargetAngles.get(plan.id);\n    }'
     );
-    expect(resolveFireTrajectorySource).toContain("canonicalFirePreviewTargetMode");
-    expect(resolveFireTrajectorySource).toContain(
-      "const target = this.getFireTargetRenderData(plan, baseTarget);"
+    expect(getFireTargetRenderDataSource).toContain(
+      "private getFireTrajectoryTargetMode(plan: RenderableFirePlan)"
     );
-    expect(resolveFireTrajectorySource).not.toContain('"orbit-center"');
+    expect(getFireTargetRenderDataSource).toContain(
+      '"launchedTurn" in plan && this.activeMissileTargetAngles.has(plan.id)'
+    );
+    expect(getFireTargetRenderDataSource).toContain('? "tracked-ship"');
+    expect(getFireTargetRenderDataSource).toContain(": canonicalFirePreviewTargetMode");
+    expect(resolveFireTrajectorySource).toContain(
+      "const target = this.getFireTrajectoryTargetRenderData(plan, baseTarget, resolvedTargetMode);"
+    );
+    expect(resolveFireTrajectorySource).toContain(
+      "const resolvedTargetMode = targetMode ?? this.getFireTrajectoryTargetMode(plan);"
+    );
+    expect(resolveFireTrajectorySource).toContain("getTransferArcDirectionFromPositions(");
+    expect(resolveFireTrajectorySource).toContain("toVector3(plan.targetPositionAtImpact)");
     expect(resolveFireTrajectorySource).toContain(
       "`${this.getFirePlanPresentationKey(plan)}:${resolvedTargetMode}`"
     );
-    expect(source).not.toContain('"orbit-center"');
     expect(source).not.toContain("private getFirePreviewRenderedPoints(");
     expect(source).toContain("dashTerminalAnchorProgress");
     expect(source).toContain("max(min(lead, trail), terminalAnchor)");

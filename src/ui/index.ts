@@ -122,6 +122,7 @@ import {
   getCommandFactionClass
 } from "./commandConsoleFormatting";
 import {
+  applyGameGlossaryTokenSemantics,
   createGameGlossaryController,
   createGameGlossaryTextSpans,
   gameMenuGlossaryHoverDwellMs,
@@ -212,7 +213,7 @@ import { getTutorialAiPlanningFactionIds } from "./tutorial/turnControl";
 import {
   createTutorialConfirmBurnLiveRows,
   createTutorialEnterFireModeLiveRows,
-  createTutorialEnemyContactVictoryWarningRows,
+  createTutorialEnemyContactVictoryRows,
   createTutorialConfirmFiringSolutionLiveRows,
   createTutorialConfirmTransferBurnLiveRows,
   createTutorialFirstBurnCostRows,
@@ -767,7 +768,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   controls.className = "map-controls debug-controls";
 
   const musicEngine = new DeltaVMusicEngine();
-  let isMusicEnabled = true;
+  const isMusicTemporarilyUnavailable = true;
+  let isMusicEnabled = false;
   const sfxEngine = new DeltaVSfxEngine();
 
   const nextTurnButton = document.createElement("button");
@@ -1139,9 +1141,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let isCommandConsoleResolving = false;
   let turnPresentationDeadlineAt: number | null = null;
   let isCommandConsoleTypingLiveBlock = false;
-  let isCommandConsoleAnimatingLiveRows = false;
   let shouldRefreshCommandConsoleAfterLiveUpdate = false;
-  let hasRenderedLiveCommandRows = false;
   let shouldTypeNextLiveCommandBlock = false;
   let isReplayMode = false;
   let userReplayFocusTargetKeys: readonly string[] = [];
@@ -1283,7 +1283,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   const commandDvHistory: FactionCounts[] = [];
   const debugRecorderMessages: string[] = [];
   const debugPanelMessages: string[] = [];
-  let previousLiveDynamicCommandRows: readonly CommandConsoleRow[] = [];
   const contentByPresetKey = new Map<string, SolarSystemData>();
   const proceduralGenerationBySeed = new Map<string, ProceduralMapGeneration>();
   const aiAutorunIssuedProceduralSeeds = new Set<string>();
@@ -1733,16 +1732,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     updateDebugFps();
-  }
-
-  function openDebugDrawerFromGameMenu(): void {
-    if (!debugToggleButton.isConnected || !header.isConnected) {
-      canvasFrame.append(debugToggleButton, header);
-    }
-
-    if (header.classList.contains("is-hidden")) {
-      toggleDebugDrawer();
-    }
   }
 
   function setBeautyModeActive(active: boolean): void {
@@ -2620,24 +2609,28 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         createGameMenuAction(
           "NEW GAME",
           () => {
-            toggleGameMenuSubmenu("new-game");
+            openUnavailableGameMenuLogbook("new-game");
           },
           {
-            actionScreen: "new-game",
-            tone: "regular",
-            tooltip: "Open match configuration for factions and planning time."
+            actionScreen: "main",
+            tone: "dim",
+            unavailable: true,
+            tooltip:
+              "Not active in version 0.7. Open the Logbook to see what the full match mode will include."
           },
           typingTargets
         ),
         createGameMenuAction(
           "PLAYER VS PLAYER",
           () => {
-            navigateToSiteSection("player-vs-player");
+            openUnavailableGameMenuLogbook("player-vs-player");
           },
           {
             actionScreen: "main",
-            tone: "regular",
-            tooltip: "Read about deterministic network matches between two human commanders."
+            tone: "dim",
+            unavailable: true,
+            tooltip:
+              "Not active in version 0.7. Open the Logbook to see how matches between human commanders will work."
           },
           typingTargets
         ),
@@ -2690,6 +2683,29 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       const screen = action.dataset["screen"];
       action.classList.toggle("is-selected", screen !== "main" && screen === gameMenuScreen);
     }
+  }
+
+  function openUnavailableGameMenuLogbook(mode: "new-game" | "player-vs-player"): void {
+    if (mode === "new-game") {
+      commandGlossaryController.openContextualLogbook({
+        id: "game-menu-new-game",
+        label: "NEW GAME / CURRENTLY INACTIVE",
+        detail: [
+          "NEW GAME will be the route into a complete match without tutorial guidance. It will open the match setup, where faction count and planning time can be chosen before entering the full Solar System.",
+          "This mode is currently inactive in version 0.7. PLAY TUTORIAL is the available way to play this build."
+        ]
+      });
+      return;
+    }
+
+    commandGlossaryController.openContextualLogbook({
+      id: "game-menu-player-vs-player",
+      label: "PLAYER VS PLAYER / CURRENTLY INACTIVE",
+      detail: [
+        "PLAYER VS PLAYER will put human commanders on opposite sides of the same orbital war. Each side will plan movement, production and combat, then watch those orders resolve together.",
+        "This mode is currently inactive in version 0.7. Online matches and matchmaking are not available yet."
+      ]
+    });
   }
 
   function renderGameMenuSubmenu(typingTargets: GameMenuTypingTarget[]): void {
@@ -2793,12 +2809,13 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       toggleGameMenuMusic,
       {
         audioControl: "music",
-        tone: isMusicEnabled ? "regular" : "dim",
+        tone: "dim",
         tooltipLabel: "MUSIC",
-        tooltip: "Enable or disable soundtrack playback."
+        tooltip: "The current soundtrack is temporarily disabled while its replacement is prepared."
       },
       typingTargets
     );
+    musicAction.disabled = isMusicTemporarilyUnavailable;
     const sfxAction = createGameMenuAction(
       getGameMenuSfxLabel(),
       toggleGameMenuSfx,
@@ -2908,15 +2925,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     fullscreenAction.disabled = !document.fullscreenEnabled;
     gameMenuFullscreenAction = fullscreenAction;
     const brightnessControl = createGameMenuBrightnessControl(typingTargets);
-    const debugAction = createGameMenuAction(
-      "DEBUG",
-      openDebugDrawerFromGameMenu,
-      {
-        tone: "dim",
-        tooltip: "Open the developer diagnostics drawer."
-      },
-      typingTargets
-    );
 
     actions.append(
       musicAction,
@@ -2925,8 +2933,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       reflectionsAction,
       accentsAction,
       fullscreenAction,
-      brightnessControl,
-      debugAction
+      brightnessControl
     );
   }
 
@@ -3052,6 +3059,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       selected?: boolean;
       actionScreen?: GameMenuScreen;
       tone?: GameMenuActionTone;
+      unavailable?: boolean;
       tooltip?: string;
       tooltipLabel?: string;
     }> = {},
@@ -3063,6 +3071,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     action.classList.toggle("is-selected", options.selected === true);
     if (options.tone !== undefined) {
       action.classList.add(`game-menu__action--${options.tone}`);
+    }
+    if (options.unavailable === true) {
+      action.classList.add("is-unavailable");
+      action.setAttribute("aria-disabled", "true");
     }
     action.dataset["screen"] = options.actionScreen ?? "";
     if (options.audioControl !== undefined) {
@@ -3450,6 +3462,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function getGameMenuMusicLabel(): string {
+    if (isMusicTemporarilyUnavailable) {
+      return "MUSIC UNAVAILABLE";
+    }
+
     return isMusicEnabled ? "MUSIC ON" : "MUSIC OFF";
   }
 
@@ -3701,6 +3717,17 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function updateMusicButton(): void {
+    if (isMusicTemporarilyUnavailable) {
+      isMusicEnabled = false;
+      cancelMusicAutoplayUnlock();
+      musicEngine.stop();
+      musicButton.textContent = "Music Unavailable";
+      musicButton.disabled = true;
+      musicButton.classList.remove("is-active");
+      musicButton.setAttribute("aria-pressed", "false");
+      return;
+    }
+
     if (!musicEngine.isSupported) {
       musicButton.textContent = "Music N/A";
       musicButton.disabled = true;
@@ -4132,6 +4159,14 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   async function toggleMusic(): Promise<void> {
+    if (isMusicTemporarilyUnavailable) {
+      isMusicEnabled = false;
+      cancelMusicAutoplayUnlock();
+      musicEngine.stop();
+      updateMusicButton();
+      return;
+    }
+
     if (!musicEngine.isSupported) {
       updateMusicButton();
       return;
@@ -4164,7 +4199,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function startMusicOnGameStart(): void {
-    if (!musicEngine.isSupported || !isMusicEnabled) {
+    if (isMusicTemporarilyUnavailable || !musicEngine.isSupported || !isMusicEnabled) {
       if (!isMusicEnabled) {
         cancelMusicAutoplayUnlock();
         musicEngine.stop();
@@ -4187,7 +4222,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   function restartMusicForZeroTimerCountdown(): void {
     fallbackBeatSyncStartedAtMs = performance.now();
 
-    if (!musicEngine.isSupported || !isMusicEnabled) {
+    if (isMusicTemporarilyUnavailable || !musicEngine.isSupported || !isMusicEnabled) {
       if (!isMusicEnabled) {
         cancelMusicAutoplayUnlock();
         musicEngine.stop();
@@ -4212,7 +4247,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function registerMusicAutoplayUnlock(): void {
-    if (musicAutoplayUnlockHandler !== null) {
+    if (isMusicTemporarilyUnavailable || musicAutoplayUnlockHandler !== null) {
       return;
     }
 
@@ -4623,7 +4658,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
-    if (isCommandConsoleTypingLiveBlock || isCommandConsoleAnimatingLiveRows) {
+    if (isCommandConsoleTypingLiveBlock) {
       shouldRefreshCommandConsoleAfterLiveUpdate = true;
       return;
     }
@@ -4649,23 +4684,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       isCommandConsoleTypingLiveBlock = true;
       void appendLiveCommandBlockSequential(rows, { typewriter: true })
         .then(() => {
-          hasRenderedLiveCommandRows = true;
-          previousLiveDynamicCommandRows = getDynamicCommandRows(rows);
           appendExecutePromptToLiveBlock();
         })
         .finally(() => {
           isCommandConsoleTypingLiveBlock = false;
           flushQueuedCommandConsoleRefresh();
         });
-      return;
-    }
-
-    if (shouldAnimateLiveDynamicCommandRows(rows)) {
-      isCommandConsoleAnimatingLiveRows = true;
-      void renderLiveCommandRowsWithDynamicAnimation(rows).finally(() => {
-        isCommandConsoleAnimatingLiveRows = false;
-        flushQueuedCommandConsoleRefresh();
-      });
       return;
     }
 
@@ -4690,8 +4714,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       }
 
       await appendLiveCommandBlockSequential(rows, { typewriter: true });
-      hasRenderedLiveCommandRows = true;
-      previousLiveDynamicCommandRows = getDynamicCommandRows(rows);
       appendExecutePromptToLiveBlock();
     } finally {
       isCommandConsoleTypingLiveBlock = false;
@@ -5125,8 +5147,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         child instanceof HTMLElement &&
         child.classList.contains("command-console__line") &&
         !child.classList.contains("command-console__line--spacer") &&
-        !child.classList.contains("command-console__line--tutorial-spacer") &&
-        !child.classList.contains("command-console__line--erasing")
+        !child.classList.contains("command-console__line--tutorial-spacer")
     );
     const blinkingCandidates = candidates.filter((line) =>
       line.classList.contains("command-console__line--tutorial-live-hint")
@@ -5183,77 +5204,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   function renderLiveCommandRowsInstant(rows: readonly CommandConsoleRow[]): void {
     prepareCommandLiveRowsBlock();
     appendCommandBlock(commandLiveRows, rows, { typewriter: false });
-    hasRenderedLiveCommandRows = true;
-    previousLiveDynamicCommandRows = getDynamicCommandRows(rows);
     appendExecutePromptToLiveBlock();
-  }
-
-  function shouldAnimateLiveDynamicCommandRows(rows: readonly CommandConsoleRow[]): boolean {
-    if (!hasRenderedLiveCommandRows) {
-      return false;
-    }
-
-    return (
-      getCommandRowsSignature(getDynamicCommandRows(rows)) !==
-      getCommandRowsSignature(previousLiveDynamicCommandRows)
-    );
-  }
-
-  async function renderLiveCommandRowsWithDynamicAnimation(
-    rows: readonly CommandConsoleRow[]
-  ): Promise<void> {
-    releaseTutorialCommandLogPinnedRow();
-    commandLive.innerHTML = "";
-    prepareCommandLiveRowsBlock();
-    appendExecutePromptToLiveBlock();
-    const previousRows = previousLiveDynamicCommandRows;
-    const previousRowsByKey = new Map(previousRows.map((row) => [row.key, row]));
-    const nextRowsByKey = new Map(getDynamicCommandRows(rows).map((row) => [row.key, row]));
-    const pendingEraseAnimations: Promise<void>[] = [];
-
-    for (const row of rows) {
-      if (row.key === undefined) {
-        appendCommandConsoleLine(commandLiveRows, row.parts, row.className, {
-          metadata: row.metadata,
-          typewriter: false
-        });
-        continue;
-      }
-
-      const isNewRow = !previousRowsByKey.has(row.key);
-      const line = appendCommandConsoleLine(commandLiveRows, row.parts, row.className, {
-        metadata: row.metadata,
-        typewriter: isNewRow && shouldTypewriteLiveCommandRow(row)
-      });
-      scrollCommandTranscriptToEnd();
-
-      if (isNewRow && line.typewriterDone !== undefined) {
-        await line.typewriterDone;
-        scrollCommandTranscriptToEnd();
-      }
-    }
-
-    for (const row of previousRows) {
-      if (row.key === undefined || nextRowsByKey.has(row.key)) {
-        continue;
-      }
-
-      const line = appendCommandConsoleLine(
-        commandLiveRows,
-        row.parts,
-        mergeCommandConsoleClassNames(row.className, "command-console__line--erasing"),
-        {
-          typewriter: false
-        }
-      );
-      pendingEraseAnimations.push(eraseCommandConsoleLine(line));
-    }
-
-    await Promise.all(pendingEraseAnimations);
-    hasRenderedLiveCommandRows = true;
-    previousLiveDynamicCommandRows = getDynamicCommandRows(rows);
-    appendExecutePromptToLiveBlock();
-    scrollCommandTranscriptToEnd();
   }
 
   async function appendResolutionTranscriptRows(fromDebugEventIndex: number): Promise<void> {
@@ -5388,6 +5339,36 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     noteTutorialPlayerActivity();
     pushLiveTutorialTimelineRows(expandTutorialSentenceRows(rows, key), key);
     updateCommandConsole();
+  }
+
+  async function appendPersistentTutorialTimelineRows(
+    rows: readonly CommandTimelineRow[],
+    key: string,
+    options: CommandConsoleAppendOptions
+  ): Promise<void> {
+    if (rows.length === 0) {
+      return;
+    }
+
+    const entry: CommandTimelineEntry = {
+      kind: "tutorial",
+      id: `command-tutorial:${snapshot.turn}:${commandTimelineEntries.length}:${key}`,
+      turn: snapshot.turn,
+      rows
+    };
+    commandTimelineEntries.push(entry);
+    await appendCommandTimelineEntrySequential(entry, options);
+    scrollCommandTranscriptToEnd();
+  }
+
+  async function commitLiveTutorialTimelineRowsToTranscript(key: string): Promise<void> {
+    if (liveTutorialTimelineRows.length === 0) {
+      return;
+    }
+
+    const rows = liveTutorialTimelineRows.map(freezeTutorialLiveHintRow);
+    liveTutorialTimelineRows.length = 0;
+    await appendPersistentTutorialTimelineRows(rows, key, { typewriter: false });
   }
 
   function appendTutorialFirstBurnCostOnce(): void {
@@ -7628,6 +7609,15 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     bars.className = `dv-bars ${getCommandFactionClass(factionId)}`;
     const bounded = values.slice(-5);
     const maxValue = Math.max(10, ...bounded);
+    const factionLabel = getConsoleFactionLabel(factionId);
+    const valuesLabel = bounded.join(" → ");
+    const sampleExplanation =
+      bounded.length <= 1
+        ? "The only bar is the live projection; no resolved history is available yet."
+        : "Left bars are resolved history; the right bar is the live projection.";
+    applyGameGlossaryTokenSemantics(bars, "dv-chart", `${factionLabel} ΔV trend`);
+    bars.dataset["glossaryShort"] =
+      `${factionLabel} ΔV trend: ${valuesLabel}. ${sampleExplanation}`;
 
     for (const value of bounded) {
       const bar = document.createElement("span");
@@ -7668,10 +7658,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     return className === undefined ? row : { ...row, className };
   }
 
-  function getDynamicCommandRows(rows: readonly CommandConsoleRow[]): readonly CommandConsoleRow[] {
-    return rows.filter((row) => row.key !== undefined);
-  }
-
   function shouldTypewriteLiveCommandRow(row: CommandConsoleRow): boolean {
     const className = row.className ?? "";
 
@@ -7691,26 +7677,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     return shouldTypewriteLiveCommandRow(row);
-  }
-
-  function getCommandRowsSignature(rows: readonly CommandConsoleRow[]): string {
-    return rows
-      .map((row) => {
-        return `${row.key ?? ""}:${getCommandConsolePartsText(row.parts)}`;
-      })
-      .join("\n");
-  }
-
-  function getCommandConsolePartsText(parts: readonly CommandConsolePart[]): string {
-    return parts
-      .map((part) => {
-        return part.text ?? part.element?.textContent ?? "";
-      })
-      .join("");
-  }
-
-  function mergeCommandConsoleClassNames(first: string | undefined, second: string): string {
-    return first === undefined ? second : `${first} ${second}`;
   }
 
   function renderExecutePrompt(mode: ExecutePromptMode): void {
@@ -7769,8 +7735,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
-    snapCommandTranscriptTailWithoutClippedLine();
-
     if (commandTranscriptScrollFrame !== null) {
       return;
     }
@@ -7782,36 +7746,38 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         return;
       }
 
-      snapCommandTranscriptTailWithoutClippedLine();
+      scrollCommandTranscriptTo(getCommandTranscriptScrollEnd(), getCommandTranscriptBehavior());
     });
   }
 
   function snapCommandTranscriptToLiveTail(): void {
     commandTranscriptFollowsTail = true;
-    scrollCommandTranscriptToEnd();
+    cancelCommandTranscriptScrollAnimation();
+    scrollCommandTranscriptTo(getCommandTranscriptScrollEnd(), "auto");
   }
 
-  function snapCommandTranscriptTailWithoutClippedLine(): void {
-    commandTranscript.style.setProperty("--command-console-tail-snap-padding", "0px");
-    commandTranscript.scrollTop = getCommandTranscriptScrollEnd();
-    const transcriptTop = commandTranscript.getBoundingClientRect().top;
-    const partiallyVisibleLine = Array.from(
-      commandTranscript.querySelectorAll<HTMLElement>(".command-console__line")
-    ).find((line) => {
-      const bounds = line.getBoundingClientRect();
-      return bounds.top < transcriptTop - 0.5 && bounds.bottom > transcriptTop + 0.5;
-    });
+  function getCommandTranscriptBehavior(): ScrollBehavior {
+    return typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? "auto"
+      : "smooth";
+  }
 
-    if (partiallyVisibleLine === undefined) {
+  function scrollCommandTranscriptTo(top: number, behavior: ScrollBehavior): void {
+    if (typeof commandTranscript.scrollTo === "function") {
+      commandTranscript.scrollTo({ top, behavior });
       return;
     }
 
-    const visibleRemainder = partiallyVisibleLine.getBoundingClientRect().bottom - transcriptTop;
-    commandTranscript.style.setProperty(
-      "--command-console-tail-snap-padding",
-      `${Math.max(0, visibleRemainder)}px`
-    );
-    commandTranscript.scrollTop = getCommandTranscriptScrollEnd();
+    commandTranscript.scrollTop = top;
+  }
+
+  function cancelCommandTranscriptScrollAnimation(): void {
+    if (commandTranscriptScrollFrame !== null) {
+      window.cancelAnimationFrame(commandTranscriptScrollFrame);
+    }
+
+    commandTranscriptScrollFrame = null;
   }
 
   function getCommandTranscriptScrollEnd(): number {
@@ -8171,61 +8137,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     line.style.height = "";
-  }
-
-  function eraseCommandConsoleLine(line: CommandConsoleLineElement): Promise<void> {
-    const reservedHeight = Math.ceil(line.getBoundingClientRect().height);
-
-    if (reservedHeight > 0) {
-      line.style.height = `${reservedHeight}px`;
-    }
-
-    const targets = [...line.querySelectorAll<HTMLSpanElement>("span")]
-      .filter((span) => {
-        return span.className !== "command-console__type-cursor";
-      })
-      .map((span) => {
-        return { span, text: span.textContent ?? "" };
-      });
-    const totalCharacters = targets.reduce((total, target) => {
-      return total + target.text.length;
-    }, 0);
-    const durationMs = clampNumber(totalCharacters * 1.1, 35, 90);
-    const startedAt = performance.now();
-
-    const renderRemainingCharacters = (visibleCharacters: number) => {
-      let remainingCharacters = visibleCharacters;
-
-      for (const target of targets) {
-        const visibleInTarget = clampNumber(remainingCharacters, 0, target.text.length);
-        target.span.textContent = target.text.slice(0, visibleInTarget);
-        remainingCharacters -= visibleInTarget;
-      }
-    };
-
-    return new Promise((resolve) => {
-      if (totalCharacters === 0) {
-        line.remove();
-        resolve();
-        return;
-      }
-
-      const eraseNextFrame = () => {
-        const progress = clampNumber((performance.now() - startedAt) / durationMs, 0, 1);
-        const visibleCharacters = Math.max(0, Math.ceil(totalCharacters * (1 - progress)));
-        renderRemainingCharacters(visibleCharacters);
-
-        if (visibleCharacters <= 0) {
-          line.remove();
-          resolve();
-          return;
-        }
-
-        window.requestAnimationFrame(eraseNextFrame);
-      };
-
-      window.requestAnimationFrame(eraseNextFrame);
-    });
   }
 
   function waitForCommandConsoleMs(durationMs: number): Promise<void> {
@@ -9191,19 +9102,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       postMatchReturnTimer = null;
       returnToMainMenuFromPostMatch();
     }, postMatchAutoReturnDelayMs);
-  }
-
-  function showTutorialCompletionReport(): void {
-    showPostMatchReport(
-      [
-        "TUTORIAL COMPLETE",
-        "",
-        "The guided operation has concluded.",
-        `Final turn: ${snapshot.turn}`,
-        `Active orbits: ${snapshot.nodes.length}`
-      ].join("\n")
-    );
-    updateStatus();
   }
 
   function returnToMainMenuFromPostMatch(): void {
@@ -10314,7 +10212,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     )) {
       const isCueLine = cue !== null && line.dataset["eventId"] === cue.eventId;
       const isDisabledByCue = cue !== null && !isCueLine;
+      const isSelectedCueLine =
+        isCueLine && tutorialState?.firstEnemyKillReplayLineSelected === true;
       line.classList.toggle("command-console__line--tutorial-replay-cue", isCueLine);
+      line.classList.toggle("command-console__line--tutorial-replay-selected", isSelectedCueLine);
       line.classList.toggle("command-console__line--tutorial-replay-disabled", isDisabledByCue);
       line.tabIndex = isDisabledByCue ? -1 : 0;
       if (isDisabledByCue) {
@@ -13895,9 +13796,16 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         await playCommandLogReviewForwardToPosition(replayTape.transitions.length, null, [], null, {
           preserveCurrentFocus: true
         });
-        showTutorialFirstEnemyKillReplayFollowupHint(tutorial);
-        completeTutorialFirstEnemyKillReplayCue();
+        freezeTutorialFirstEnemyKillReplayHint("return");
+        await completeTutorialFirstEnemyKillReplayCue();
         scrollCommandTranscriptToEnd();
+        return;
+      }
+
+      if (!tutorial.firstEnemyKillReplayLineSelected) {
+        tutorial.firstEnemyKillReplayLineSelected = true;
+        focusCommandScrollbackLineTarget(line);
+        syncTutorialFirstEnemyKillReplayCueLine();
         return;
       }
 
@@ -13912,7 +13820,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
       await rewindCommandLogToEvent(targetId, focusTargetKeys, commandRowKey);
       if (commandLogTimeReviewState !== null) {
-        freezeTutorialFirstEnemyKillReplayFollowupHints();
+        tutorial.firstEnemyKillReplayLineSelected = false;
+        freezeTutorialFirstEnemyKillReplayHint("rewind");
+        showTutorialFirstEnemyKillReplayReturnHint(tutorial);
       }
       syncTutorialFirstEnemyKillReplayCueLine();
     } finally {
@@ -13926,8 +13836,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     });
   }
 
-  function showTutorialFirstEnemyKillReplayFollowupHint(tutorial: TutorialRuntimeState): void {
-    const key = "tutorial:first-enemy-kill-replay-followup-hint";
+  function showTutorialFirstEnemyKillReplayRewindHint(tutorial: TutorialRuntimeState): void {
+    const key = "tutorial:first-enemy-kill-replay-rewind-hint";
 
     if (tutorial.loggedKeys.has(key)) {
       return;
@@ -13939,17 +13849,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         {
           parts: [
             {
-              text: "Left-click the blinking log line again to rewind to that event."
+              text: "Left-click the blinking log line once to select it, then left-click it again to rewind to that event."
             }
           ],
           className: tutorialLiveHintClassName,
           key: `${key}:rewind`
-        },
-        createTutorialSpacerRow(`${key}:spacer`),
-        {
-          parts: [{ text: "Left-click the same line once more to resume from the present." }],
-          className: tutorialLiveHintClassName,
-          key: `${key}:replay`
         }
       ],
       key
@@ -13957,13 +13861,37 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     updateCommandConsole();
   }
 
-  function freezeTutorialFirstEnemyKillReplayFollowupHints(): void {
-    const key = "tutorial:first-enemy-kill-replay-followup-hint";
-    const hintRowKeys = new Set([`${key}:rewind`, `${key}:replay`]);
+  function showTutorialFirstEnemyKillReplayReturnHint(tutorial: TutorialRuntimeState): void {
+    const key = "tutorial:first-enemy-kill-replay-return-hint";
+
+    if (tutorial.loggedKeys.has(key)) {
+      return;
+    }
+
+    tutorial.loggedKeys.add(key);
+    pushLiveTutorialTimelineRows(
+      [
+        createTutorialSpacerRow(`${key}:spacer`),
+        {
+          parts: [{ text: "Left-click the selected log line again to return to the present." }],
+          className: tutorialLiveHintClassName,
+          key: `${key}:return`
+        }
+      ],
+      key
+    );
+    updateCommandConsole();
+  }
+
+  function freezeTutorialFirstEnemyKillReplayHint(kind: "rewind" | "return"): void {
+    const hintRowKey =
+      kind === "rewind"
+        ? "tutorial:first-enemy-kill-replay-rewind-hint:rewind"
+        : "tutorial:first-enemy-kill-replay-return-hint:return";
     let didFreezeHint = false;
 
     for (const [rowIndex, row] of liveTutorialTimelineRows.entries()) {
-      if (row.key === undefined || !hintRowKeys.has(row.key)) {
+      if (row.key !== hintRowKey) {
         continue;
       }
 
@@ -15038,14 +14966,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     shouldSuppressNextCommandLogClick = false;
     isCommandConsoleResolving = false;
     isCommandConsoleTypingLiveBlock = false;
-    isCommandConsoleAnimatingLiveRows = false;
-    hasRenderedLiveCommandRows = false;
     shouldTypeNextLiveCommandBlock = true;
     planningTimerState = createDisabledPlanningTimerState(state.turn);
     planningTimerPausedAtMs = null;
     stopPlanningTimerLoop();
     setCommandLogReviewPromptDimmed(false);
-    previousLiveDynamicCommandRows = [];
     clearPostMatchReturnTimer();
     postMatchReportText = null;
     lastVictoryAudit = null;
@@ -15120,7 +15045,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
-    if (appendTutorialFirstEnemyKillPostReplayWarning(tutorial)) {
+    if (tutorial.firstEnemyKillReplayVictoryLessonPending) {
+      void appendTutorialFirstEnemyKillPostReplayVictoryLesson(tutorial);
       return;
     }
 
@@ -15761,20 +15687,29 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     tutorial.loggedKeys.add("tutorial:return-normal");
-    const showCompletionReport = () => {
+    const returnToNormalMatch = async () => {
       if (tutorialState !== tutorial) {
         return;
       }
 
-      showTutorialCompletionReport();
+      await commitLiveTutorialTimelineRowsToTranscript("tutorial:quiet-handoff");
+      tutorial.inputLocked = false;
+      tutorial.autoAdvanceActive = false;
+      tutorial.phase = "complete";
+      handOffTutorialToNormalMatch(tutorial);
+      updateInteractionLocks();
+      updateCommandConsole();
+      updateStatus();
     };
 
     if (options.immediate === true) {
-      showCompletionReport();
+      void returnToNormalMatch();
       return;
     }
 
-    const timer = window.setTimeout(showCompletionReport, 900);
+    const timer = window.setTimeout(() => {
+      void returnToNormalMatch();
+    }, 900);
     tutorial.timers.push(timer);
   }
 
@@ -18121,10 +18056,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     tutorial.autoAdvanceActive = false;
     tutorial.firstEnemyKillReplayEventId = event.id;
     tutorial.firstEnemyKillReplayNodeId = nodeId;
+    tutorial.firstEnemyKillReplayLineSelected = false;
     if (nodeId !== null) {
       selectTutorialTarget(`node:${nodeId}`);
     }
-    showTutorialFirstEnemyKillReplayFollowupHint(tutorial);
+    showTutorialFirstEnemyKillReplayRewindHint(tutorial);
     updateInteractionLocks();
     updateCommandConsole();
     syncTutorialFirstEnemyKillReplayCueLine();
@@ -18132,7 +18068,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     return true;
   }
 
-  function completeTutorialFirstEnemyKillReplayCue(): void {
+  async function completeTutorialFirstEnemyKillReplayCue(): Promise<void> {
     const tutorial = tutorialState;
 
     if (tutorial === null || tutorial.phase !== "firstEnemyKillReplayCue") {
@@ -18141,28 +18077,35 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
     tutorial.firstEnemyKillReplayEventId = null;
     tutorial.firstEnemyKillReplayNodeId = null;
-    tutorial.firstEnemyKillReplayWarningPending = true;
+    tutorial.firstEnemyKillReplayLineSelected = false;
+    tutorial.firstEnemyKillReplayVictoryLessonPending = true;
     tutorial.inputLocked = false;
     tutorial.autoAdvanceActive = false;
     tutorial.phase = "complete";
     syncTutorialFirstEnemyKillReplayCueLine();
-    appendTutorialFirstEnemyKillPostReplayWarning(tutorial);
+    await commitLiveTutorialTimelineRowsToTranscript(
+      "tutorial:first-enemy-kill-replay-instructions"
+    );
+    await appendTutorialFirstEnemyKillPostReplayVictoryLesson(tutorial);
   }
 
-  function appendTutorialFirstEnemyKillPostReplayWarning(tutorial: TutorialRuntimeState): boolean {
-    if (!tutorial.firstEnemyKillReplayWarningPending) {
+  async function appendTutorialFirstEnemyKillPostReplayVictoryLesson(
+    tutorial: TutorialRuntimeState
+  ): Promise<boolean> {
+    if (!tutorial.firstEnemyKillReplayVictoryLessonPending) {
       return false;
     }
 
-    tutorial.firstEnemyKillReplayWarningPending = false;
-    appendTutorialTimelineRows(
-      createTutorialEnemyContactVictoryWarningRows(),
-      "tutorial:first-enemy-kill-post-replay-warning"
+    tutorial.firstEnemyKillReplayVictoryLessonPending = false;
+    await appendPersistentTutorialTimelineRows(
+      createTutorialEnemyContactVictoryRows(),
+      "tutorial:first-enemy-kill-post-replay-victory",
+      { typewriter: true, typewriteAllNonSpacerRows: true }
     );
     tutorialPostVictoryActionLessonTurn = snapshot.turn;
-    updateTutorialCommandConsoleWithTypewriter();
     handOffTutorialToNormalMatch(tutorial);
     updateInteractionLocks();
+    updateCommandConsole();
     updateStatus();
     return true;
   }
