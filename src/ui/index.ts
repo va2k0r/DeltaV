@@ -768,8 +768,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   controls.className = "map-controls debug-controls";
 
   const musicEngine = new DeltaVMusicEngine();
-const isMusicTemporarilyUnavailable = false;
-let isMusicEnabled = true;
+  const isMusicTemporarilyUnavailable = false;
+  let isMusicEnabled = true;
   const sfxEngine = new DeltaVSfxEngine();
 
   const nextTurnButton = document.createElement("button");

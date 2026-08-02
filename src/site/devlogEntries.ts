@@ -178,7 +178,7 @@ const devlogArchive = [
   {
     category: "VICTORY / ECONOMY",
     slug: "war-ends-before-last-ship-dies",
-    title: "Why Access to Fuel Decides Victory",
+    title: "Fuel Access Decides the War",
     date: "2026-05-25",
     deck: "A side remains in the war while one credible route to tritium is still open. Extra ships cannot postpone defeat once every route has closed.",
     body: [
@@ -317,7 +317,7 @@ const devlogArchive = [
   {
     category: "DESIGN / STRATEGY",
     slug: "shipyard-completion-is-a-commitment",
-    title: "Why Completing a Hull Forces a Departure",
+    title: "Completing a Hull Forces a Departure",
     date: "2026-08-02",
     deck: "Finishing a ship forces the current worker to leave the yard, turning production into a visible movement problem rather than a passive reward.",
     body: [
@@ -331,7 +331,7 @@ const devlogArchive = [
   {
     category: "AI / STRATEGY",
     slug: "deterministic-opponent-for-better-mistakes",
-    title: "Why the Opponent Does Not Learn Mid-Match",
+    title: "The Opponent Does Not Learn Mid-Match",
     date: "2026-08-02",
     deck: "The computer opponent uses fixed priorities and makes the same decision from the same position, so repeated mistakes can be investigated directly.",
     body: [
@@ -345,7 +345,7 @@ const devlogArchive = [
   {
     category: "COMBAT / DESIGN",
     slug: "the-long-argument-over-one-dodge",
-    title: "Why Evasion Became Automatic",
+    title: "Evasion Became Automatic",
     date: "2026-08-02",
     deck: "Evasion changed repeatedly before becoming an automatic fuel cost paid on impact, without requiring a separate defensive order from the player.",
     body: [
@@ -374,7 +374,7 @@ const devlogArchive = [
   {
     category: "ECONOMY / STRATEGY",
     slug: "the-most-valuable-yard-is-half-built",
-    title: "Why Shipyard Progress Can Be Captured",
+    title: "Shipyard Progress Can Be Captured",
     date: "2026-08-02",
     deck: "Construction stays at the yard when control changes. Taking an enemy's unfinished hull can be more valuable than owning an idle shipyard from the start.",
     body: [
@@ -389,7 +389,7 @@ const devlogArchive = [
   {
     category: "MAP / STRATEGY",
     slug: "why-the-solar-system-got-smaller",
-    title: "Why DeltaV Uses Twenty-Two Playable Places",
+    title: "DeltaV's Twenty-Two Playable Places",
     date: "2026-08-02",
     deck: "The current map uses 22 planets and moons. It includes enough local positions for support and route control without asking the player to manage every real moon in the Solar System.",
     body: [
@@ -404,7 +404,7 @@ const devlogArchive = [
   {
     category: "TACTICS",
     slug: "the-third-ship-stays-outside",
-    title: "Why the Third Ship Stays Outside",
+    title: "The Third Ship Stays Outside",
     date: "2026-08-02",
     deck: "A contested orbit holds one ship from each side. Additional ships remain outside, where support becomes a separate tactical role instead of a larger stack.",
     body: [
@@ -419,7 +419,7 @@ const devlogArchive = [
   {
     category: "MAP / INFORMATION",
     slug: "a-moving-map-without-a-time-machine",
-    title: "Why DeltaV Does Not Show Every Future Route",
+    title: "A Moving Map Without a Time Machine",
     date: "2026-08-02",
     deck: "The planetarium shows the journey that can be ordered now, not an unlimited forecast. Moving geography remains a source of timing without becoming a planning spreadsheet.",
     body: [
