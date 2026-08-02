@@ -398,14 +398,14 @@ describe("Cinematic 3D architecture boundary", () => {
     }
   });
 
-  it("keeps gameplay music asset-backed, UI-owned, looping, and autoplay-safe", () => {
+  it("keeps gameplay music asset-backed, UI-owned, shuffled, and autoplay-safe", () => {
     const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
     const audioSource = readFileSync(join(process.cwd(), "src/ui/audio.ts"), "utf8");
 
     expect(uiSource).toContain("new DeltaVMusicEngine()");
     expect(uiSource).toContain("musicButton");
-    expect(uiSource).toContain("const isMusicTemporarilyUnavailable = true;");
-    expect(uiSource).toContain("let isMusicEnabled = false;");
+    expect(uiSource).toContain("const isMusicTemporarilyUnavailable = false;");
+    expect(uiSource).toContain("let isMusicEnabled = true;");
     expect(uiSource).toContain('musicButton.textContent = "Music Unavailable"');
     expect(uiSource).toContain('musicButton.textContent = "Music On"');
     expect(uiSource).toContain('musicButton.setAttribute("aria-pressed", "true")');
@@ -422,9 +422,12 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain("musicButton.setAttribute");
     expect(uiSource).toContain("beforeunload");
     expect(uiSource).toContain("musicEngine.dispose()");
-    expect(audioSource).toContain("border242_retrosonic_original.mp3");
+    expect(audioSource).toContain("30-stellar-rift.mp3");
     expect(audioSource).toContain('document.createElement("audio")');
-    expect(audioSource).toContain("this.audio.loop = true");
+    expect(audioSource).toContain("this.audio.loop = false");
+    expect(audioSource).toContain('this.audio.addEventListener("ended"');
+    expect(audioSource).toContain("this.selectRandomTrack()");
+    expect(audioSource).toContain("Math.random()");
     expect(audioSource).toContain("this.audio.play()");
     expect(audioSource).toContain("this.audio.currentTime");
     expect(audioSource).toContain("restartFromBeginning(): Promise<boolean>");
