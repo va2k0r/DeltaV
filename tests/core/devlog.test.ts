@@ -162,12 +162,17 @@ describe("public devlog", () => {
       (entry) => entry.slug === "from-hard-scifi-to-cartoon-space-and-back"
     );
 
-    expect(visualEntry?.figures).toHaveLength(4);
-    expect(
-      devlogEntries
-        .filter((entry) => entry.slug !== "from-hard-scifi-to-cartoon-space-and-back")
-        .every((entry) => entry.figures === undefined)
-    ).toBe(true);
+    expect(visualEntry?.figures).toHaveLength(5);
+    const entriesWithFigures = devlogEntries
+      .filter((entry) => entry.figures !== undefined)
+      .map((entry) => entry.slug)
+      .sort();
+
+    expect(entriesWithFigures).toEqual([
+      "from-hard-scifi-to-cartoon-space-and-back",
+      "playing-past-the-tutorial",
+      "replay-led-debugging-became-the-workflow"
+    ]);
   });
 
   it("describes the current runtime map as twenty-two playable places", () => {
