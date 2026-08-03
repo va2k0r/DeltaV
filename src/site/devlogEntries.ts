@@ -224,7 +224,8 @@ const devlogArchive = [
     figures: [
       {
         afterParagraph: 2,
-        src: new URL("./assets/devlog/11_gif_stable_02_v17_fixed_camera_mid.gif", import.meta.url).href,
+        src: new URL("./assets/devlog/11_gif_stable_02_v17_fixed_camera_mid.gif", import.meta.url)
+          .href,
         alt: "Fixed-camera mid angle during a tutorial replay analysis pass",
         caption:
           "Fixed-camera mid sequence used to keep camera movement stable while reviewing a full-playthrough regression workflow."
@@ -311,7 +312,8 @@ const devlogArchive = [
     figures: [
       {
         afterParagraph: 5,
-        src: new URL("./assets/devlog/11_gif_stable_03_v17_fixed_camera_late.gif", import.meta.url).href,
+        src: new URL("./assets/devlog/11_gif_stable_03_v17_fixed_camera_late.gif", import.meta.url)
+          .href,
         alt: "Fixed-camera late framing during late-turn replay review",
         caption:
           "Fixed-camera late shot helps checking late-resolution behavior while replaying a suspicious turn."
@@ -498,8 +500,10 @@ const devlogArchive = [
       },
       {
         afterParagraph: 0,
-        src: new URL("./assets/devlog/11_gif_stable_08_v21_beauty_frozen_front.gif", import.meta.url)
-          .href,
+        src: new URL(
+          "./assets/devlog/11_gif_stable_08_v21_beauty_frozen_front.gif",
+          import.meta.url
+        ).href,
         alt: "Beauty frozen front composition from the latest stable visual pass",
         caption:
           "Beauty frozen front frame used as a stable visual reference for the cinematic direction review."
