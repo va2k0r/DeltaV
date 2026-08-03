@@ -45,6 +45,14 @@ const devlogArchive = [
       "Orders are chosen simultaneously. Ships, fuel, construction and weapons already in flight are public; the choice being made now is not. Strategy comes from creating several believable futures and committing before the opponent reveals which future was chosen.",
       "Victory follows the same logic as the fuel reserve. A side remains in the war while it still has a credible route back to tritium, whether through a working ship, a journey already under way, a contest it can afford or a hull close enough to completion to reopen the map. The war ends when every such route has closed, not when the last model disappears from the screen.",
       "DeltaV leaves out component damage, manual piloting and exact spacecraft flight plans. It keeps moving destinations, travel time, visible attacks and the competition between industrial work and military action because those elements affect fleet-level decisions."
+    ],
+    figures: [
+      {
+        afterParagraph: 3,
+        src: "/assets/devlog/11_gif_stable_08_v21_beauty_frozen_front.gif",
+        alt: "A stable frontal view of the DeltaV planetarium.",
+        caption: "The orbital map stays readable while the strategic situation develops."
+      }
     ]
   },
   {
