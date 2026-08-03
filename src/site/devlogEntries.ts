@@ -220,6 +220,15 @@ const devlogArchive = [
       "The final fixes were mostly changes in meaning, not spectacle. A broken missile solution now says that the target escaped. Capturing a yard and adding another turn of work are distinct events. Existing fuel is no longer replaced. The menu pauses the clock even when a new turn begins behind it.",
       "The replay itself exposed another edge. Clicking a highlighted word could open its explanation while preventing the same row from rewinding to the moment it described. Treating the whole row as one event made the interaction agree with the history it was supposed to clarify.",
       "Every visible cost, capture, escape or death now comes from the event that changed the match. This matters because a correct number beside the wrong explanation can teach the player an incorrect rule."
+    ],
+    figures: [
+      {
+        afterParagraph: 2,
+        src: new URL("./assets/devlog/11_gif_stable_02_v17_fixed_camera_mid.gif", import.meta.url).href,
+        alt: "Fixed-camera mid angle during a tutorial replay analysis pass",
+        caption:
+          "Fixed-camera mid sequence used to keep camera movement stable while reviewing a full-playthrough regression workflow."
+      }
     ]
   },
   {
@@ -298,6 +307,15 @@ const devlogArchive = [
       "Replaying the exact moment removes the temptation to fix whichever part is easiest. First the result is compared with the current rule. Then the opponent's decision, the written explanation and the picture are checked against that same result.",
       "Some faults only exist across time. A menu can pause the current clock but fail to pause the next one. A live view can be correct while rewinding restores an older, misleading sentence. Preserving the sequence catches those failures better than a single image.",
       "Even when the rule is working, replaying the saved turn can show that the interface gave the player an inaccurate explanation of the result."
+    ],
+    figures: [
+      {
+        afterParagraph: 5,
+        src: new URL("./assets/devlog/11_gif_stable_03_v17_fixed_camera_late.gif", import.meta.url).href,
+        alt: "Fixed-camera late framing during late-turn replay review",
+        caption:
+          "Fixed-camera late shot helps checking late-resolution behavior while replaying a suspicious turn."
+      }
     ]
   },
   {
@@ -477,6 +495,14 @@ const devlogArchive = [
         alt: "Orbital Maneuver AI with a bright white ship, colorful space clouds and rounded controls",
         caption:
           "Orbital Maneuver AI: stronger color and a more immediately readable vehicle suited the real-time prototype, but shifted the overall tone."
+      },
+      {
+        afterParagraph: 0,
+        src: new URL("./assets/devlog/11_gif_stable_08_v21_beauty_frozen_front.gif", import.meta.url)
+          .href,
+        alt: "Beauty frozen front composition from the latest stable visual pass",
+        caption:
+          "Beauty frozen front frame used as a stable visual reference for the cinematic direction review."
       },
       {
         afterParagraph: 2,
