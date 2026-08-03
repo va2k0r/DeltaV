@@ -170,6 +170,7 @@ describe("public devlog", () => {
 
     expect(entriesWithFigures).toEqual([
       "from-hard-scifi-to-cartoon-space-and-back",
+      "how-to-wage-war-in-space",
       "playing-past-the-tutorial",
       "replay-led-debugging-became-the-workflow"
     ]);
