@@ -2142,17 +2142,24 @@ describe("Cinematic 3D architecture boundary", () => {
   it("defers tutorial selection log rebuilds until after the selected orbit can render", () => {
     const uiSource = readFileSync(join(process.cwd(), "src/ui/index.ts"), "utf8");
     const handlerStart = uiSource.indexOf("function handleTutorialSelection(");
-    const handlerEnd = uiSource.indexOf("function isTutorialLogbookIntroductionBlockingOpening(", handlerStart);
+    const handlerEnd = uiSource.indexOf(
+      "function isTutorialLogbookIntroductionBlockingOpening(",
+      handlerStart
+    );
     const handlerSource = uiSource.slice(handlerStart, handlerEnd);
     const previewStart = uiSource.indexOf("function handleTutorialBurnPreviewSeen(");
     const previewEnd = uiSource.indexOf("function isTutorialBurnPlanAllowed(", previewStart);
     const previewSource = uiSource.slice(previewStart, previewEnd);
 
-    expect(uiSource).toContain('import { createDeferredFrameRefresh } from "./deferredFrameRefresh";');
-    expect(uiSource).toContain("const tutorialSelectionCommandConsoleRefresh = createDeferredFrameRefresh(");
+    expect(uiSource).toContain(
+      'import { createDeferredFrameRefresh } from "./deferredFrameRefresh";'
+    );
+    expect(uiSource).toContain(
+      "const tutorialSelectionCommandConsoleRefresh = createDeferredFrameRefresh("
+    );
     expect(uiSource).toContain("function refreshCommandConsoleAfterTutorialSelection(): void {");
     expect(uiSource).toContain("tutorialSelectionCommandConsoleRefresh.cancel();");
-    expect(handlerSource).toContain('appendTutorialFirstBurnCostOnce({ refresh: false });');
+    expect(handlerSource).toContain("appendTutorialFirstBurnCostOnce({ refresh: false });");
     expect(handlerSource).toContain("refreshCommandConsoleAfterTutorialSelection();");
     expect(handlerSource).not.toContain("updateCommandConsole();");
     expect(previewSource).toContain("refreshCommandConsoleAfterTutorialSelection();");
