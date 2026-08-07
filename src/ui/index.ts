@@ -145,6 +145,7 @@ import {
   sampleFixedTimelineReviewPosition
 } from "./replayPacing";
 import { normalizeCommandLogWheelDelta } from "./commandLogScroll";
+import { createDeferredFrameRefresh } from "./deferredFrameRefresh";
 import { shiftPlanningTimerDeadlinesAfterPause } from "./planningTimerPause";
 import {
   countRemainingShips,
@@ -1143,6 +1144,15 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let isCommandConsoleTypingLiveBlock = false;
   let shouldRefreshCommandConsoleAfterLiveUpdate = false;
   let shouldTypeNextLiveCommandBlock = false;
+  const tutorialSelectionCommandConsoleRefresh = createDeferredFrameRefresh(
+    () => {
+      updateCommandConsole();
+    },
+    {
+      requestFrame: (callback) => window.requestAnimationFrame(callback),
+      cancelFrame: (requestId) => window.cancelAnimationFrame(requestId)
+    }
+  );
   let isReplayMode = false;
   let userReplayFocusTargetKeys: readonly string[] = [];
   let replayCancelRequested = false;
@@ -2743,6 +2753,16 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   function toggleGameMenuSubmenu(screen: Exclude<GameMenuScreen, "main">): void {
     gameMenuScreen = gameMenuScreen === screen ? "main" : screen;
     renderGameMenu();
+  }
+
+  function hideDebugUiAndMainMenuForMatchStart(): void {
+    if (isGameMenuOpen()) {
+      stopGameMenuDemo();
+    }
+
+    header.classList.add("is-hidden");
+    debugToggleButton.setAttribute("aria-expanded", "false");
+    debugToggleButton.classList.add("is-hidden");
   }
 
   function appendGameMenuNewGameOptions(
@@ -4738,6 +4758,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     updateCommandConsole();
   }
 
+  function refreshCommandConsoleAfterTutorialSelection(): void {
+    tutorialSelectionCommandConsoleRefresh.request();
+  }
+
   function appendExecutePromptToLiveBlock(): void {
     const showExecutePrompt = shouldShowExecutePrompt();
 
@@ -5320,7 +5344,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
   function appendTutorialTimelineRows(
     rows: readonly TutorialCommandTimelineRow[],
-    key = rows.map(getCommandTimelineRowText).join("\n")
+    key = rows.map(getCommandTimelineRowText).join("\n"),
+    options: Readonly<{ refresh?: boolean }> = {}
   ): void {
     const tutorial = tutorialState;
 
@@ -5338,7 +5363,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     tutorial.loggedKeys.add(key);
     noteTutorialPlayerActivity();
     pushLiveTutorialTimelineRows(expandTutorialSentenceRows(rows, key), key);
-    updateCommandConsole();
+    if (options.refresh !== false) {
+      updateCommandConsole();
+    }
   }
 
   async function appendPersistentTutorialTimelineRows(
@@ -5371,10 +5398,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     await appendPersistentTutorialTimelineRows(rows, key, { typewriter: false });
   }
 
-  function appendTutorialFirstBurnCostOnce(): void {
+  function appendTutorialFirstBurnCostOnce(options: Readonly<{ refresh?: boolean }> = {}): void {
     appendTutorialTimelineRows(
       createTutorialFirstBurnCostRows(getCommandFactionClass("player")),
-      "tutorial:first-burn-cost"
+      "tutorial:first-burn-cost",
+      options
     );
   }
 
@@ -11347,8 +11375,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       tutorial.firstBurnReselectionStartedAt = null;
       lastPlayerNodeSelectionAt = tutorial.firstSelectionAt;
       hasConfirmedPlayerOrderAfterSelection = false;
-      appendTutorialFirstBurnCostOnce();
-      updateCommandConsole();
+      appendTutorialFirstBurnCostOnce({ refresh: false });
+      refreshCommandConsoleAfterTutorialSelection();
       return;
     }
 
@@ -11362,14 +11390,14 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           tutorial.firstBurnPreviewDestinationNodeId = null;
           tutorial.firstBurnReselectionStartedAt = null;
           lastPlayerNodeSelectionAt = tutorial.firstSelectionAt;
-          updateCommandConsole();
+          refreshCommandConsoleAfterTutorialSelection();
         }
         return;
       }
 
       if (tutorial.firstBurnReselectionStartedAt === null) {
         tutorial.firstBurnReselectionStartedAt = performance.now();
-        updateCommandConsole();
+        refreshCommandConsoleAfterTutorialSelection();
       }
     }
 
@@ -11386,7 +11414,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           tutorial.productiveBurnPromptStartedAt = performance.now();
           tutorial.productiveBurnReselectionStartedAt = null;
           lastPlayerNodeSelectionAt = tutorial.productiveBurnPromptStartedAt;
-          updateCommandConsole();
+          refreshCommandConsoleAfterTutorialSelection();
         }
         return;
       }
@@ -11394,7 +11422,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       if (tutorial.productiveBurnReselectionStartedAt === null) {
         tutorial.productiveBurnReselectionStartedAt = performance.now();
         tutorial.productiveBurnPromptStartedAt = null;
-        updateCommandConsole();
+        refreshCommandConsoleAfterTutorialSelection();
       }
     }
   }
@@ -11699,12 +11727,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         snapCommandTranscriptToLiveTail();
         tutorial.phase = "awaitingFirstBurnConfirm";
         tutorial.firstBurnReselectionStartedAt = null;
-        updateCommandConsole();
+        refreshCommandConsoleAfterTutorialSelection();
         return;
       }
 
       if (previousDestinationNodeId !== destinationNodeId) {
-        updateCommandConsole();
+        refreshCommandConsoleAfterTutorialSelection();
       }
       return;
     }
@@ -11718,7 +11746,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       tutorial.phase = "awaitingProductiveBurnConfirm";
       tutorial.productiveBurnPromptStartedAt = performance.now();
       tutorial.productiveBurnReselectionStartedAt = null;
-      updateCommandConsole();
+      refreshCommandConsoleAfterTutorialSelection();
     }
   }
 
@@ -14171,6 +14199,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       updateStatus();
       return;
     }
+    hideDebugUiAndMainMenuForMatchStart();
 
     debugAiStrategyProfiles = {};
     currentProceduralDebug = getProceduralDebugForPreset(
@@ -14190,6 +14219,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       updateStatus();
       return;
     }
+    hideDebugUiAndMainMenuForMatchStart();
 
     debugAiStrategyProfiles = {};
     currentProceduralDebug = getProceduralDebugForPreset(
@@ -14221,9 +14251,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         return;
       }
 
-      if (isGameMenuOpen()) {
-        stopGameMenuDemo();
-      }
+      hideDebugUiAndMainMenuForMatchStart();
 
       planningTimerMode = "zero";
       planningTimerDurationOverrideMs = null;
@@ -14245,6 +14273,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       updateStatus();
       return;
     }
+    hideDebugUiAndMainMenuForMatchStart();
 
     debugAiStrategyProfiles = {
       player: "FIRE",
@@ -14269,8 +14298,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       updateStatus();
       return;
     }
+    hideDebugUiAndMainMenuForMatchStart();
 
-    stopGameMenuDemo();
     let scenario;
 
     try {
@@ -14306,6 +14335,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       updateStatus();
       return;
     }
+    hideDebugUiAndMainMenuForMatchStart();
 
     let scenario;
 
@@ -14329,6 +14359,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       updateStatus();
       return;
     }
+    hideDebugUiAndMainMenuForMatchStart();
 
     const tutorialPreset = selectedMapPreset;
     status.textContent = "Loading tutorial";
@@ -14938,6 +14969,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       options.preserveCamera === true ? (cinematicRenderer?.captureCameraState() ?? null) : null;
     const preservedTacticalCamera = options.preserveCamera === true ? tacticalCamera : null;
     pendingCinematicCameraRestore = null;
+    tutorialSelectionCommandConsoleRefresh.cancel();
     commandGlossaryController.endTutorialLogbookIntroduction();
 
     if (options.preserveTutorial !== true) {
