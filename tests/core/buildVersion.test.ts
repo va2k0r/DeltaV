@@ -2,13 +2,25 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { DELTAV_BUILD_NUMBER, DELTAV_BUILD_VERSION } from "../../src/buildVersion";
+import {
+  DELTAV_BUILD_REVISION,
+  DELTAV_BUILD_SERIES,
+  DELTAV_BUILD_VERSION,
+  formatDeltaVBuildVersion
+} from "../../src/buildVersion";
 
 describe("public build version", () => {
-  it("formats the progressive build number as three digits", () => {
-    expect(DELTAV_BUILD_NUMBER).toBe(71);
+  it("formats the current build as a decimal series plus a hexadecimal revision", () => {
+    expect(DELTAV_BUILD_SERIES).toBe(7);
+    expect(DELTAV_BUILD_REVISION).toBe(1);
     expect(DELTAV_BUILD_VERSION).toBe("071");
-    expect(DELTAV_BUILD_VERSION).toMatch(/^\d{3}$/u);
+  });
+
+  it("continues from decimal revisions into hexadecimal revisions", () => {
+    expect(formatDeltaVBuildVersion(7, 9)).toBe("079");
+    expect(formatDeltaVBuildVersion(7, 10)).toBe("07A");
+    expect(formatDeltaVBuildVersion(7, 15)).toBe("07F");
+    expect(formatDeltaVBuildVersion(8, 1)).toBe("081");
   });
 
   it("keeps the build label mounted outside the replaceable app root", () => {
