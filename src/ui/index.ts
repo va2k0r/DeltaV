@@ -10759,8 +10759,15 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
   }
 
+  let shouldSkipCommandConsoleRefreshOnRedraw = false;
+
   function redraw(): void {
-    updateStatus();
+    if (shouldSkipCommandConsoleRefreshOnRedraw) {
+      shouldSkipCommandConsoleRefreshOnRedraw = false;
+      updateStatusWithoutCommandConsoleRefresh({ skipCommandConsoleRefresh: true });
+    } else {
+      updateStatus();
+    }
 
     if (currentView === "cinematic3d") {
       ensureCinematicRenderer();
@@ -10783,6 +10790,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     renderTacticalMap2d(tacticalCanvas, snapshot, tacticalCamera, {
       viewport: tacticalViewport()
     });
+  }
+
+  function redrawSkippingCommandConsoleRefresh(): void {
+    shouldSkipCommandConsoleRefreshOnRedraw = true;
+    redraw();
   }
 
   function getCinematicPerformanceMode(): CinematicPerformanceMode {
@@ -11008,7 +11020,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           intensity: burnPlan === null ? 0.5 : Math.min(1, burnPlan.burnCost / 6)
         });
         sfxEngine.play("queue.add");
-        redraw();
+        redrawSkippingCommandConsoleRefresh();
+        refreshTutorialCommandConsole();
       },
       onFireOrderRequested(originNodeId: string, targetNodeId: string) {
         if (
@@ -11032,7 +11045,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         markPlayerOrderConfirmedAfterSelection();
         handleTutorialFireOrderQueued(originNodeId, targetNodeId, previousPendingOrderCount);
         sfxEngine.play("queue.add");
-        redraw();
+        redrawSkippingCommandConsoleRefresh();
+        refreshTutorialCommandConsole();
       },
       onBurnOrderCancelled(originNodeId: string) {
         if (isCinematicCommandInputLocked()) {
@@ -11561,11 +11575,20 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       lastTutorialPlayerActivityAt = performance.now();
 
       if (shouldRefreshVisibleConfirmHint) {
-        updateCommandConsole();
+        refreshTutorialCommandConsole();
       } else {
         syncTutorialConfirmCameraHintRefreshTimer();
       }
     }
+  }
+
+  function refreshTutorialCommandConsole(): void {
+    if (tutorialState === null) {
+      updateCommandConsole();
+      return;
+    }
+
+    refreshCommandConsoleAfterTutorialSelection();
   }
 
   function appendTutorialCameraPanOrbitHint(): void {
@@ -12006,7 +12029,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       tutorial.phase = "shipyardFireQueued";
       tutorial.shipyardFirePromptStartedAt = null;
       updateInteractionLocks();
-      updateCommandConsole();
+      refreshTutorialCommandConsole();
     }
 
     const contestedFireTargetNodeId = getTutorialShipyardContestedTargetNodeId(tutorial);
@@ -12022,7 +12045,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       tutorial.shipyardSupportFirePromptStartedAt = null;
       tutorial.contestedNodeId = contestedFireTargetNodeId;
       updateInteractionLocks();
-      updateCommandConsole();
+      refreshTutorialCommandConsole();
     }
   }
 
@@ -12062,7 +12085,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     hasConfirmedPlayerOrderAfterSelection = false;
 
     updateInteractionLocks();
-    updateCommandConsole();
+    refreshTutorialCommandConsole();
   }
 
   function appendTutorialShipyardFireWorkChoiceRows(): void {
@@ -12099,7 +12122,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       tutorial.firstBurnDestinationNodeId = order.destinationNodeId;
       tutorial.firstBurnArrivalTurn = order.arrivalTurn;
       updateInteractionLocks();
-      updateCommandConsole();
+      refreshTutorialCommandConsole();
       return;
     }
 
@@ -12116,7 +12139,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       tutorial.productiveBurnPromptStartedAt = null;
       tutorial.productiveBurnReselectionStartedAt = null;
       updateInteractionLocks();
-      updateCommandConsole();
+      refreshTutorialCommandConsole();
       return;
     }
 
@@ -12138,7 +12161,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       tutorial.tutorialBurnDestinationNodeId = destinationNodeId;
       tutorial.tutorialBurnArrivalTurn = order?.arrivalTurn ?? null;
       updateInteractionLocks();
-      updateCommandConsole();
+      refreshTutorialCommandConsole();
       void autoAdvanceTutorialMandatoryLaunchToDestination();
       return;
     }
@@ -12157,7 +12180,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       tutorial.contestedNodeId = contestedBurnTargetNodeId;
       tutorial.shipyardContestedPromptStartedAt = null;
       updateInteractionLocks();
-      updateCommandConsole();
+      refreshTutorialCommandConsole();
       return;
     }
 
@@ -12177,7 +12200,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       tutorial.contestedNodeId = counterContestTargetNodeId;
       tutorial.shipyardContestedPromptStartedAt = null;
       updateInteractionLocks();
-      updateCommandConsole();
+      refreshTutorialCommandConsole();
       return;
     }
 
@@ -12185,7 +12208,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       tutorial.phase = "enemyBurnQueued";
       tutorial.contestedNodeId = destinationNodeId;
       updateInteractionLocks();
-      updateCommandConsole();
+      refreshTutorialCommandConsole();
       return;
     }
 
@@ -12200,7 +12223,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         "tutorial:burn-out-queued"
       );
       updateInteractionLocks();
-      updateCommandConsole();
+      refreshTutorialCommandConsole();
     }
   }
 
