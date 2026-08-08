@@ -6,7 +6,7 @@ import { devlogEntries } from "../../src/site/devlogEntries";
 
 describe("public devlog", () => {
   it("publishes a dated, evidence-led development record without timestamp noise", () => {
-    expect(devlogEntries).toHaveLength(27);
+    expect(devlogEntries).toHaveLength(31);
     expect(new Set(devlogEntries.map((entry) => entry.slug)).size).toBe(devlogEntries.length);
     expect(devlogEntries.every((entry) => entry.body.length >= 5)).toBe(true);
     expect(devlogEntries.every((entry) => /^\d{4}-\d{2}-\d{2}$/u.test(entry.date))).toBe(true);
@@ -140,6 +140,49 @@ describe("public devlog", () => {
     );
   });
 
+  it("develops the strategy article as one argument from income denial to defeat", () => {
+    const strategyEntry = devlogEntries.find((entry) => entry.slug === "how-to-wage-war-in-space");
+    const copy = strategyEntry?.body.join(" ") ?? "";
+
+    expect(copy).toContain("A campaign therefore begins with income, not gunfire");
+    expect(copy).toContain("These pressures become decisive when they converge on the same turn");
+    expect(copy).toContain("closes alternatives in sequence");
+    expect(copy.indexOf("Tritium plants")).toBeLessThan(copy.indexOf("Missiles exploit"));
+    expect(copy.indexOf("Missiles exploit")).toBeLessThan(copy.indexOf("contested orbit"));
+    expect(copy.indexOf("contested orbit")).toBeLessThan(copy.indexOf("Shipyards create"));
+  });
+
+  it("adds focused explanations for automatic work, zero-cost fire and identical ships", () => {
+    const workEntry = devlogEntries.find(
+      (entry) => entry.slug === "why-productive-ships-often-receive-no-order"
+    );
+    const fireEntry = devlogEntries.find(
+      (entry) => entry.slug === "why-firing-a-missile-costs-no-fuel"
+    );
+    const shipEntry = devlogEntries.find(
+      (entry) => entry.slug === "why-deltav-has-one-kind-of-ship"
+    );
+
+    expect(workEntry?.body.join(" ")).toContain("cannot WORK until the following turn");
+    expect(workEntry?.body.join(" ")).toContain("one turn longer than the travel estimate");
+    expect(fireEntry?.body.join(" ")).toContain("opportunity cost");
+    expect(fireEntry?.body.join(" ")).toContain("which ship can stop working now");
+    expect(shipEntry?.body.join(" ")).toContain("every ship the same mechanical capabilities");
+    expect(shipEntry?.body.join(" ")).toContain("the orbit is the loadout");
+  });
+
+  it("gives mandatory launch a contextual title and explains the change of guard", () => {
+    const launchEntry = devlogEntries.find(
+      (entry) => entry.slug === "shipyard-completion-is-a-commitment"
+    );
+    const copy = launchEntry?.body.join(" ") ?? "";
+
+    expect(launchEntry?.title).toBe("Why Building a Ship Makes Another Ship Leave");
+    expect(copy).toContain("change of guard");
+    expect(copy).toContain("compulsory departure");
+    expect(copy).toContain("five out of five");
+  });
+
   it("avoids the rejected trailer cadence and unsupported development mythology", () => {
     const paragraphs = devlogEntries.flatMap((entry) => [entry.deck, ...entry.body]);
     const copy = paragraphs.join(" ");
@@ -176,20 +219,18 @@ describe("public devlog", () => {
     ]);
   });
 
-  it("describes the current runtime map as twenty-two playable places", () => {
+  it("describes the eighteen-place canon without treating every moon as playable", () => {
     const mapEntry = devlogEntries.find(
       (entry) => entry.slug === "why-the-solar-system-got-smaller"
     );
     const copy = [mapEntry?.deck ?? "", ...(mapEntry?.body ?? [])].join(" ");
 
-    expect(copy).toContain("22 playable places");
-    expect(copy).toContain("Phobos");
-    expect(copy).toContain("Ganymede");
-    expect(copy).toContain("Titania");
-    expect(copy).toContain("Pluto and Charon");
-    expect(devlogEntries.flatMap((entry) => [entry.deck, ...entry.body]).join(" ")).not.toMatch(
-      /\b(?:18|eighteen)\b/iu
-    );
+    expect(mapEntry?.title).toBe("Why Most Moons Stay Outside the War");
+    expect(copy).toContain("18 active places");
+    expect(copy).toContain("combined Pluto/Charon system");
+    expect(copy).toContain("Eighteen active places are the clean reference");
+    expect(copy).toContain("twenty-four are treated as an upper practical limit");
+    expect(copy).not.toContain("22 playable places");
   });
 
   it("explains which design problems the lore resolves", () => {

@@ -8,7 +8,10 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "preview": "vite preview --host 127.0.0.1",
+    "version:bump": "node scripts/bump-build-version.mjs",
     "test": "vitest run",
+    "test:tutorial:entry": "playwright test --config tests/e2e/playwright.config.ts tests/e2e/tutorial-entry.spec.ts",
+    "test:tutorial:interactions": "playwright test --config tests/e2e/playwright.config.ts tests/e2e/tutorial-interactions.spec.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" \"vite.config.ts\" && prettier --check \"AGENTS.md\" \"README.md\" \"docs/**/*.md\" \"index.html\" \"package.json\" \"tsconfig.json\" \"vite.config.ts\" \"eslint.config.js\" \"scripts/**/*.mjs\" \"src/**/*.{ts,css}\" \"tests/**/*.ts\"",
     "build": "vite build",
@@ -28,6 +31,7 @@
   },
   "devDependencies": {
     "@electron/packager": "^20.0.3",
+    "@playwright/test": "^1.61.1",
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
     "@types/three": "^0.184.1",

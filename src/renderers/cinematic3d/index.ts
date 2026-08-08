@@ -132,6 +132,7 @@ import {
   getMissileImpactCameraTravelDurationMs,
   getPredictedMissileImpactElapsed
 } from "./missileImpactCamera";
+import { resolveCinematicGameplayClickTarget } from "./gameplayClickTarget";
 import { pickNodeOrbitZone, resolveNodeOrbitPickZones } from "./nodeOrbitPicker";
 import {
   cinematicDecorativePointLightSourceUserDataKey,
@@ -20872,7 +20873,7 @@ export class CinematicSolarSystemRenderer {
   }
 
   private handlePrimaryClickAtScreenPoint(point: Vec2): void {
-    const targetKey = this.pickAtScreenPoint(point) ?? this.pickBurnPreviewHoverZone(point);
+    const targetKey = this.pickGameplayClickTarget(point) ?? this.pickBurnPreviewHoverZone(point);
 
     if (!this.canAcceptTargetInput(targetKey)) {
       return;
@@ -21039,10 +21040,31 @@ export class CinematicSolarSystemRenderer {
 
   private selectAtScreenPoint(point: Vec2): void {
     const targetKey =
-      this.pickAtScreenPoint(point) ??
+      this.pickGameplayClickTarget(point) ??
       this.pickBurnDestinationHoverZone(point) ??
       this.pickBurnPreviewHoverZone(point);
     this.handleTargetClick(targetKey);
+  }
+
+  private pickGameplayClickTarget(point: Vec2): string | null {
+    const pickedTargetKey = this.pickAtScreenPoint(point);
+    const isTransientTarget =
+      isBurnTargetKey(pickedTargetKey) || getMissileIdFromTargetKey(pickedTargetKey) !== null;
+    const nodeOrbitTargetKey = isTransientTarget ? this.pickNodeOrbitScreenZone(point) : null;
+    const activeBurnDestinationTargetKey =
+      this.selectedActionMode === "fire" && isBurnTargetKey(pickedTargetKey)
+        ? this.getActiveBurnTransitForTargetKey(pickedTargetKey)
+        : null;
+
+    return resolveCinematicGameplayClickTarget({
+      pickedTargetKey,
+      nodeOrbitTargetKey,
+      selectedActionMode: this.selectedActionMode,
+      activeBurnDestinationTargetKey:
+        activeBurnDestinationTargetKey === null
+          ? null
+          : `node:${activeBurnDestinationTargetKey.destinationNodeId}`
+    });
   }
 
   private handleTargetClick(targetKey: string | null): void {

@@ -32,19 +32,19 @@ const devlogArchive = [
     category: "STRATEGY",
     slug: "how-to-wage-war-in-space",
     title: "How to Wage War in Space",
-    date: "2026-08-02",
-    deck: "Every ship draws movement, defense and contested upkeep from the same fuel reserve. Depleting that reserve can defeat a fleet whose ships are still intact.",
+    date: "2026-08-08",
+    deck: "Orbital war is won by closing the enemy's next useful turn: first its work, then its movement, and finally every credible route back to fuel.",
     body: [
-      "Most of DeltaV's strategy follows from the fact that a fleet can still have ships but no longer have enough mobility to use them effectively.",
-      "Each side has one shared reserve of delta-v, meaning the amount of change in speed the fleet can still produce. Moving to another orbit spends it. Dodging a missile spends it. Keeping a ship beside an enemy in a contested orbit spends it every turn. A larger fleet has more options, but all of those ships depend on the same reserve.",
-      "Tritium plants are the only reliable way to refill that reserve. A ship that gives an entire turn to a plant adds two points of delta-v; the interface calls this WORK. Moving, firing or dodging means giving up that work, so a missile can affect the economy without hitting its target.",
-      "The interface calls a movement order a BURN. The destination keeps moving while the ship is in flight, and the same route can become cheaper, slower or unaffordable as the Solar System changes shape. Choosing a destination also means checking whether the ship will arrive in time and retain enough fuel for the following turn.",
-      "Arrival does not grant an instant turn of production. A new ship can block an enemy immediately, but it must survive until the following turn before operating a plant or shipyard. A reinforcement that arrives one beat after a missile or a completed hull has missed the decisive moment, even if the map makes it look close.",
-      "Enemy ships can share a valuable orbit and make it contested. Neither can work, fire or dodge there, and both sides pay to keep the lock in place. A supporting ship is often more dangerous just outside: it can fire on the pinned enemy, cover an escape or wait for another arrival without surrendering its freedom to act.",
-      "Shipyards turn time into new hulls, but not into a private stockpile. Work already completed remains at the yard if control changes. When a hull is finished, the ship that assembled it must leave and the new ship stays behind. Production therefore creates a departure that an opponent can anticipate.",
-      "Orders are chosen simultaneously. Ships, fuel, construction and weapons already in flight are public; the choice being made now is not. Strategy comes from creating several believable futures and committing before the opponent reveals which future was chosen.",
-      "Victory follows the same logic as the fuel reserve. A side remains in the war while it still has a credible route back to tritium, whether through a working ship, a journey already under way, a contest it can afford or a hull close enough to completion to reopen the map. The war ends when every such route has closed, not when the last model disappears from the screen.",
-      "DeltaV leaves out component damage, manual piloting and exact spacecraft flight plans. It keeps moving destinations, travel time, visible attacks and the competition between industrial work and military action because those elements affect fleet-level decisions."
+      "The quickest way to lose a war in DeltaV is to treat every enemy ship as a target that must be destroyed. A fleet becomes harmless earlier than that: at the moment when none of its ships can earn fuel, reach fuel or preserve enough fuel to survive the journey.",
+      "Each faction draws from one reserve of delta-v, the amount of change in speed its fleet can still produce. A move by one ship can consume the dodge needed by another. Holding an enemy in place can drain the reserve that was meant to finish a journey elsewhere. Fleet size matters, but every additional commitment reaches into the same account.",
+      "A campaign therefore begins with income, not gunfire. Tritium plants are the only reliable way to refill the reserve. A ship that devotes an uninterrupted turn to one adds two points of delta-v; the interface calls this WORK. Moving, firing, dodging or sharing the orbit with an enemy interrupts that income. The first useful attack is often the one that makes a productive ship stop producing.",
+      "Movement turns that pressure into geography. The interface calls a movement order a BURN. Its destination keeps moving while the ship is in flight, so a route must be judged by three moments: what it costs now, when it arrives and what the fleet can still afford afterward. Reaching a plant with an empty reserve is not a recovery if an incoming missile or enemy arrival makes the first working turn impossible.",
+      "Missiles exploit that delay. FIRE spends no delta-v, but the launching ship gives up its own WORK to create a public threat several turns ahead. The target can leave and abandon the orbit, or stay and reserve one point of delta-v for every impact it intends to survive. Either answer can be useful to the attacker before anything is destroyed because it changes what the target is allowed to accomplish in the meantime.",
+      "A contested orbit applies the same pressure immediately. Two opposing ships deny each other WORK, FIRE and EVADE while both factions pay upkeep. The ship inside the lock is not necessarily the one that decides it. A second ship outside can time a missile against the pinned target, cover the likely exit or wait to take over after one reserve fails.",
+      "Shipyards create a longer clock. Their progress stays with the facility, so interrupting a nearly finished hull preserves something worth stealing. Completion also forces the incumbent ship to depart while the new vessel remains at the yard. A fleet that ignores the exit cost can finish a ship and discover that production has consumed the maneuver it needed for the rest of the position.",
+      "These pressures become decisive when they converge on the same turn. A missile is due, contested upkeep is paid first, a hull needs its incumbent to leave and a reinforcement is still one turn from becoming productive. Because orders are chosen simultaneously, both sides must commit before they know which escape, attack or delay the other has selected.",
+      "The winning plan is the one that closes alternatives in sequence. Deny a working turn, make the safe route too expensive, force the remaining ship to defend the wrong orbit, then check whether any credible path to tritium remains. The war ends at the point where the losing fleet can no longer reopen such a path, even if several of its ships are still visible.",
+      "This is why DeltaV compresses combat instead of simulating every component and firing pass. The details kept in play are the ones that alter the next strategic turn: moving destinations, public arrival times, shared fuel, delayed threats and the work each action displaces."
     ],
     figures: [
       {
@@ -53,6 +53,70 @@ const devlogArchive = [
         alt: "A stable frontal view of the DeltaV planetarium.",
         caption: "The orbital map stays readable while the strategic situation develops."
       }
+    ]
+  },
+  {
+    category: "ECONOMY / TIMING",
+    slug: "why-productive-ships-often-receive-no-order",
+    title: "Why Productive Ships Often Receive No Order",
+    date: "2026-08-08",
+    deck: "WORK happens automatically, but only for a ship that was already in place and gives the entire turn to the facility.",
+    body: [
+      "A ship at a tritium plant or shipyard does not need a production command. If it began the turn there, remains uncontested and takes no other action, WORK resolves automatically during the economy phase.",
+      "That makes an empty order meaningful. Staying at a tritium plant earns two delta-v for the shared reserve. Staying at a shipyard adds one of the five working turns required for a hull. The player is not skipping the ship; the player is protecting the time on which the economy depends.",
+      "BURN, FIRE and EVADE all replace that work. The same is true of a contested orbit. A launch with no fuel price can still be expensive when it delays a hull, and an automatic dodge can save a ship while preventing the income that the rest of the fleet expected to spend.",
+      "Arrival has its own restriction. A ship that reaches a productive orbit can contest or block it immediately, but it cannot WORK until the following turn. Occupation and operation are separate moments, which gives the opponent one full resolution in which to answer the arrival.",
+      "This delay prevents movement from producing an instant refund. Without it, a ship could spend delta-v to reach a plant and recover fuel in the same resolution, or arrive at a yard on its fifth step and complete a hull before the defender could react.",
+      "The practical clock is therefore one turn longer than the travel estimate. An arrival marked T+3 can affect control at T+3, but its first possible income or construction step is T+4. Missile impacts, hostile arrivals and compulsory departures due before then belong in the route calculation.",
+      "WORK is automatic so the interface does not ask for a confirmation whose correct answer is usually obvious. The strategy remains in deciding when a ship can afford to do anything else."
+    ]
+  },
+  {
+    category: "WEAPONS / ECONOMY",
+    slug: "why-firing-a-missile-costs-no-fuel",
+    title: "Why Firing a Missile Costs No Fuel",
+    date: "2026-08-08",
+    deck: "FIRE spends zero delta-v because its real price is the productive turn surrendered by the launching ship.",
+    body: [
+      "The zero beside a FIRE order can look like a missing cost. It is a deliberate distinction between fuel expenditure and opportunity cost: the faction keeps its delta-v, but the ship cannot WORK during the turn in which it launches.",
+      "A missile fired from a tritium plant gives up two points of income. One fired from a shipyard postpones the next hull. A ship in barren space loses no production, which makes staging positions useful launch sites even though they generate nothing themselves.",
+      "The target pays later. If it remains in place until impact and is not contested, it automatically spends one delta-v for each missile it survives and loses that turn's WORK. If it leaves earlier, every firing solution attached to the departing ship breaks, but the orbit and its future production have been surrendered.",
+      "This creates a comparison between two schedules rather than a purchase price. The attacker gives up useful time now; the defender may give up fuel, work or position later. A shot is worthwhile only when the later disruption matters more than the launcher's current task.",
+      "Charging delta-v at launch would make weapons compete with movement twice. The firing ship would spend the shared reserve immediately, while the target would still tax that reserve through evasion. Missile use would then be governed mainly by whether the faction could afford the button, not by where the launcher and target were working.",
+      "Zero fuel does not permit unlimited pressure. Each ship can perform only one action, missiles need time to arrive and a comfortable target may trade one future lost working turn for the launcher's present one. Repeated fire becomes strong when impacts coincide with upkeep, another missile or a shipyard deadline.",
+      "The rule keeps the important question visible: not how many missiles are stored, but which ship can stop working now in order to make a more valuable ship stop working later."
+    ]
+  },
+  {
+    category: "FLEET DESIGN",
+    slug: "why-deltav-has-one-kind-of-ship",
+    title: "Why DeltaV Has Only One Kind of Ship",
+    date: "2026-08-08",
+    deck: "Ships acquire different roles from position, timing and fuel instead of from a catalogue of specialized hulls.",
+    body: [
+      "The early fleet rules considered the familiar path of scouts, tankers, missile ships and industrial vessels. The first playable version removed those classes and gave every ship the same mechanical capabilities.",
+      "A ship becomes a worker by staying at a plant, a builder by staying at a yard, a raider by firing, a blockader by entering an enemy orbit and a reserve by waiting outside a contest. Those roles can change from one turn to the next because they come from the ship's commitment rather than its chassis.",
+      "Specialized hulls would make many decisions before the match began. A tanker sent to tritium and a missile ship ordered to FIRE would mostly be following their labels. With a common hull, assigning the only nearby ship to launch also means choosing not to collect fuel or advance construction with that same asset.",
+      "Identical capability does not make ships interchangeable. One may be three turns from Saturn with enough delta-v to leave again, while another is already working at Mars under an incoming missile. Their histories, routes and obligations give them different strategic value even when their statistics match.",
+      "The rule also keeps reinforcements legible. A completed hull expands the set of possible commitments without opening a fitting screen or adding a second production economy. Its value depends on the yard where it appears and the route the incumbent had to take to make room for it.",
+      "Ship classes could be added only if their physical limits create decisions the map cannot already express. A different silhouette, damage number or weapon range would add material to learn without necessarily changing how a fleet protects access to tritium.",
+      "For now, the orbit is the loadout. Position determines whether a ship earns, builds, threatens, pins or escapes, and changing that role always takes time."
+    ]
+  },
+  {
+    category: "MAP / BALANCE",
+    slug: "how-saturn-became-the-dangerous-exception",
+    title: "How Saturn Became the Map's Dangerous Exception",
+    date: "2026-08-08",
+    deck: "Saturn combines tritium, a nearby shipyard and a staging moon, making one local system powerful enough to organize a war around.",
+    body: [
+      "Most productive systems in DeltaV make a fleet travel for what it lacks. A shipyard produces vessels but not the delta-v needed to move them; a gas or ice giant supplies delta-v but not new hulls. The distance between those functions creates vulnerable journeys.",
+      "Saturn is the intentional exception. Saturn itself supports tritium production, Titan contains a shipyard and Iapetus provides a barren staging orbit. A fleet inside the system can earn fuel, build and position support without first crossing the wider Solar System.",
+      "That concentration makes Saturn attractive, but it also gives an attacker several connected targets. A ship working at Saturn cannot simultaneously protect Titan. A defender inside a contest cannot fire outward, while a ship at Iapetus can remain free to threaten the locked position or cover a departure.",
+      "Titan's yard does not turn the system into a safe fleet factory. Five uninterrupted WORK turns advertise the completion date, stored progress can be captured and the incumbent must make a legal BURN when the new hull is commissioned. Control of Saturn does not guarantee that the departure will be affordable or safe.",
+      "Earlier map candidates distributed more productive places across more moons. The result was geographical variety without enough strategic contrast: losing one facility often meant using a similar one nearby. Saturn became more interesting when the rest of the baseline grew sparser and its local combination became unusual.",
+      "The system is also a balance instrument. If Saturn dominates too many openings, the connection between its tritium plant and Titan can be lengthened or made harder to leave before another moon is added elsewhere. The aim is to preserve a dangerous center, not an automatic capital.",
+      "Saturn demonstrates the rule used to select active moons: a body belongs on the map when its presence changes a decision. Titan changes what Saturn can build, and Iapetus changes how that power can be attacked."
     ]
   },
   {
@@ -274,7 +338,7 @@ const devlogArchive = [
   {
     category: "DEVELOPMENT",
     slug: "what-the-machine-was-good-for",
-    title: "What the Machine Was Good For",
+    title: "What Generative Tools Changed, and What They Could Not Decide",
     date: "2026-08-01",
     deck: "DeltaV is openly vibe-coded. Fast generation made broad experimentation possible; canon, replays and taste were needed to decide which results deserved to stay.",
     body: [
@@ -335,25 +399,28 @@ const devlogArchive = [
     date: "2026-08-01",
     deck: "Everyone sees the same ships, trajectories and resources. What remains secret is the next commitment, revealed only after all sides have chosen.",
     body: [
-      "DeltaV keeps ships and existing trajectories visible while hiding the orders currently being chosen.",
-      "The map reveals current fuel, visible journeys, missiles in flight and work completed at shipyards. What it withholds is the order being chosen during the present turn.",
-      "That single unknown is enough because one ship may have several affordable futures. It can protect production, leave before a missile arrives, contest a yard or fire and sacrifice its own work. The opponent has to prepare for intentions without inventing unseen units.",
-      "Simultaneous planning turns information into timing. A move that would be safe after seeing the enemy order may be reckless when both choices must be locked first. Surprise comes from commitment, not from a random failure to detect an object that was already active in space.",
-      "This limited information gap keeps larger positions readable. Players study the same public facts and can still reach different conclusions about the opponent's next commitment."
+      "At the start of a planning phase, both sides can account for every ship, journey, missile, shared fuel reserve and unfinished hull. The only missing information is what the opponent is committing to now.",
+      "Consider a ship working at a tritium plant with a missile due in two turns. It can stay and preserve income, leave before impact, or FIRE and give up work to create pressure elsewhere. An enemy support ship may be preparing to contest the plant, but its order is hidden until both sides finish planning.",
+      "None of those possibilities requires an invisible unit. Uncertainty comes from several legal futures sharing the same visible starting position. Fuel narrows the set, travel time reveals when each choice would matter and the value of the plant supplies a reason for choosing one route over another.",
+      "Orders are revealed together. A withdrawal that looks cautious after an enemy FIRE order may be wasteful if the enemy moved somewhere else; staying becomes fatal if the expected support arrives one turn earlier than planned. Neither player gets to revise the commitment after learning the other answer.",
+      "This is the part of secrecy that affects strategy. Hiding existing ships would create a search problem, while hiding current intention creates a prediction problem. The player can explain every possible move and still be wrong about which one the opponent selected.",
+      "Public information therefore does not remove surprise. It gives surprise a traceable cause: the opponent used a known ship, paid a visible cost and chose a future that the player considered less likely."
     ]
   },
   {
     category: "DESIGN / STRATEGY",
     slug: "shipyard-completion-is-a-commitment",
-    title: "Completing a Hull Forces a Departure",
+    title: "Why Building a Ship Makes Another Ship Leave",
     date: "2026-08-02",
-    deck: "Finishing a ship forces the current worker to leave the yard, turning production into a visible movement problem rather than a passive reward.",
+    deck: "A shipyard can assemble a replacement hull, but it cannot supply an independent crew and command structure. The incumbent commissions the new vessel and then has to clear the orbit.",
     body: [
-      "Completing a hull also forces the ship currently working at the yard to leave.",
-      "When construction finishes, the new vessel remains at the yard and the ship that did the work must leave. The departure needs a legal destination and enough fuel, so the final construction turn cannot be separated from the map around it.",
-      "The rule prevents yards from becoming safe warehouses. A nearly completed hull announces a coming movement. The producing side may delay the last turn because every exit is dangerous; the opponent may time a missile, an arrival or a nearby support ship around that hesitation.",
-      "The new ship is therefore not simply more material. It changes which vessel holds the yard, exposes the old worker to a route and can consume fuel at the exact moment the fleet hoped to become stronger.",
-      "Both sides can see the approach of this production deadline. The producing fleet must therefore consider whether it can afford the movement and change of positions that completion requires."
+      "A shipyard stores pressure sections, drive structures, radiators and other protected assemblies rather than a queue of crewed warships ready to deploy. An active ship must remain at the facility for five eligible WORK turns to mate, test and commission those parts.",
+      "When the fifth turn completes, the new vessel stays at the yard. The incumbent transfers the reserve crew, fuel canisters and command authority needed to activate it, then performs a compulsory departure before missile impacts and ordinary arrivals resolve.",
+      "The result is easier to understand as a change of guard. The yard always contains one operational ship: first the incumbent doing the construction, then the newly commissioned hull. Production adds a ship to the fleet by sending the old worker back into the map.",
+      "That departure needs a legal destination and enough delta-v. If no route can be paid, the incumbent is lost. The final working turn therefore cannot be planned as a passive reward; it includes a movement order whose cost may affect every other ship sharing the reserve.",
+      "The deadline is public because construction progress remains visible at the yard. An opponent can arrange a missile, an arrival or outside support around the compulsory movement. The producing side may even delay completion when every useful exit is covered.",
+      "The rule prevents finished ships from accumulating in a protected warehouse. It also stops a single worker from turning one safe yard into a growing stack. Each completed hull rearranges the fleet and creates a route that can be anticipated.",
+      "A nearly finished shipyard is therefore both an asset and an appointment. Reaching five out of five means the fleet must already know which ship will hold the facility next and where the incumbent can survive after leaving."
     ]
   },
   {
@@ -363,11 +430,12 @@ const devlogArchive = [
     date: "2026-08-02",
     deck: "The computer opponent uses fixed priorities and makes the same decision from the same position, so repeated mistakes can be investigated directly.",
     body: [
-      "The computer opponent follows fixed priorities and produces the same decision when it receives the same position.",
+      "An opponent that changed its priorities for reasons the player could never observe would work against a strategy game built from public information.",
       "DeltaV's opponent follows fixed priorities and chooses the same order from the same position. It does not learn the player's habits during a match and does not receive a private difficulty bonus.",
       "That consistency suits a strategy game built around public information. Players learn how fuel, timing and contested positions shape behavior instead of trying to guess an unseen mood. The opponent can still surprise them because simultaneous orders hide its immediate intention.",
       "Repeatability is just as valuable when the opponent is wrong. A wasteful missile, a premature retreat or a missed recovery route can be reopened exactly. The cause remains there long enough to be understood.",
-      "Repeatable mistakes can be linked to the opponent's reading of fuel, threats or recovery routes and revised without adding hidden information or bonuses."
+      "The error can then be linked to a fuel estimate, a threat it valued too highly or a recovery route it failed to protect. Correcting that judgment improves the same rules the player faces instead of concealing the weakness behind extra resources.",
+      "Determinism does not make every match identical because orbital phases, map generation and the player's orders change the position being evaluated. It makes identical positions explainable."
     ]
   },
   {
@@ -390,13 +458,14 @@ const devlogArchive = [
     slug: "a-missile-arrives-before-reinforcement",
     title: "A Missile Arrives Before the Reinforcement",
     date: "2026-08-02",
-    deck: "Several days went into deciding how a forced shipyard departure, a missile impact and a reinforcement arrival resolve when they share one turn.",
+    deck: "A compulsory shipyard departure, a missile impact and a reinforcement can share one turn. Their order determines whether the threatened ship is able to evade.",
     body: [
-      "Several days were spent deciding the order of three events that can affect the same orbit in one turn: a forced shipyard departure, a missile impact and a reinforcement arrival.",
+      "Three events can reach the same orbit in one turn: a compulsory shipyard departure, a missile impact and a reinforcement arrival. Treating them as simultaneous would leave a crucial question unanswered: which ships were present when the target tried to evade?",
       "DeltaV resolves the forced departure first, then the missile, then the incoming ship. The new hull left at the yard can still dodge if the orbit was not already contested when the turn began. Only after the weapon has been answered does the reinforcement arrive and change control of the position.",
       "Putting the reinforcement first would let a ship launched days earlier erase the defender's ability to dodge at the final instant. Putting the missile before the forced departure would punish a ship that had already committed to leaving. Both answers created tactics that felt detached from the orders players had actually made.",
       "To pin a target for an incoming missile, the attacking ship must already share its orbit before that turn begins. Arriving during the same turn is too late to affect that impact.",
-      "This order also keeps construction consistent. The worker leaves because the new hull exists, the hull answers any threat already due, and only then does the arriving ship contest the yard."
+      "This order also keeps construction consistent. The worker leaves because the new hull exists, the hull answers any threat already due, and only then does the arriving ship contest the yard.",
+      "The sequence is intentionally strict so a player can plan from the clocks already visible on the map. An impact marked for the current turn cannot acquire a new restriction from an arrival that has not resolved yet."
     ]
   },
   {
@@ -417,22 +486,23 @@ const devlogArchive = [
   {
     category: "MAP / STRATEGY",
     slug: "why-the-solar-system-got-smaller",
-    title: "DeltaV's Twenty-Two Playable Places",
+    title: "Why Most Moons Stay Outside the War",
     date: "2026-08-02",
-    deck: "The current map uses 22 planets and moons. It includes enough local positions for support and route control without asking the player to manage every real moon in the Solar System.",
+    deck: "The canonical reference map uses 18 active planets and moons. Every included body must change access to fuel, construction, support or escape.",
     body: [
-      "The current runtime map contains 22 playable places. They are Mercury, Venus, Earth, the Moon, Mars, Phobos, Deimos, Jupiter, Io, Europa, Ganymede, Callisto, Saturn, Titan, Iapetus, Uranus, Oberon, Titania, Neptune, Triton, Pluto and Charon.",
-      "Earlier map studies also considered asteroids, Trojan groups, more distant objects and different selections of moons. Adding real names was easy, but many of those locations repeated a decision that already existed nearby or added another place to wait without changing the surrounding routes.",
-      "The current set keeps the major planets as the large-scale structure and gives the most important outer systems several local positions. Mars has Phobos and Deimos; Jupiter has Io, Europa, Ganymede and Callisto; Saturn has Titan and Iapetus; Uranus has Oberon and Titania. These moons allow a fleet to support a nearby contest, approach from another orbit or remain outside a full position without creating a new class of unit.",
-      "Earth and the Moon are included because they orient the whole map and form the protected corridor, not because they provide another battlefield. Pluto and Charon are separate playable places in the current runtime, which gives the outer edge a local relationship instead of treating the pair as one combined destination.",
-      "Not every real moon becomes playable. A moon is included when its position can change access to fuel, construction, support or movement between systems. Smaller satellites can remain visible as part of the Solar System without adding another location the player must inspect every turn.",
-      "Twenty-two places leave room for local tactics without losing the larger geography. The player can read Mars, Jupiter, Saturn, Uranus and the outer edge as different groups while the changing alignment between those groups continues to alter long journeys."
+      "The Solar System offers hundreds of named moons, but a strategy map does not improve whenever another real object becomes selectable. Each active orbit asks the player to inspect routes, arrivals, threats and possible work, so every addition needs a distinct purpose.",
+      "Earlier candidates included asteroids, Trojan groups, distant objects and denser selections of satellites. They produced a larger map without producing the same increase in decisions. Several bodies became interchangeable refuges: another place to wait, but not a reason to alter a plan.",
+      "The canonical reference was reduced to 18 active places. Earth and the Moon form the protected corridor. Jupiter, Saturn, Uranus and Neptune supply tritium. Mercury, Mars, Titan and the combined Pluto/Charon system contain shipyards. Venus, Deimos, Callisto, Iapetus, Oberon, Triton, Nix and Hydra provide barren staging positions.",
+      "This distribution makes productive orbits scarce. Jupiter has fuel without a local yard. Saturn is the dangerous hybrid system. Uranus and Neptune offer outer fuel, while the Pluto/Charon yard must maintain a viable connection back toward it. A barren moon matters only when it changes how one of those relationships can be attacked or escaped.",
+      "Moons remain tactically useful because a support ship outside a contested orbit retains the freedom to FIRE, cover a departure or occupy the facility later. Deimos, Callisto and Iapetus create those local choices without requiring every moon in their systems to become another equivalent parking place.",
+      "The default procedural map can vary the opening while applying the same discipline. Eighteen active places are the clean reference, twenty produce a richer scenario and twenty-four are treated as an upper practical limit. Beyond that, additional bodies are expected to justify themselves rather than enter because they exist.",
+      "Inactive moons do not vanish from the Solar System. They can remain visual and astronomical context. They become part of the war only when selecting them would change a decision."
     ]
   },
   {
     category: "TACTICS",
     slug: "the-third-ship-stays-outside",
-    title: "The Third Ship Stays Outside",
+    title: "Why a Third Ship Cannot Join a Contested Orbit",
     date: "2026-08-02",
     deck: "A contested orbit holds one ship from each side. Additional ships remain outside, where support becomes a separate tactical role instead of a larger stack.",
     body: [
@@ -447,7 +517,7 @@ const devlogArchive = [
   {
     category: "MAP / INFORMATION",
     slug: "a-moving-map-without-a-time-machine",
-    title: "A Moving Map Without a Time Machine",
+    title: "Why the Map Shows Only Routes Available Now",
     date: "2026-08-02",
     deck: "The planetarium shows the journey that can be ordered now, not an unlimited forecast. Moving geography remains a source of timing without becoming a planning spreadsheet.",
     body: [

@@ -1,5 +1,6 @@
 import { createDeltaVApp } from "./ui";
 import { createDeltaVSite } from "./site";
+import { DELTAV_BUILD_VERSION } from "./buildVersion";
 import "./styles.css";
 
 const root = document.querySelector<HTMLElement>("#app");
@@ -9,6 +10,16 @@ if (root === null) {
 }
 
 const appRoot = root;
+
+function installBuildVersionLabel(): void {
+  const label = document.createElement("div");
+  label.className = "deltav-build-version";
+  label.textContent = DELTAV_BUILD_VERSION;
+  label.setAttribute("aria-label", `DeltaV build ${DELTAV_BUILD_VERSION}`);
+  document.body.append(label);
+}
+
+installBuildVersionLabel();
 
 function showStartupFailure(reason: unknown): void {
   const message = reason instanceof Error ? `${reason.name}: ${reason.message}` : String(reason);
