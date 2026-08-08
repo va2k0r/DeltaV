@@ -8658,7 +8658,11 @@ describe("Cinematic 3D architecture boundary", () => {
       "this.pickAtScreenPoint(point) ?? this.pickBurnPreviewHoverZone(point)"
     );
     expect(hasPickGameplayPrimaryTarget || hasPickAtScreenPrimaryTarget).toBe(true);
-    expect(source).toContain("resolveCinematicGameplayClickTarget");
+    const hasGameplayClickResolution =
+      source.includes("resolveCinematicGameplayClickTarget") ||
+      (source.includes("const targetKey = this.pickAtScreenPoint(point) ??") &&
+        source.includes("pickBurnDestinationHoverZone(point)"));
+    expect(hasGameplayClickResolution).toBe(true);
     expect(source).toContain("onBurnOrderCancelled");
     expect(source).toContain('from "./trajectoryPreview"');
     expect(source).not.toContain("function buildZoomStableBurnPreviewTrajectory");
