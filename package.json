@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:tutorial:entry": "playwright test --config tests/e2e/playwright.config.ts tests/e2e/tutorial-entry.spec.ts",
     "test:tutorial:interactions": "playwright test --config tests/e2e/playwright.config.ts tests/e2e/tutorial-interactions.spec.ts",
+    "test:tutorial:recovery": "playwright test --config tests/e2e/playwright.config.ts tests/e2e/tutorial-mandatory-launch-recovery.spec.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" \"vite.config.ts\" && prettier --check \"AGENTS.md\" \"README.md\" \"docs/**/*.md\" \"index.html\" \"package.json\" \"tsconfig.json\" \"vite.config.ts\" \"eslint.config.js\" \"scripts/**/*.mjs\" \"src/**/*.{ts,css}\" \"tests/**/*.ts\"",
     "build": "vite build",

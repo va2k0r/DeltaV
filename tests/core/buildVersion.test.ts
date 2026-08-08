@@ -12,8 +12,8 @@ import {
 describe("public build version", () => {
   it("formats the current build as a decimal series plus a hexadecimal revision", () => {
     expect(DELTAV_BUILD_SERIES).toBe(7);
-    expect(DELTAV_BUILD_REVISION).toBe(1);
-    expect(DELTAV_BUILD_VERSION).toBe("071");
+    expect(DELTAV_BUILD_REVISION).toBe(2);
+    expect(DELTAV_BUILD_VERSION).toBe("072");
   });
 
   it("continues from decimal revisions into hexadecimal revisions", () => {

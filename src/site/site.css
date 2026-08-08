@@ -599,6 +599,24 @@ body.is-deltav-site::-webkit-scrollbar {
   margin-top: 1.55em;
 }
 
+.delta-site__brief-body > p a,
+.delta-site__brief-body > p a:visited,
+.delta-site__brief-play-to-win a,
+.delta-site__brief-play-to-win a:visited {
+  color: var(--site-cyan);
+  text-decoration-color: color-mix(in srgb, var(--site-cyan) 50%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.16em;
+}
+
+.delta-site__brief-body > p a:hover,
+.delta-site__brief-body > p a:focus-visible,
+.delta-site__brief-play-to-win a:hover,
+.delta-site__brief-play-to-win a:focus-visible {
+  color: #fff;
+  outline: none;
+}
+
 .delta-site__brief-body figure {
   width: min(100vw - 48px, 1040px);
   margin: clamp(44px, 7vw, 78px) 0;
@@ -624,6 +642,30 @@ body.is-deltav-site::-webkit-scrollbar {
   font-size: 10px;
   letter-spacing: 0.08em;
   line-height: 1.55;
+}
+
+.delta-site__brief-play-to-win {
+  max-width: 68ch;
+  margin-top: clamp(34px, 5vw, 54px);
+  padding: 18px 20px 20px;
+  border-left: 2px solid var(--site-cyan);
+  background: rgb(52 199 230 / 6%);
+}
+
+.delta-site__brief-play-to-win > span {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--site-cyan);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.13em;
+}
+
+.delta-site__brief-play-to-win p {
+  margin: 0;
+  color: var(--site-ink) !important;
+  font-size: clamp(15px, 1vw, 17px);
+  line-height: 1.65;
 }
 
 .delta-site__release {

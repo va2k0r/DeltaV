@@ -106,12 +106,13 @@ export function findTrackedTutorialMandatoryLaunchBurn(options: {
     return burn.factionId === "player" && burn.arrivalTurn >= options.currentTurn;
   });
 
+  if (options.activeMandatoryLaunchId !== null) {
+    return livePlayerBurns.find((burn) => {
+      return burn.mandatoryLaunchId === options.activeMandatoryLaunchId;
+    });
+  }
+
   return (
-    (options.activeMandatoryLaunchId === null
-      ? undefined
-      : livePlayerBurns.find((burn) => {
-          return burn.mandatoryLaunchId === options.activeMandatoryLaunchId;
-        })) ??
     (options.cachedDestinationNodeId === null
       ? undefined
       : livePlayerBurns.find((burn) => {

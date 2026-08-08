@@ -195,6 +195,7 @@ import {
   isTutorialTargetInputAllowed
 } from "./tutorial/selectionGate";
 import { isCinematicGameplayInteractionLocked } from "./input/interactionLock";
+import { hasQueuedPlayerMandatoryLaunchBurn } from "./mandatoryLaunchExecute";
 import {
   createTutorialRuntimeDiagnosticDump,
   createTutorialRuntimeState,
@@ -203,7 +204,10 @@ import {
   findTrackedTutorialMandatoryLaunchBurn,
   findTutorialQueuedFireOrder,
   getTutorialMandatoryLaunchResumePhase,
+  recoverTutorialQueuedBurnLessonAfterCancellation,
   recoverTutorialQueuedFireLessonAfterCancellation,
+  removeTutorialBurnLiveHintRowsAfterCancellation,
+  removeTutorialFireLiveHintRowsAfterCancellation,
   shouldInterruptTutorialForMandatoryLaunch,
   shouldRestoreTutorialAutoAdvanceLock,
   type TutorialPhase,
@@ -1185,6 +1189,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let lastNonEmptyTutorialLiveHintRows: readonly CommandTimelineRow[] = [];
   let tutorialLogSequence = 0;
   let tutorialMandatoryLaunchAutoResumeQueued = false;
+  let tutorialBurnAutoAdvanceRevision = 0;
   let lastTutorialCameraHintAt: number | null = null;
   let lastTutorialCameraHintTurn: number | null = null;
   let lastTutorialPlayerActivityAt = performance.now();
@@ -4777,6 +4782,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       executePrompt.remove();
       syncTutorialCommandLogPinnedRow(false);
       syncExecutePromptAttentionState();
+      scrollCommandTranscriptToEnd();
       return;
     }
 
@@ -4852,7 +4858,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
 
     if (tutorialState.phase === "mandatoryLaunchQueued") {
-      return false;
+      return (
+        !hasTutorialMandatoryLaunchBurnDeparted(tutorialState) &&
+        isTutorialMandatoryLaunchAutoAdvancePending()
+      );
     }
 
     if (isMandatoryLaunchLockActive()) {
@@ -4942,12 +4951,18 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function isManualExecutePromptDisabled(): boolean {
+    const mandatoryLaunch = getNextPlayerMandatoryLaunch();
+    const isMandatoryLaunchOrderMissing =
+      mandatoryLaunch !== undefined &&
+      !hasQueuedPlayerMandatoryLaunchBurn(mandatoryLaunch, state.pendingBurnOrders);
+
     return (
       isReplayMode ||
       postMatchReportText !== null ||
       isCommandConsoleResolving ||
       isTutorialCrewLostExecuteCueActive() ||
       tutorialState?.inputLocked === true ||
+      isMandatoryLaunchOrderMissing ||
       isPlanningTimerExecuteLocked() ||
       !shouldShowExecutePrompt() ||
       (isTurnTransitionActive &&
@@ -11060,11 +11075,18 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           return;
         }
 
+        const cancelledTutorialOrder = getPendingBurnOrder(originNodeId, "player");
         state = applyCommand(state, {
           type: "CANCEL_PENDING_BURN_ORDER",
           originNodeId
         });
         snapshot = createSolarSystemSnapshot(content, state);
+        if (
+          cancelledTutorialOrder !== undefined &&
+          !state.pendingBurnOrders.some((order) => order.id === cancelledTutorialOrder.id)
+        ) {
+          handleTutorialBurnOrderCancelled(cancelledTutorialOrder);
+        }
         sfxEngine.play("queue.remove");
         redraw();
       },
@@ -12092,6 +12114,14 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return;
     }
 
+    const retainedLiveRows = removeTutorialFireLiveHintRowsAfterCancellation(
+      liveTutorialTimelineRows,
+      lesson
+    );
+    liveTutorialTimelineRows.length = 0;
+    liveTutorialTimelineRows.push(...retainedLiveRows);
+    tutorial.loggedKeys.delete(lesson.frozenLiveHintLogKey);
+
     noteTutorialPlayerActivity();
     hasConfirmedPlayerOrderAfterSelection = false;
 
@@ -12118,6 +12148,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
     snapCommandTranscriptToLiveTail();
     noteTutorialPlayerActivity();
+    tutorialBurnAutoAdvanceRevision += 1;
 
     tutorial.tutorialBurnDestinationNodeId = order.destinationNodeId;
     tutorial.tutorialBurnArrivalTurn = order.arrivalTurn;
@@ -12248,6 +12279,43 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       updateInteractionLocks();
       refreshTutorialCommandConsole();
     }
+  }
+
+  function handleTutorialBurnOrderCancelled(
+    cancelledOrder: GameState["pendingBurnOrders"][number]
+  ): void {
+    const tutorial = tutorialState;
+
+    if (tutorial === null) {
+      return;
+    }
+
+    const lesson = recoverTutorialQueuedBurnLessonAfterCancellation(tutorial, {
+      openingOriginNodeId: tutorialOpeningOriginNodeId,
+      contestedTargetNodeId: getTutorialShipyardContestedTargetNodeId(tutorial),
+      cancelledOrder,
+      promptStartedAt: performance.now()
+    });
+
+    if (lesson === null) {
+      return;
+    }
+
+    tutorialBurnAutoAdvanceRevision += 1;
+    const retainedLiveRows = removeTutorialBurnLiveHintRowsAfterCancellation(
+      liveTutorialTimelineRows,
+      lesson
+    );
+    liveTutorialTimelineRows.length = 0;
+    liveTutorialTimelineRows.push(...retainedLiveRows);
+    if (lesson.frozenLiveHintLogKey !== null) {
+      tutorial.loggedKeys.delete(lesson.frozenLiveHintLogKey);
+    }
+
+    noteTutorialPlayerActivity();
+    hasConfirmedPlayerOrderAfterSelection = false;
+    updateInteractionLocks();
+    refreshTutorialCommandConsole();
   }
 
   function getPendingBurnOrder(
@@ -12735,18 +12803,43 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       return false;
     }
 
+    const activeMandatoryLaunchId = tutorial.activeMandatoryLaunchId;
+    const isTrackedLaunchBurn = (burn: GameState["pendingBurnOrders"][number]): boolean => {
+      return activeMandatoryLaunchId === null
+        ? burn.destinationNodeId === destinationNodeId
+        : burn.mandatoryLaunchId === activeMandatoryLaunchId;
+    };
+
     return (
       state.pendingBurnOrders.some((order) => {
-        return order.factionId === "player" && order.destinationNodeId === destinationNodeId;
+        return order.factionId === "player" && isTrackedLaunchBurn(order);
       }) ||
       state.activeBurnTransits.some((transit) => {
         return (
           transit.factionId === "player" &&
-          transit.destinationNodeId === destinationNodeId &&
+          isTrackedLaunchBurn(transit) &&
           transit.arrivalTurn >= state.turn
         );
       })
     );
+  }
+
+  function hasTutorialMandatoryLaunchBurnDeparted(tutorial: TutorialRuntimeState): boolean {
+    const destinationNodeId = recoverTutorialMandatoryLaunchAutoDestination(tutorial);
+
+    if (destinationNodeId === null) {
+      return false;
+    }
+
+    return state.activeBurnTransits.some((transit) => {
+      if (transit.factionId !== "player" || transit.arrivalTurn < state.turn) {
+        return false;
+      }
+
+      return tutorial.activeMandatoryLaunchId === null
+        ? transit.destinationNodeId === destinationNodeId
+        : transit.mandatoryLaunchId === tutorial.activeMandatoryLaunchId;
+    });
   }
 
   function maybeResumeTutorialMandatoryLaunchAutoAdvance(): void {
@@ -12760,6 +12853,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       tutorialMandatoryLaunchAutoResumeQueued ||
       isCommandConsoleResolving ||
       isTurnTransitionActive ||
+      !hasTutorialMandatoryLaunchBurnDeparted(tutorial) ||
       !isTutorialMandatoryLaunchAutoAdvancePending()
     ) {
       return;
@@ -12774,6 +12868,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         tutorial.phase !== "mandatoryLaunchQueued" ||
         tutorial.inputLocked ||
         tutorial.autoAdvanceActive ||
+        !hasTutorialMandatoryLaunchBurnDeparted(tutorial) ||
         !isTutorialMandatoryLaunchAutoAdvancePending()
       ) {
         return;
@@ -15458,6 +15553,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     if (tutorial === null || tutorial.phase !== "mandatoryLaunchQueued") {
       return;
     }
+    const autoAdvanceRevision = tutorialBurnAutoAdvanceRevision;
 
     if (
       tutorial.shipyardEnemyDestinationNodeId !== null &&
@@ -15475,6 +15571,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
     if (
       tutorialState === tutorial &&
+      tutorialBurnAutoAdvanceRevision === autoAdvanceRevision &&
       tutorial.phase === "mandatoryLaunchQueued" &&
       !isTutorialMandatoryLaunchAutoAdvancePending()
     ) {
@@ -15492,7 +15589,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     if (
       tutorial === null ||
       tutorial.phase !== "mandatoryLaunchQueued" ||
-      tutorial.autoAdvanceActive
+      tutorial.autoAdvanceActive ||
+      !hasTutorialMandatoryLaunchBurnDeparted(tutorial)
     ) {
       return;
     }
@@ -15671,6 +15769,14 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     if (tutorial === null || tutorial.phase !== expectedPhase) {
       return;
     }
+    const autoAdvanceRevision = tutorialBurnAutoAdvanceRevision;
+    const isCurrentAutoAdvance = (): boolean => {
+      return (
+        tutorialState === tutorial &&
+        tutorial.phase === expectedPhase &&
+        tutorialBurnAutoAdvanceRevision === autoAdvanceRevision
+      );
+    };
 
     const destinationNodeId =
       expectedPhase === "mandatoryLaunchQueued"
@@ -15702,24 +15808,20 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
           return {
             turn: state.turn,
-            isActive: tutorialState === tutorial && tutorial.phase === expectedPhase,
+            isActive: isCurrentAutoAdvance(),
             hasReachedDestination:
-              tutorialState === tutorial &&
-              tutorial.phase === expectedPhase &&
+              isCurrentAutoAdvance() &&
               hasTutorialBurnReachedDestination(tutorial, destinationNodeId)
           };
         },
         advanceTurn: resolveTutorialAutoFramedTurn
       });
     } finally {
-      if (tutorialState === tutorial) {
+      if (isCurrentAutoAdvance()) {
         tutorial.inputLocked = false;
         tutorial.autoAdvanceActive = false;
 
-        if (
-          tutorial.phase === expectedPhase &&
-          hasTutorialBurnReachedDestination(tutorial, destinationNodeId)
-        ) {
+        if (hasTutorialBurnReachedDestination(tutorial, destinationNodeId)) {
           focusTutorialTurnSkipArrivalNode(destinationNodeId);
           await onArrival(destinationNodeId);
         }
@@ -16371,7 +16473,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       state.mandatoryLaunches.some((launch) => launch.factionId === "player")
     ) {
       completeTutorialShipyardProductionLesson();
+      return;
     }
+
+    recoverTutorialProductionCompletionAfterTurnLimit(tutorial, "shipyardProductionCompletion");
   }
 
   async function startTutorialSupportShipyardArrivalWorkSequence(
@@ -16429,7 +16534,28 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       state.mandatoryLaunches.some((launch) => launch.factionId === "player")
     ) {
       beginTutorialMandatoryLaunchLesson(tutorial);
+      return;
     }
+
+    recoverTutorialProductionCompletionAfterTurnLimit(
+      tutorial,
+      "shipyardSupportProductionCompletion"
+    );
+  }
+
+  function recoverTutorialProductionCompletionAfterTurnLimit(
+    tutorial: TutorialRuntimeState,
+    expectedPhase: "shipyardProductionCompletion" | "shipyardSupportProductionCompletion"
+  ): void {
+    if (tutorialState !== tutorial || tutorial.phase !== expectedPhase) {
+      return;
+    }
+
+    if (maybePresentTutorialShipyardContestedCheckpoint()) {
+      return;
+    }
+
+    recoverTutorialTowardAdditionalPlayerShip(tutorial);
   }
 
   function completeTutorialShipyardProductionLesson(): void {

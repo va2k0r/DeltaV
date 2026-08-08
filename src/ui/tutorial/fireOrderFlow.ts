@@ -12,6 +12,8 @@ export type TutorialQueuedFireLesson = Readonly<{
   promptPhase: "shipyardFirePrompt" | "shipyardContestedFirePrompt";
   originNodeId: string;
   targetNodeId: string;
+  frozenLiveHintLogKey: string;
+  liveHintKeyPrefix: string;
 }>;
 
 type TutorialFireLessonRuntimeState = Pick<
@@ -28,7 +30,9 @@ export function getTutorialQueuedFireLesson(
       queuedPhase: "shipyardFireQueued",
       promptPhase: "shipyardFirePrompt",
       originNodeId: tutorial.shipyardLessonNodeId,
-      targetNodeId: tutorial.shipyardEnemyDestinationNodeId
+      targetNodeId: tutorial.shipyardEnemyDestinationNodeId,
+      frozenLiveHintLogKey: "tutorial:shipyard-fire-live-hints-frozen",
+      liveHintKeyPrefix: "tutorial:live-confirm-shipyard-fire"
     };
   }
 
@@ -41,7 +45,9 @@ export function getTutorialQueuedFireLesson(
       queuedPhase: "shipyardContestedFireQueued",
       promptPhase: "shipyardContestedFirePrompt",
       originNodeId: tutorial.shipyardSupportFireNodeId,
-      targetNodeId: contestedTargetNodeId
+      targetNodeId: contestedTargetNodeId,
+      frozenLiveHintLogKey: "tutorial:shipyard-contested-fire-live-hints-frozen",
+      liveHintKeyPrefix: "tutorial:live-confirm-shipyard-contested-fire"
     };
   }
 
@@ -99,4 +105,10 @@ export function recoverTutorialQueuedFireLessonAfterCancellation(
   }
 
   return lesson;
+}
+
+export function removeTutorialFireLiveHintRowsAfterCancellation<
+  TRow extends Readonly<{ key?: string }>
+>(rows: readonly TRow[], lesson: TutorialQueuedFireLesson): readonly TRow[] {
+  return rows.filter((row) => row.key?.startsWith(lesson.liveHintKeyPrefix) !== true);
 }

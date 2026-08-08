@@ -6927,6 +6927,9 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(uiSource).toContain(
       "commandTranscriptFollowsTail = true;\n    commandTranscript.innerHTML ="
     );
+    expect(uiSource).toContain(
+      "syncTutorialCommandLogPinnedRow(false);\n      syncExecutePromptAttentionState();\n      scrollCommandTranscriptToEnd();"
+    );
   });
 
   it("provides paced 1/2/3 command-log transport and an exact first-turn scroll stop", () => {

@@ -51,6 +51,7 @@ import {
   getTutorialMandatoryLaunchResumePhase,
   isOrderForTutorialQueuedFireLesson,
   recoverTutorialQueuedFireLessonAfterCancellation,
+  removeTutorialFireLiveHintRowsAfterCancellation,
   shouldInterruptTutorialForMandatoryLaunch,
   shouldRestoreTutorialAutoAdvanceLock
 } from "../../src/ui/tutorial/runtimeState";
@@ -687,7 +688,9 @@ describe("tutorial runtime modules", () => {
 
     expect(firstLesson).toMatchObject({
       queuedPhase: "shipyardFireQueued",
-      promptPhase: "shipyardFirePrompt"
+      promptPhase: "shipyardFirePrompt",
+      frozenLiveHintLogKey: "tutorial:shipyard-fire-live-hints-frozen",
+      liveHintKeyPrefix: "tutorial:live-confirm-shipyard-fire"
     });
     expect(
       firstLesson === null ? false : isOrderForTutorialQueuedFireLesson(firstOrder, firstLesson)
@@ -706,6 +709,18 @@ describe("tutorial runtime modules", () => {
     expect(state.shipyardEnemyFireImpactTurn).toBeNull();
     expect(state.shipyardEnemyEvadeObserved).toBe(false);
     expect(state.shipyardFirePromptStartedAt).toBe(250);
+    expect(
+      firstLesson === null
+        ? []
+        : removeTutorialFireLiveHintRowsAfterCancellation(
+            [
+              { key: "tutorial:live-confirm-shipyard-fire" },
+              { key: "tutorial:live-confirm-shipyard-fire:camera-pan-orbit-hint" },
+              { key: "tutorial:shipyard-fire-work-choice" }
+            ],
+            firstLesson
+          )
+    ).toEqual([{ key: "tutorial:shipyard-fire-work-choice" }]);
 
     state.phase = "shipyardContestedFireQueued";
     state.shipyardSupportFireNodeId = "support_node";
@@ -719,7 +734,9 @@ describe("tutorial runtime modules", () => {
 
     expect(contestedLesson).toMatchObject({
       queuedPhase: "shipyardContestedFireQueued",
-      promptPhase: "shipyardContestedFirePrompt"
+      promptPhase: "shipyardContestedFirePrompt",
+      frozenLiveHintLogKey: "tutorial:shipyard-contested-fire-live-hints-frozen",
+      liveHintKeyPrefix: "tutorial:live-confirm-shipyard-contested-fire"
     });
     expect(
       contestedLesson === null

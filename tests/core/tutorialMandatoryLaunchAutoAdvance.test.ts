@@ -110,6 +110,26 @@ describe("tutorial mandatory launch auto-advance", () => {
     );
   });
 
+  it("does not fall back to an unrelated route when the tracked launch was cancelled", () => {
+    expect(
+      findTrackedTutorialMandatoryLaunchBurn({
+        burns: [
+          {
+            factionId: "player",
+            originNodeId: "shipyard_node",
+            destinationNodeId: "venus_node",
+            arrivalTurn: 18,
+            mandatoryLaunchId: "launch:other"
+          }
+        ],
+        activeMandatoryLaunchId: "launch:cancelled",
+        cachedDestinationNodeId: "venus_node",
+        shipyardLessonNodeId: "shipyard_node",
+        currentTurn: 14
+      })
+    ).toBeUndefined();
+  });
+
   it("skips real core turns until the player contests the enemy-occupied shipyard", async () => {
     const vanillaContent = parseSolarSystemData(JSON.parse(readFileSync(bodiesJsonUrl, "utf8")));
     const content = {

@@ -13,6 +13,18 @@ async function clickCinematicTarget(page: Page, targetKey: string): Promise<void
   await page.locator(`.cinematic-label[data-target="${targetKey}"]`).dispatchEvent("click");
 }
 
+async function expectCommandTranscriptAtLiveTail(page: Page): Promise<void> {
+  const commandTranscript = page.locator(".command-console__transcript");
+
+  await expect
+    .poll(() =>
+      commandTranscript.evaluate(
+        (element) => element.scrollHeight - element.clientHeight - element.scrollTop
+      )
+    )
+    .toBeLessThanOrEqual(2);
+}
+
 async function findUnoccupiedProductiveTarget(page: Page): Promise<string> {
   const targetKey = await page.locator('.cinematic-label[data-target^="node:"]').evaluateAll(
     (labels) =>
@@ -66,6 +78,7 @@ test("opening controls and first BURN remain recoverable after cancellation", as
 
   await clickCinematicTarget(page, "node:moon_node");
   await expect(commandConsole).toContainText("Left-click the destination to confirm the BURN");
+  await expectCommandTranscriptAtLiveTail(page);
 
   const productiveTargetKey = await findUnoccupiedProductiveTarget(page);
   await clickCinematicTarget(page, productiveTargetKey);

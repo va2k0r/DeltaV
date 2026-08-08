@@ -1,5 +1,5 @@
 export const DELTAV_BUILD_SERIES = 7;
-export const DELTAV_BUILD_REVISION = 1;
+export const DELTAV_BUILD_REVISION = 2;
 
 export function formatDeltaVBuildVersion(series: number, revision: number): string {
   if (!Number.isInteger(series) || series < 0 || series > 99) {
