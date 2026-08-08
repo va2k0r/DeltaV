@@ -1794,7 +1794,7 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(tutorialCommandRowsSource).toContain(
       'createTutorialSpacerRow("tutorial:first-burn-time-cost:lead-spacer")'
     );
-    expect(uiSource).toContain("appendTutorialFirstBurnTimeCostOnce()");
+    expect(uiSource).toContain("appendTutorialFirstBurnTimeCostOnce({ refresh: false })");
     expect(uiSource).toContain('"mandatory-launch-arrival"');
     expect(uiSource).toContain("continueTutorialAfterMandatoryLaunchArrival");
     expect(uiSource).toContain("rows.push(...tutorialLiveRows.postOrders)");
@@ -8651,7 +8651,10 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("nodeObject.occupiedBand.visible = !isContested");
     expect(source).not.toContain("createOccupiedNodeOrbitGlint");
     expect(source).not.toContain("occupied-node-orbit-glint");
-    expect(source).toContain("pickAtScreenPoint(point) ?? this.pickBurnPreviewHoverZone(point)");
+    expect(source).toContain(
+      "this.pickGameplayClickTarget(point) ?? this.pickBurnPreviewHoverZone(point)"
+    );
+    expect(source).toContain("resolveCinematicGameplayClickTarget");
     expect(source).toContain("onBurnOrderCancelled");
     expect(source).toContain('from "./trajectoryPreview"');
     expect(source).not.toContain("function buildZoomStableBurnPreviewTrajectory");

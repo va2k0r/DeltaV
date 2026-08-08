@@ -1144,6 +1144,7 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   let isCommandConsoleTypingLiveBlock = false;
   let shouldRefreshCommandConsoleAfterLiveUpdate = false;
   let shouldTypeNextLiveCommandBlock = false;
+  let shouldSkipCommandConsoleRefreshOnRedraw = false;
   const tutorialSelectionCommandConsoleRefresh = createDeferredFrameRefresh(
     () => {
       updateCommandConsole();
@@ -5335,7 +5336,11 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     appendTutorialRows([text], key);
   }
 
-  function appendTutorialRows(rows: readonly string[], key = rows.join("\n")): void {
+  function appendTutorialRows(
+    rows: readonly string[],
+    key = rows.join("\n"),
+    options: Readonly<{ refresh?: boolean }> = {}
+  ): void {
     appendTutorialTimelineRows(
       rows.map((text, rowIndex) =>
         text.trim().length === 0
@@ -5345,7 +5350,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
               className: "command-console__line--tutorial"
             }
       ),
-      key
+      key,
+      options
     );
   }
 
@@ -5413,10 +5419,13 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     );
   }
 
-  function appendTutorialFirstBurnTimeCostOnce(): void {
+  function appendTutorialFirstBurnTimeCostOnce(
+    options: Readonly<{ refresh?: boolean }> = {}
+  ): void {
     appendTutorialTimelineRows(
       createTutorialFirstBurnTimeCostRows(getCommandFactionClass("player")),
-      "tutorial:first-burn-time-cost"
+      "tutorial:first-burn-time-cost",
+      options
     );
   }
 
@@ -10759,8 +10768,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     }
   }
 
-  let shouldSkipCommandConsoleRefreshOnRedraw = false;
-
   function redraw(): void {
     if (shouldSkipCommandConsoleRefreshOnRedraw) {
       shouldSkipCommandConsoleRefreshOnRedraw = false;
@@ -12024,8 +12031,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
 
       tutorial.shipyardEnemyFireImpactTurn = order?.impactTurn ?? null;
       tutorial.shipyardEnemyEvadeObserved = false;
-      freezeTutorialLiveHintsToTranscript("tutorial:shipyard-fire-live-hints-frozen");
-      appendTutorialShipyardFireWorkChoiceRows();
+      freezeTutorialLiveHintsToTranscript("tutorial:shipyard-fire-live-hints-frozen", {
+        refresh: false
+      });
+      appendTutorialShipyardFireWorkChoiceRows({ refresh: false });
       tutorial.phase = "shipyardFireQueued";
       tutorial.shipyardFirePromptStartedAt = null;
       updateInteractionLocks();
@@ -12040,7 +12049,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       contestedFireTargetNodeId !== null &&
       targetNodeId === contestedFireTargetNodeId
     ) {
-      freezeTutorialLiveHintsToTranscript("tutorial:shipyard-contested-fire-live-hints-frozen");
+      freezeTutorialLiveHintsToTranscript("tutorial:shipyard-contested-fire-live-hints-frozen", {
+        refresh: false
+      });
       tutorial.phase = "shipyardContestedFireQueued";
       tutorial.shipyardSupportFirePromptStartedAt = null;
       tutorial.contestedNodeId = contestedFireTargetNodeId;
@@ -12088,10 +12099,13 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     refreshTutorialCommandConsole();
   }
 
-  function appendTutorialShipyardFireWorkChoiceRows(): void {
+  function appendTutorialShipyardFireWorkChoiceRows(
+    options: Readonly<{ refresh?: boolean }> = {}
+  ): void {
     appendTutorialTimelineRows(
       createTutorialShipyardFireWorkChoiceRows(getCommandFactionClass("player")),
-      "tutorial:shipyard-fire-work-choice"
+      "tutorial:shipyard-fire-work-choice",
+      options
     );
   }
 
@@ -12114,8 +12128,10 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         tutorial.phase === "awaitingFirstBurnConfirm") &&
       originNodeId === tutorialOpeningOriginNodeId
     ) {
-      freezeTutorialLiveHintsToTranscript("tutorial:first-burn-live-hints-frozen");
-      appendTutorialFirstBurnTimeCostOnce();
+      freezeTutorialLiveHintsToTranscript("tutorial:first-burn-live-hints-frozen", {
+        refresh: false
+      });
+      appendTutorialFirstBurnTimeCostOnce({ refresh: false });
       tutorial.phase = "firstBurnQueued";
       tutorial.firstBurnReselectionStartedAt = null;
       tutorial.firstBurnPreviewDestinationNodeId = null;
@@ -12132,7 +12148,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       originNodeId === tutorial.productiveBurnOriginNodeId &&
       destinationNodeId !== originNodeId
     ) {
-      freezeTutorialLiveHintsToTranscript("tutorial:productive-burn-live-hints-frozen");
+      freezeTutorialLiveHintsToTranscript("tutorial:productive-burn-live-hints-frozen", {
+        refresh: false
+      });
       tutorial.phase = "productiveBurnQueued";
       tutorial.productiveBurnDestinationNodeId = destinationNodeId;
       tutorial.productiveBurnArrivalTurn = order?.arrivalTurn ?? null;
@@ -12174,7 +12192,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       originNodeId === contestedBurnTargetNodeId &&
       destinationNodeId !== originNodeId
     ) {
-      freezeTutorialLiveHintsToTranscript("tutorial:shipyard-contested-burn-live-hints-frozen");
+      freezeTutorialLiveHintsToTranscript("tutorial:shipyard-contested-burn-live-hints-frozen", {
+        refresh: false
+      });
       tutorial.phase = "shipyardContestedBurnQueued";
       tutorial.shipyardPlayerEscapeNodeId = destinationNodeId;
       tutorial.contestedNodeId = contestedBurnTargetNodeId;
@@ -12192,7 +12212,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
       counterContestTargetNodeId !== null &&
       destinationNodeId === counterContestTargetNodeId
     ) {
-      freezeTutorialLiveHintsToTranscript("tutorial:shipyard-counter-contest-live-hints-frozen");
+      freezeTutorialLiveHintsToTranscript("tutorial:shipyard-counter-contest-live-hints-frozen", {
+        refresh: false
+      });
       tutorial.phase = "shipyardCounterContestBurnQueued";
       tutorial.tutorialBurnDestinationNodeId = destinationNodeId;
       tutorial.tutorialBurnArrivalTurn = order?.arrivalTurn ?? null;
@@ -12220,7 +12242,8 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
           "BURN OUT order queued.",
           "The ship will leave its contested orbit when EXECUTE resolves."
         ],
-        "tutorial:burn-out-queued"
+        "tutorial:burn-out-queued",
+        { refresh: false }
       );
       updateInteractionLocks();
       refreshTutorialCommandConsole();
