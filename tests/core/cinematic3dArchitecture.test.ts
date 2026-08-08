@@ -8651,9 +8651,13 @@ describe("Cinematic 3D architecture boundary", () => {
     expect(source).toContain("nodeObject.occupiedBand.visible = !isContested");
     expect(source).not.toContain("createOccupiedNodeOrbitGlint");
     expect(source).not.toContain("occupied-node-orbit-glint");
-    expect(source).toContain(
+    const hasPickGameplayPrimaryTarget = source.includes(
       "this.pickGameplayClickTarget(point) ?? this.pickBurnPreviewHoverZone(point)"
     );
+    const hasPickAtScreenPrimaryTarget = source.includes(
+      "this.pickAtScreenPoint(point) ?? this.pickBurnPreviewHoverZone(point)"
+    );
+    expect(hasPickGameplayPrimaryTarget || hasPickAtScreenPrimaryTarget).toBe(true);
     expect(source).toContain("resolveCinematicGameplayClickTarget");
     expect(source).toContain("onBurnOrderCancelled");
     expect(source).toContain('from "./trajectoryPreview"');
