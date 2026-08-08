@@ -1353,6 +1353,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
   }
 
   function updateStatus(): void {
+    return updateStatusWithoutCommandConsoleRefresh({});
+  }
+
+  function updateStatusWithoutCommandConsoleRefresh(
+    options: Readonly<{ skipCommandConsoleRefresh?: boolean }> = {}
+  ): void {
     syncPlanningTimerWithCurrentTurn();
     const playerDv = getFactionDv(snapshot, "player");
     const mandatoryLaunchCount = snapshot.mandatoryLaunches.filter((launch) => {
@@ -1380,7 +1386,9 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     updateInteractionLocks();
     updateDebugPanel();
     updateCommandConsoleModeControls();
-    updateCommandConsole();
+    if (!options.skipCommandConsoleRefresh) {
+      updateCommandConsole();
+    }
   }
 
   function createDisabledPlanningTimerState(turn: number): PlanningTimerState {
@@ -2945,7 +2953,6 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
     fullscreenAction.disabled = !document.fullscreenEnabled;
     gameMenuFullscreenAction = fullscreenAction;
     const brightnessControl = createGameMenuBrightnessControl(typingTargets);
-
     actions.append(
       musicAction,
       sfxAction,
@@ -10874,7 +10881,12 @@ export async function createDeltaVApp(root: HTMLElement): Promise<void> {
         syncFocusSelectToTarget(selectedTargetKey);
         handleTutorialOverlaySelection(selection);
         handleTutorialSelection(selection);
-        updateStatus();
+        if (tutorialState !== null) {
+          updateStatusWithoutCommandConsoleRefresh({ skipCommandConsoleRefresh: true });
+          refreshCommandConsoleAfterTutorialSelection();
+        } else {
+          updateStatus();
+        }
       },
       onUserFocusChange(targetKey: string) {
         setUserReplayFocusTarget(targetKey);
